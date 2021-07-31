@@ -1,0 +1,5 @@
+logger:
+  infoopen: true  #是否开启info日志打印
+  debugopen: true #是否开启debug日志打印，主要用于调试
+  level: 2 #LogMode = 0 //默认   LogMode = 1 //只输出main文件    LogMode = 2 //只出输cmd
+  logpath: "logs"

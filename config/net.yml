@@ -1,0 +1,16 @@
+net:
+  - devid: 1001
+    node:
+      in: #输入端口
+        name: broker2
+        port: 1886
+      out: #输出端口
+        #name: broker2
+        port: 1887
+discover:
+  addr: "127.0.0.1:1890"
+#  - devid:
+#    node: 1002
+#      name: broker2
+#        addr: 127.0.0.1:1884
+
