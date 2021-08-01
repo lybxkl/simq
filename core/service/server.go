@@ -1,7 +1,6 @@
 package service
 
 import (
-	"SI-MQTT/comment"
 	"SI-MQTT/core/auth"
 	"SI-MQTT/core/logger"
 	"SI-MQTT/core/topics"
@@ -31,6 +30,7 @@ var SVC *service
 // Server是MQTT服务器的一个库实现，它尽其所能遵守
 //使用MQTT 3.1和3.1.1规范。
 type Server struct {
+	Version string // 服务版本
 	// The number of seconds to keep the connection live if there's no data.
 	// If not set then default to 5 mins.
 	//如果没有数据，保持连接的秒数。
@@ -149,7 +149,7 @@ func (this *Server) ListenAndServe(uri string) error {
 	if err != nil {
 		panic(err)
 	}
-	printBanner()
+	printBanner(this.Version)
 	var tempDelay time.Duration // how long to sleep on accept failure 接受失败要睡多久，默认5ms，最大1s
 
 	this.ln, err = net.Listen(u.Scheme, u.Host) // 监听连接
@@ -200,7 +200,7 @@ func (this *Server) ListenAndServe(uri string) error {
 }
 
 // 打印启动banner
-func printBanner() {
+func printBanner(serverVersion string) {
 	logger.Logger.Info("\n" +
 		"\\***\n" +
 		"*  _ooOoo_\n" +
@@ -234,7 +234,7 @@ func printBanner() {
 		"*  ░ ░     ░░░ ░ ░ ░        ░ ░░ ░\n" +
 		"*             ░     ░ ░      ░  ░\n" +
 		"*/" +
-		"服务器准备就绪: server is ready... version: " + comment.ServerVersion)
+		"服务器准备就绪: server is ready... version: " + serverVersion)
 }
 
 // Close terminates the server by shutting down all the client connections and closing
@@ -381,24 +381,23 @@ func (this *Server) checkConfiguration() error {
 
 	this.configOnce.Do(func() {
 		if this.KeepAlive == 0 {
-			this.KeepAlive = comment.DefaultKeepAlive
+			this.KeepAlive = 30
 		}
 
 		if this.ConnectTimeout == 0 {
-			this.ConnectTimeout = comment.DefaultConnectTimeout
+			this.ConnectTimeout = 30
 		}
 
 		if this.AckTimeout == 0 {
-			this.AckTimeout = comment.DefaultAckTimeout
+			this.AckTimeout = 20
 		}
 
 		if this.TimeoutRetries == 0 {
-			this.TimeoutRetries = comment.DefaultTimeoutRetries
+			this.TimeoutRetries = 3
 		}
 
 		if this.Authenticator == "" {
 			logger.Logger.Info("缺少权限认证，采用默认方式")
-			this.Authenticator = comment.DefaultAuthenticator
 		}
 
 		this.authMgr, err = auth.NewManager(this.Authenticator)
@@ -407,7 +406,7 @@ func (this *Server) checkConfiguration() error {
 		}
 
 		if this.SessionsProvider == "" {
-			this.SessionsProvider = comment.DefaultSessionsProvider
+			logger.Logger.Info("缺少Session管理器，采用默认方式")
 		}
 
 		this.sessMgr, err = sessions.NewManager(this.SessionsProvider)
@@ -416,7 +415,7 @@ func (this *Server) checkConfiguration() error {
 		}
 
 		if this.TopicsProvider == "" {
-			this.TopicsProvider = comment.DefaultTopicsProvider
+			logger.Logger.Info("缺少Topic管理器，采用默认方式")
 		}
 
 		this.topicsMgr, err = topics.NewManager(this.TopicsProvider)

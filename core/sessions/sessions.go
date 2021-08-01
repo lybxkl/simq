@@ -28,11 +28,15 @@ type SessionsProvider interface {
 // Register makes a session provider available by the provided name.
 // If a Register is called twice with the same name or if the driver is nil,
 // it panics.
+var Default = "default"
+
 func Register(name string, provider SessionsProvider) {
 	if provider == nil {
 		panic("session: Register provide is nil")
 	}
-
+	if name == "" {
+		name = Default
+	}
 	if _, dup := providers[name]; dup {
 		panic("session: Register called twice for provider " + name)
 	}
@@ -41,6 +45,9 @@ func Register(name string, provider SessionsProvider) {
 }
 
 func Unregister(name string) {
+	if name == "" {
+		name = Default
+	}
 	delete(providers, name)
 }
 
@@ -49,6 +56,9 @@ type Manager struct {
 }
 
 func NewManager(providerName string) (*Manager, error) {
+	if providerName == "" {
+		providerName = Default
+	}
 	p, ok := providers[providerName]
 	if !ok {
 		return nil, fmt.Errorf("session: unknown provider %q", providerName)

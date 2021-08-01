@@ -1,24 +1,17 @@
 package sessions
 
 import (
-	"SI-MQTT/config"
 	"SI-MQTT/core/logger"
 	"fmt"
 	"strconv"
 	"sync"
 )
 
-var (
-	sessionsProvider = "mem"
-)
 var _ SessionsProvider = (*memProvider)(nil)
 
 func memProviderInit() {
-	consts := config.ConstConf
-	provider := consts.DefaultConst.SessionsProvider
-	if provider == sessionsProvider {
-		Register(sessionsProvider, NewMemProvider())
-	}
+	Register("", NewMemProvider())
+	logger.Logger.Info("开启mem进行session管理")
 }
 
 type memProvider struct {
@@ -36,7 +29,6 @@ func (this *memProvider) New(id string) (*Session, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 	this.st[id] = &Session{id: id}
-	//logger.Info(strconv.Itoa(len(this.st)))
 	return this.st[id], nil
 }
 

@@ -1,16 +1,16 @@
 package cli
 
 import (
-	"SI-MQTT/comment"
-	"SI-MQTT/config"
+	"SI-MQTT/core/auth"
+	"SI-MQTT/core/config"
 	"SI-MQTT/core/logger"
 	"SI-MQTT/core/service"
+	"SI-MQTT/core/sessions"
+	"SI-MQTT/core/topics"
 	"SI-MQTT/core/utils"
-	"flag"
 	"fmt"
 	"golang.org/x/net/websocket"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -20,67 +20,32 @@ import (
 	"strings"
 )
 
-var (
-	keepAlive        int
-	connectTimeout   int
-	ackTimeout       int
-	timeoutRetries   int
-	authenticator    string
-	sessionsProvider string
-	topicsProvider   string
-	cpuprofile       string
-	wsAddr           string // HTTPS websocket address eg. :8080
-	wssAddr          string // HTTPS websocket address, eg. :8081
-	wssCertPath      string // path to HTTPS public key
-	wssKeyPath       string // path to HTTPS private key
-)
-
 func init() {
-	consts := config.ConstConf
-	authenticator = consts.DefaultConst.Authenticator
-	sessionsProvider = consts.DefaultConst.SessionsProvider
-	topicsProvider = consts.DefaultConst.TopicsProvider
-	cpuprofile = utils.GetCurrentDirectory() + "/pprof_file/cpu.txt"
-	flag.IntVar(&keepAlive, "keepalive", comment.DefaultKeepAlive, "Keepalive (sec)")
-	flag.IntVar(&connectTimeout, "connecttimeout", comment.DefaultConnectTimeout, "Connect Timeout (sec)")
-	flag.IntVar(&ackTimeout, "acktimeout", comment.DefaultAckTimeout, "Ack Timeout (sec)")
-	flag.IntVar(&timeoutRetries, "retries", comment.DefaultTimeoutRetries, "Timeout Retries")
-	//权限认证的
-	flag.StringVar(&authenticator, "auth", authenticator, "Authenticator Type")
-	//下面两个的value要改都要改
-	flag.StringVar(&sessionsProvider, "sessions", sessionsProvider, "Session Provider Type")
-	flag.StringVar(&topicsProvider, "topics", topicsProvider, "Topics Provider Type")
-
-	flag.StringVar(&cpuprofile, "cpuprofile", "", "CPU Profile Filename")
-	flag.StringVar(&wsAddr, "wsaddr", "", "HTTP websocket address, eg. ':8080'")
-	flag.StringVar(&wssAddr, "wssaddr", "", "HTTPS websocket address, eg. ':8081'")
-	flag.StringVar(&wssCertPath, "wsscertpath", "", "HTTPS server public key file")
-	flag.StringVar(&wssKeyPath, "wsskeypath", "", "HTTPS server private key file")
-	flag.Parse()
+	utils.MustPanic(config.Configure(nil))
+	cfg := config.GetConfig()
+	auth.AuthInit(cfg.DefaultConfig.Provider.Authenticator)
+	sessions.SessionInit(cfg.DefaultConfig.Provider.SessionsProvider)
+	topics.TopicInit(cfg.DefaultConfig.Provider.TopicsProvider)
 }
 
 func Run() {
+	cfg := config.GetConfig()
+	conCif := cfg.DefaultConfig.Connect
+	proCif := cfg.DefaultConfig.Provider
 	svr := &service.Server{
-		KeepAlive:        keepAlive,
-		ConnectTimeout:   connectTimeout,
-		AckTimeout:       ackTimeout,
-		TimeoutRetries:   timeoutRetries,
-		SessionsProvider: sessionsProvider,
-		TopicsProvider:   topicsProvider,
-		Authenticator:    authenticator,
+		KeepAlive:        conCif.Keepalive,
+		ConnectTimeout:   conCif.ConnectTimeOut,
+		AckTimeout:       conCif.AckTimeOut,
+		TimeoutRetries:   conCif.TimeOutRetries,
+		SessionsProvider: proCif.SessionsProvider,
+		TopicsProvider:   proCif.TopicsProvider,
+		Authenticator:    proCif.Authenticator,
+		Version:          cfg.ServerVersion,
 	}
 
 	var f *os.File
 	var err error
 
-	if cpuprofile != "" {
-		f, err = os.Create(cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		pprof.StartCPUProfile(f)
-	}
 	sigchan := make(chan os.Signal, 1)
 	//signal.Notify(sigchan, os.Interrupt, os.Kill)
 	signal.Notify(sigchan)
@@ -107,31 +72,29 @@ func Run() {
 		os.Exit(0)
 	}()
 	mqttaddr := "tcp://:1883"
-	if strings.TrimSpace(config.ConstConf.BrokerUrl) != "" {
-		mqttaddr = strings.TrimSpace(config.ConstConf.BrokerUrl)
+	if strings.TrimSpace(cfg.Broker.TcpAddr) != "" {
+		mqttaddr = cfg.Broker.TcpAddr
 	}
-	wsAddr := ""
-	if strings.TrimSpace(config.ConstConf.WsBrokerUrl) != "" {
-		wsAddr = strings.TrimSpace(config.ConstConf.WsBrokerUrl)
-	}
+	wsAddr := cfg.Broker.WsAddr
+	wssAddr := cfg.Broker.WssAddr
 	BuffConfigInit()
-	if len(wsAddr) > 0 || len(wssAddr) > 0 {
-		AddWebsocketHandler("/mqtt", mqttaddr) // 将wsAddr的ws连接数据发到mqttaddr上
+	if len(cfg.Broker.WsPath) > 0 && (len(wsAddr) > 0 || len(wssAddr) > 0) {
+		AddWebsocketHandler(cfg.Broker.WsPath, mqttaddr) // 将wsAddr的ws连接数据发到mqttaddr上
 
 		/* start a plain websocket listener */
 		if len(wsAddr) > 0 {
 			go ListenAndServeWebsocket(wsAddr)
 		}
 		/* start a secure websocket listener */
-		if len(wssAddr) > 0 && len(wssCertPath) > 0 && len(wssKeyPath) > 0 {
-			go ListenAndServeWebsocketSecure(wssAddr, wssCertPath, wssKeyPath)
+		if len(wssAddr) > 0 && len(cfg.Broker.WssCertPath) > 0 && len(cfg.Broker.WssKeyPath) > 0 {
+			go ListenAndServeWebsocketSecure(wssAddr, cfg.Broker.WssCertPath, cfg.Broker.WssKeyPath)
 		}
 	}
 
 	/* create plain MQTT listener */
 	err = svr.ListenAndServe(mqttaddr)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("MQTT 启动异常错误 surgemq/main: %v", err))
+		logger.Logger.Error(fmt.Sprintf("MQTT 启动异常错误 simq/main: %v", err))
 	}
 
 }

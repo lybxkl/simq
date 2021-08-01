@@ -2,7 +2,7 @@
 package share
 
 import (
-	"SI-MQTT/config"
+	"SI-MQTT/core/logger"
 	"SI-MQTT/core/message"
 	"fmt"
 	"math/rand"
@@ -30,15 +30,9 @@ type memTopics struct {
 	rroot *rnode
 }
 
-var (
-	topicsProvider = "mem"
-)
-
 func memTopicInit() {
-	consts := config.ConstConf
-	if topicsProvider == consts.DefaultConst.TopicsProvider {
-		Register(topicsProvider, NewMemProvider())
-	}
+	Register("", NewMemProvider())
+	logger.Logger.Info("开启mem进行share topic管理")
 }
 
 // NewMemProvider returns an new instance of the memTopics, which is implements the

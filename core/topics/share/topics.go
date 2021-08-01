@@ -48,11 +48,15 @@ type ShareTopicsProvider interface {
 	Close() error
 }
 
+var Default = "default"
+
 func Register(name string, provider ShareTopicsProvider) {
 	if provider == nil {
 		panic("share topics: Register provide is nil")
 	}
-
+	if name == "" {
+		name = Default
+	}
 	if _, dup := providers[name]; dup {
 		panic("share topics: Register called twice for provider " + name)
 	}
@@ -62,6 +66,9 @@ func Register(name string, provider ShareTopicsProvider) {
 }
 
 func Unregister(name string) {
+	if name == "" {
+		name = Default
+	}
 	delete(providers, name)
 }
 
@@ -70,6 +77,9 @@ type Manager struct {
 }
 
 func NewManager(providerName string) (*Manager, error) {
+	if providerName == "" {
+		providerName = Default
+	}
 	p, ok := providers[providerName]
 	if !ok {
 		return nil, fmt.Errorf("session: unknown provider %q", providerName)

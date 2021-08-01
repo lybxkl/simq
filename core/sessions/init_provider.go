@@ -1,5 +1,8 @@
 package sessions
 
-func init() {
-	memProviderInit()
+func SessionInit(session string) {
+	switch session {
+	default:
+		memProviderInit()
+	}
 }

@@ -1,6 +1,6 @@
 // 共享订阅
 package share
 
-func init() {
+func ShareTopicInit() {
 	memTopicInit()
 }

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"SI-MQTT/comment"
 	"SI-MQTT/core/message"
 	"SI-MQTT/core/sessions"
 	"SI-MQTT/core/topics"
@@ -205,18 +204,18 @@ func (this *Client) getSession(svc *service, req *message.ConnectMessage, resp *
 
 func (this *Client) checkConfiguration() {
 	if this.KeepAlive == 0 {
-		this.KeepAlive = comment.DefaultKeepAlive
+		this.KeepAlive = 30
 	}
 
 	if this.ConnectTimeout == 0 {
-		this.ConnectTimeout = comment.DefaultConnectTimeout
+		this.ConnectTimeout = 20
 	}
 
 	if this.AckTimeout == 0 {
-		this.AckTimeout = comment.DefaultAckTimeout
+		this.AckTimeout = 15
 	}
 
 	if this.TimeoutRetries == 0 {
-		this.TimeoutRetries = comment.DefaultTimeoutRetries
+		this.TimeoutRetries = 2
 	}
 }

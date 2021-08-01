@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"SI-MQTT/config"
 	"container/list"
 	"fmt"
 	"github.com/go-redis/redis"
@@ -31,16 +30,8 @@ type cacheInfo struct {
 }
 
 func init() {
-	if open = config.ConstConf.Cluster.Enabled; !open {
-		return
-	}
-	redisSUrl := config.ConstConf.DefaultConst.Redis.RedisUrl
-	redisSPassword := config.ConstConf.DefaultConst.Redis.PassWord
-	redisSDB := config.ConstConf.DefaultConst.Redis.DB
-	if isEmpty(redisSUrl) {
-		panic("redis info have empty")
-	}
-	r = redis.NewClient(&redis.Options{DB: int(redisSDB), Password: redisSPassword, Addr: redisSUrl, Network: "tcp"})
+	// todo
+	r = redis.NewClient(&redis.Options{DB: int(0), Password: "", Addr: "", Network: "tcp"})
 	_, err := r.Ping().Result()
 	if err != nil {
 		panic(err)
@@ -48,9 +39,6 @@ func init() {
 	cacheGlobal = &cacheInfo{
 		RWMutex: sync.RWMutex{},
 		global:  make(map[string]*tn),
-	}
-	if sj := strings.TrimSpace(config.ConstConf.Cluster.ShareJoin); sj != "" {
-		shareJoin = sj
 	}
 	cacheGlobal.autoClea()
 }

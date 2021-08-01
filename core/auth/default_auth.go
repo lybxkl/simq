@@ -1,34 +1,22 @@
 package auth
 
-import (
-	"SI-MQTT/comment"
-	"SI-MQTT/config"
-)
+import "SI-MQTT/core/logger"
 
 type noAuthenticator bool
 
 var _ Authenticator = (*noAuthenticator)(nil)
 
 var (
-	memAuth noAuthenticator = true
+	noAuth noAuthenticator = true
 )
 
 // default auth的初始化
 func defaultAuthInit() {
-	consts := config.ConstConf.MyAuth
-	if consts.Open {
-		defaultName = consts.DefaultName
-		defaultPwd = consts.DefaultPwd
-	}
-	openTestAuth = consts.Open
-	DefaultConfig := config.ConstConf.DefaultConst
-	if DefaultConfig.Authenticator == "" || DefaultConfig.Authenticator == comment.DefaultAuthenticator {
-		// 默认不验证
-		Register(comment.DefaultAuthenticator, NewDefaultAuth()) //开启默认验证
-	}
+	Register("", NewDefaultAuth()) //开启默认验证
+	logger.Logger.Info("开启default进行账号认证")
 }
 func NewDefaultAuth() Authenticator {
-	return &memAuth
+	return &noAuth
 }
 
 //权限认证

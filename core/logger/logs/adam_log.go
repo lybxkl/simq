@@ -1,9 +1,11 @@
 package logs
 
 import (
+	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"strings"
 	"sync"
 	"time"
 )
@@ -27,8 +29,28 @@ type AdamLog struct {
 }
 type Field = zap.Field
 
-func init() {
-	NewAdamLog()
+func LogInit(level string) {
+	old := level
+	level = strings.ToLower(level)
+	logLevel := zap.InfoLevel
+	switch level {
+	case "debug":
+		logLevel = zap.DebugLevel
+	case "info":
+	case "panic":
+		logLevel = zap.PanicLevel
+	case "error":
+		logLevel = zap.ErrorLevel
+	case "warn":
+		logLevel = zap.WarnLevel
+	case "dpanic":
+		logLevel = zap.DPanicLevel
+	case "fatal":
+		logLevel = zap.FatalLevel
+	default:
+		panic(errors.New(fmt.Sprintf("unSupport log level [%v]." + old)))
+	}
+	NewAdamLog(logLevel)
 }
 
 // 自行配置日志
@@ -52,7 +74,7 @@ func NewAdamLogSelf(encoderConfig zapcore.EncoderConfig, zapConfig zap.Config) *
 }
 
 // 系统自动配置
-func NewAdamLog() *AdamLog {
+func NewAdamLog(level zapcore.Level) *AdamLog {
 	once.Do(func() {
 		encoderConfig := zapcore.EncoderConfig{
 			TimeKey:        "time",
@@ -69,7 +91,7 @@ func NewAdamLog() *AdamLog {
 		}
 
 		// 设置日志级别
-		atom := zap.NewAtomicLevelAt(zap.InfoLevel)
+		atom := zap.NewAtomicLevelAt(level)
 
 		config := zap.Config{
 			Level:         atom,          // 日志级别

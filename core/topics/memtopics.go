@@ -1,7 +1,7 @@
 package topics
 
 import (
-	"SI-MQTT/config"
+	"SI-MQTT/core/logger"
 	"SI-MQTT/core/message"
 	"SI-MQTT/core/topics/share"
 	"SI-MQTT/core/topics/sys"
@@ -31,16 +31,9 @@ type memTopics struct {
 	sys   sys.SysTopicsProvider     // 系统消息处理器
 }
 
-var (
-	topicsProvider = "mem"
-	nodeName       = config.ConstConf.Cluster.Name
-)
-
 func memTopicInit() {
-	consts := config.ConstConf
-	if topicsProvider == consts.DefaultConst.TopicsProvider {
-		Register(topicsProvider, NewMemProvider())
-	}
+	Register("", NewMemProvider())
+	logger.Logger.Info("开启mem进行普通topic管理")
 }
 
 var _ TopicsProvider = (*memTopics)(nil)
@@ -54,11 +47,11 @@ var _ TopicsProvider = (*memTopics)(nil)
 //订阅并保留内存中的消息。内容不是这样持久化的
 //当服务器关闭时，所有东西都将消失。小心使用。
 func NewMemProvider() *memTopics {
-	sharePrv, err := share.NewManager(topicsProvider)
+	sharePrv, err := share.NewManager("")
 	if err != nil {
 		panic(err)
 	}
-	sysPrv, err := sys.NewManager(topicsProvider)
+	sysPrv, err := sys.NewManager("")
 	if err != nil {
 		panic(err)
 	}

@@ -2,7 +2,7 @@
 package sys
 
 import (
-	"SI-MQTT/config"
+	"SI-MQTT/core/logger"
 	"SI-MQTT/core/message"
 	"fmt"
 	"reflect"
@@ -36,15 +36,9 @@ const (
 	stateSYS             // System level topic ($) 系统级主题($)
 )
 
-var (
-	memTopicsProvider = "mem"
-)
-
-func memTopicInit() {
-	consts := config.ConstConf
-	if memTopicsProvider == consts.DefaultConst.TopicsProvider {
-		Register(memTopicsProvider, NewMemProvider())
-	}
+func memSysTopicInit() {
+	Register("", NewMemProvider())
+	logger.Logger.Info("开启mem进行sys topic管理")
 }
 
 var _ SysTopicsProvider = (*memTopics)(nil)

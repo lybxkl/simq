@@ -17,12 +17,16 @@ type Authenticator interface {
 	Authenticate(id string, cred interface{}) error
 }
 
+var Default = "default"
+
 // 服务启动前注册有的鉴权插件
 func Register(name string, provider Authenticator) {
 	if provider == nil {
 		panic("auth: Register provide is nil")
 	}
-
+	if name == "" {
+		name = Default
+	}
 	if _, dup := providers[name]; dup {
 		panic("auth: Register called twice for provider " + name)
 	}
@@ -32,6 +36,9 @@ func Register(name string, provider Authenticator) {
 }
 
 func Unregister(name string) {
+	if name == "" {
+		name = Default
+	}
 	delete(providers, name)
 }
 
@@ -41,6 +48,9 @@ type Manager struct {
 }
 
 func NewManager(providerName string) (*Manager, error) {
+	if providerName == "" {
+		providerName = Default
+	}
 	p, ok := providers[providerName]
 	if !ok {
 		return nil, fmt.Errorf("session: unknown provider %q", providerName)
