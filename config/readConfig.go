@@ -1,7 +1,7 @@
 package config
 
 import (
-	"SI-MQTT/utils"
+	"SI-MQTT/core/utils"
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"

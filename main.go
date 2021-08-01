@@ -1,6 +1,6 @@
 package main
 
-import "SI-MQTT/cli"
+import "SI-MQTT/core/cli"
 
 func main() {
 	cli.Run()
