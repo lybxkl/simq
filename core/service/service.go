@@ -154,7 +154,7 @@ func (this *service) start() error {
 		// 这个是发送给订阅者的，是每个订阅者都有一份的方法
 		this.onpub = func(msg *message.PublishMessage) error {
 			if err := this.publish(msg, func(msg, ack message.Message, err error) error {
-				logger.Logger.Debug(fmt.Sprintf("发送成功：%v,%v,%v\n", msg, ack, err))
+				logger.Logger.Debug(fmt.Sprintf("发送成功：%v,%v,%v", msg, ack, err))
 				return nil
 			}); err != nil {
 				logger.Logger.Error(fmt.Sprintf("service/onPublish: Error publishing message: %v", err))

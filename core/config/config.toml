@@ -1,6 +1,6 @@
 serverVersion = "5.0.1"
 [log]
-level = "info"
+level = "debug"
 
 [broker]
     # broker 监听的addr

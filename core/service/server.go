@@ -157,7 +157,7 @@ func (this *Server) ListenAndServe(uri string) error {
 		return err
 	}
 	defer this.ln.Close()
-
+	logger.Logger.Info(fmt.Sprintf("AddMQTTHandler uri=%v", uri))
 	for {
 		conn, err := this.ln.Accept()
 

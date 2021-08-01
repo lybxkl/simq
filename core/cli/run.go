@@ -117,11 +117,12 @@ func BuffConfigInit() {
 	//service.BuffConfigInit(defaultBufferSize, defaultReadBlockSize, defaultWriteBlockSize)
 }
 
+// 转发websocket的数据到tcp处理中去
 func AddWebsocketHandler(urlPattern string, uri string) error {
 	logger.Logger.Info(fmt.Sprintf("AddWebsocketHandler urlPattern=%s, uri=%s", urlPattern, uri))
 	u, err := url.Parse(uri)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("go-mqtt-v2/main: %v", err))
+		logger.Logger.Error(fmt.Sprintf("simq/main: %v", err))
 		return err
 	}
 
