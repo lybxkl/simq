@@ -1,7 +1,7 @@
 # SI-MQTT
 
 #### 介绍
-golang mqtt服务器，单节点版
+golang mqtt服务器，集群版【设计中】
 
 #### 使用说明
 
