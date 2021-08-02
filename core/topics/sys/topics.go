@@ -61,7 +61,7 @@ func Register(name string, provider SysTopicsProvider) {
 	}
 
 	providers[name] = provider
-	logger.Logger.Info(fmt.Sprintf("Register Sys TopicsProvider：'%s' success，%T", name, provider))
+	logger.Logger.Infof("Register Sys TopicsProvider：'%s' success，%T", name, provider)
 }
 
 func Unregister(name string) {

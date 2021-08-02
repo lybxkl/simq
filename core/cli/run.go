@@ -8,15 +8,15 @@ import (
 	"SI-MQTT/core/sessions"
 	"SI-MQTT/core/topics"
 	"SI-MQTT/core/utils"
-	"fmt"
 	"golang.org/x/net/websocket"
 	"io"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
-	"runtime/pprof"
+	"strconv"
 	"strings"
 )
 
@@ -27,7 +27,6 @@ func init() {
 	sessions.SessionInit(cfg.DefaultConfig.Provider.SessionsProvider)
 	topics.TopicInit(cfg.DefaultConfig.Provider.TopicsProvider)
 }
-
 func Run() {
 	cfg := config.GetConfig()
 	conCif := cfg.DefaultConfig.Connect
@@ -43,13 +42,21 @@ func Run() {
 		Version:          cfg.ServerVersion,
 	}
 
-	var f *os.File
 	var err error
 
 	sigchan := make(chan os.Signal, 1)
 	//signal.Notify(sigchan, os.Interrupt, os.Kill)
 	signal.Notify(sigchan)
-
+	// 性能分析
+	if cfg.PProf.Open {
+		go func() {
+			// https://pdf.us/2019/02/18/2772.html
+			// go tool pprof -http=:8000 http://localhost:8080/debug/pprof/heap    查看内存使用
+			// go tool pprof -http=:8000 http://localhost:8080/debug/pprof/profile 查看cpu占用
+			// 注意，需要提前安装 Graphviz 用于画图
+			logger.Logger.Info(http.ListenAndServe(":"+strconv.Itoa(int(cfg.PProf.Port)), nil).Error())
+		}()
+	}
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -57,17 +64,11 @@ func Run() {
 			}
 		}()
 		sig := <-sigchan
-		logger.Logger.Info(fmt.Sprintf("服务停止：Existing due to trapped signal; %v", sig))
-
-		if f != nil {
-			logger.Logger.Info("Stopping profile")
-			pprof.StopCPUProfile()
-			f.Close()
-		}
+		logger.Logger.Infof("服务停止：Existing due to trapped signal; %v", sig)
 
 		err := svr.Close()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("server close err: %v", err))
+			logger.Logger.Errorf("server close err: %v", err)
 		}
 		os.Exit(0)
 	}()
@@ -94,7 +95,7 @@ func Run() {
 	/* create plain MQTT listener */
 	err = svr.ListenAndServe(mqttaddr)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("MQTT 启动异常错误 simq/main: %v", err))
+		logger.Logger.Errorf("MQTT 启动异常错误 simq/main: %v", err)
 	}
 
 }
@@ -119,10 +120,10 @@ func BuffConfigInit() {
 
 // 转发websocket的数据到tcp处理中去
 func AddWebsocketHandler(urlPattern string, uri string) error {
-	logger.Logger.Info(fmt.Sprintf("AddWebsocketHandler urlPattern=%s, uri=%s", urlPattern, uri))
+	logger.Logger.Infof("AddWebsocketHandler urlPattern=%s, uri=%s", urlPattern, uri)
 	u, err := url.Parse(uri)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("simq/main: %v", err))
+		logger.Logger.Errorf("simq/main: %v", err)
 		return err
 	}
 

@@ -1,6 +1,7 @@
 serverVersion = "5.0.1"
+
 [log]
-level = "debug"
+    level = "info"
 
 [broker]
     # broker 监听的addr
@@ -60,3 +61,6 @@ level = "debug"
         source=""
         db=1
         poolSize=10
+[pprof]
+port = 8080
+open = true

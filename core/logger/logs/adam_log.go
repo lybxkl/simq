@@ -19,13 +19,8 @@ func GetLogger() *AdamLog {
 var once sync.Once
 
 type AdamLog struct {
-	zap   *zap.Logger
-	Info  func(msg string, fields ...Field)
-	Debug func(msg string, fields ...Field)
-	Error func(msg string, fields ...Field)
-	Fatal func(msg string, fields ...Field)
-	Panic func(msg string, fields ...Field)
-	Warn  func(msg string, fields ...Field)
+	zap *zap.Logger
+	*zap.SugaredLogger
 }
 type Field = zap.Field
 
@@ -62,13 +57,7 @@ func NewAdamLogSelf(encoderConfig zapcore.EncoderConfig, zapConfig zap.Config) *
 	}
 	logger.Info("log 初始化成功", Time("runTime", time.Now()))
 	adamLogger = &AdamLog{
-		zap:   logger,
-		Info:  logger.Info,
-		Debug: logger.Debug,
-		Error: logger.Error,
-		Fatal: logger.Fatal,
-		Panic: logger.Panic,
-		Warn:  logger.Warn,
+		zap: logger,
 	}
 	return adamLogger
 }
@@ -109,21 +98,17 @@ func NewAdamLog(level zapcore.Level) *AdamLog {
 			panic(fmt.Sprintf("log 初始化失败: %v", err))
 		}
 		logger.Info("log 初始化成功", Time("runTime", time.Now()))
+		sugar := logger.Sugar()
 		adamLogger = &AdamLog{
-			zap:   logger,
-			Info:  logger.Info,
-			Debug: logger.Debug,
-			Error: logger.Error,
-			Fatal: logger.Fatal,
-			Panic: logger.Panic,
-			Warn:  logger.Warn,
+			zap:           logger,
+			SugaredLogger: sugar,
 		}
 	})
 	return adamLogger
 }
-func (a *AdamLog) GetZapLogger() *zap.Logger {
-	return a.zap
-}
+
 func (a *AdamLog) Close() error {
-	return a.zap.Sync()
+	a.zap.Sync()
+	a.SugaredLogger.Sync()
+	return nil
 }

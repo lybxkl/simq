@@ -28,9 +28,14 @@ type SIConfig struct {
 	Cluster       Cluster       `toml:"cluster"`
 	DefaultConfig DefaultConfig `toml:"defaultConfig"`
 	Store         Store         `toml:"store"`
+	PProf         PProf         `toml:"pprof"`
 }
 type Log struct {
 	Level string `toml:"level"`
+}
+type PProf struct {
+	Open bool  `toml:"open"`
+	Port int64 `toml:"port"`
 }
 type Broker struct {
 	TcpAddr     string `toml:"tcpAddr"`

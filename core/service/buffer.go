@@ -195,7 +195,7 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 		if len(p) > 0 {
 			n, err := w.Write(p)
 			total += int64(n)
-			logger.Logger.Debug(fmt.Sprintf("Wrote %d bytes, totaling %d bytes", n, total))
+			logger.Logger.Debugf("Wrote %d bytes, totaling %d bytes", n, total)
 
 			if err != nil {
 				return total, err

@@ -62,7 +62,7 @@ func Register(name string, provider ShareTopicsProvider) {
 	}
 
 	providers[name] = provider
-	logger.Logger.Info(fmt.Sprintf("Register Share TopicsProvider：'%s' success，%T", name, provider))
+	logger.Logger.Infof("Register Share TopicsProvider：'%s' success，%T", name, provider)
 }
 
 func Unregister(name string) {

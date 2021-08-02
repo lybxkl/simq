@@ -19,7 +19,7 @@ func getConnectMessage(conn io.Closer) (*message.ConnectMessage, error) {
 	msg := message.NewConnectMessage()
 
 	_, err = msg.Decode(buf)
-	logger.Logger.Debug(fmt.Sprintf("Received: %s", msg))
+	logger.Logger.Debugf("Received: %s", msg)
 	return msg, err
 }
 
@@ -33,7 +33,7 @@ func getConnackMessage(conn io.Closer) (*message.ConnackMessage, error) {
 	msg := message.NewConnackMessage()
 
 	_, err = msg.Decode(buf)
-	logger.Logger.Debug(fmt.Sprintf("Received: %s", msg))
+	logger.Logger.Debugf("Received: %s", msg)
 	return msg, err
 }
 
@@ -42,10 +42,10 @@ func writeMessage(conn io.Closer, msg message.Message) error {
 	buf := make([]byte, msg.Len())
 	_, err := msg.Encode(buf)
 	if err != nil {
-		logger.Logger.Debug(fmt.Sprintf("Write error: %v", err))
+		logger.Logger.Debugf("Write error: %v", err)
 		return err
 	}
-	logger.Logger.Debug(fmt.Sprintf("Writing: %s", msg))
+	logger.Logger.Debugf("Writing: %s", msg)
 
 	return writeMessageBuffer(conn, buf)
 }

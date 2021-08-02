@@ -32,15 +32,15 @@ func (this *service) receiver() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Error(fmt.Sprintf("(%s) Recovering from panic: %v", this.cid(), r))
+			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 
-		logger.Logger.Debug(fmt.Sprintf("(%s) Stopping receiver", this.cid()))
+		logger.Logger.Debugf("(%s) Stopping receiver", this.cid())
 	}()
 
-	logger.Logger.Debug(fmt.Sprintf("(%s) Starting receiver", this.cid()))
+	logger.Logger.Debugf("(%s) Starting receiver", this.cid())
 
 	this.wgStarted.Done()
 
@@ -60,7 +60,7 @@ func (this *service) receiver() {
 			if err != nil {
 				if err != io.EOF {
 					//连接异常或者断线啥的
-					//logger.Logger.Error(fmt.Sprintf("<<(%s)>> 连接异常关闭：%v", this.cid(), err.Error()))
+					//logger.Logger.Errorf("<<(%s)>> 连接异常关闭：%v", this.cid(), err.Error())
 				}
 				return
 			}
@@ -70,7 +70,7 @@ func (this *service) receiver() {
 	//	glog.Errorf("(%s) Websocket: %v", this.cid(), ErrInvalidConnectionType)
 
 	default:
-		logger.Logger.Error(fmt.Sprintf("未知异常 (%s) %v", this.cid(), ErrInvalidConnectionType))
+		logger.Logger.Errorf("未知异常 (%s) %v", this.cid(), ErrInvalidConnectionType)
 	}
 }
 
@@ -79,15 +79,15 @@ func (this *service) sender() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Error(fmt.Sprintf("(%s) Recovering from panic: %v", this.cid(), r))
+			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 
-		logger.Logger.Debug(fmt.Sprintf("(%s) Stopping sender", this.cid()))
+		logger.Logger.Debugf("(%s) Stopping sender", this.cid())
 	}()
 
-	logger.Logger.Debug(fmt.Sprintf("(%s) Starting sender", this.cid()))
+	logger.Logger.Debugf("(%s) Starting sender", this.cid())
 
 	this.wgStarted.Done()
 
@@ -98,7 +98,7 @@ func (this *service) sender() {
 
 			if err != nil {
 				if err != io.EOF {
-					logger.Logger.Error(fmt.Sprintf("(%s) error writing data: %v", this.cid(), err))
+					logger.Logger.Errorf("(%s) error writing data: %v", this.cid(), err)
 				}
 				return
 			}
@@ -108,7 +108,7 @@ func (this *service) sender() {
 	//	glog.Errorf("(%s) Websocket not supported", this.cid())
 
 	default:
-		logger.Logger.Info(fmt.Sprintf("(%s) Invalid connection type", this.cid()))
+		logger.Logger.Infof("(%s) Invalid connection type", this.cid())
 	}
 }
 
@@ -241,7 +241,7 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 	for l < total {
 		n, err = this.in.Read(this.intmp[l:])
 		l += n
-		logger.Logger.Debug(fmt.Sprintf("read %d bytes, total %d", n, l))
+		logger.Logger.Debugf("read %d bytes, total %d", n, l)
 		if err != nil {
 			return nil, 0, err
 		}

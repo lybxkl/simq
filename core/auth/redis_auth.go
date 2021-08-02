@@ -2,7 +2,6 @@ package auth
 
 import (
 	"SI-MQTT/core/logger"
-	"fmt"
 )
 
 type redisAuthenticator bool
@@ -21,10 +20,10 @@ func NewRedisAuth() Authenticator {
 func (this redisAuthenticator) Authenticate(id string, cred interface{}) error {
 	if this {
 		if cid, ok := redisCheck(id, cred); ok {
-			logger.Logger.Info(fmt.Sprintf("redis : 账号：%v，密码：%v，登陆-成功，clientID==%s", id, cred, cid))
+			logger.Logger.Infof("redis : 账号：%v，密码：%v，登陆-成功，clientID==%s", id, cred, cid)
 			return nil
 		}
-		logger.Logger.Info(fmt.Sprintf("redis : 账号：%v，密码：%v，登陆-失败", id, cred))
+		logger.Logger.Infof("redis : 账号：%v，密码：%v，登陆-失败", id, cred)
 		return ErrAuthFailure
 	}
 	logger.Logger.Info("当前未开启账号验证，取消一切连接。。。")

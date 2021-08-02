@@ -157,7 +157,7 @@ func (this *Server) ListenAndServe(uri string) error {
 		return err
 	}
 	defer this.ln.Close()
-	logger.Logger.Info(fmt.Sprintf("AddMQTTHandler uri=%v", uri))
+	logger.Logger.Infof("AddMQTTHandler uri=%v", uri)
 	for {
 		conn, err := this.ln.Accept()
 
@@ -181,7 +181,7 @@ func (this *Server) ListenAndServe(uri string) error {
 				if max := 1 * time.Second; tempDelay > max {
 					tempDelay = max
 				}
-				logger.Logger.Error(fmt.Sprintf("Accept error: %v; retrying in %v", err, tempDelay))
+				logger.Logger.Errorf("Accept error: %v; retrying in %v", err, tempDelay)
 				time.Sleep(tempDelay)
 				continue
 			}
@@ -247,21 +247,21 @@ func (this *Server) Close() error {
 	if this.sessMgr != nil {
 		err := this.sessMgr.Close()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("关闭session管理器错误:%v", err))
+			logger.Logger.Errorf("关闭session管理器错误:%v", err)
 		}
 	}
 
 	if this.topicsMgr != nil {
 		err := this.topicsMgr.Close()
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("关闭topic管理器错误:%v", err))
+			logger.Logger.Errorf("关闭topic管理器错误:%v", err)
 		}
 	}
 	// We then close the net.Listener, which will force Accept() to return if it's
 	// blocked waiting for new connections.
 	err := this.ln.Close()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("关闭网络Listener错误:%v", err))
+		logger.Logger.Errorf("关闭网络Listener错误:%v", err)
 	}
 	// 后面不会执行到，不知道为啥
 	// TODO 将当前节点上的客户端数据保存持久化到mysql或者redis都行，待这些客户端重连集群时，可以搜索到旧session，也要考虑是否和客户端连接时的cleanSession有绑定
@@ -314,7 +314,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	req, err := getConnectMessage(conn)
 	if err != nil {
 		if cerr, ok := err.(message.ConnackCode); ok {
-			logger.Logger.Debug(fmt.Sprintf("request message: %s\nresponse message: %s\nerror : %v", nil, resp, err))
+			logger.Logger.Debugf("request message: %s\nresponse message: %s\nerror : %v", nil, resp, err)
 			resp.SetReturnCode(cerr)
 			resp.SetSessionPresent(false)
 			writeMessage(conn, resp)
@@ -372,7 +372,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	//this.svcs = append(this.svcs, svc)
 	//this.mu.Unlock()
 
-	logger.Logger.Debug(fmt.Sprintf("(%s) server/handleConnection: Connection established.", svc.cid()))
+	logger.Logger.Debugf("(%s) server/handleConnection: Connection established.", svc.cid())
 
 	return svc, nil
 }

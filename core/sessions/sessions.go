@@ -40,7 +40,7 @@ func Register(name string, provider SessionsProvider) {
 	if _, dup := providers[name]; dup {
 		panic("session: Register called twice for provider " + name)
 	}
-	logger.Logger.Info(fmt.Sprintf("Register SessionProvide：'%s' success，%T", name, provider))
+	logger.Logger.Infof("Register SessionProvide：'%s' success，%T", name, provider)
 	providers[name] = provider
 }
 

@@ -2,7 +2,6 @@ package auth
 
 import (
 	"SI-MQTT/core/logger"
-	"fmt"
 )
 
 type authenticator bool
@@ -26,10 +25,10 @@ func NewMysqlAuth() Authenticator {
 func (this authenticator) Authenticate(id string, cred interface{}) error {
 	if this {
 		if clientID, ok := checkAuth(id, cred); ok {
-			logger.Logger.Info(fmt.Sprintf("mysql : 账号：%s，密码：%v，登陆成功，clientID==%s", id, cred, clientID))
+			logger.Logger.Infof("mysql : 账号：%s，密码：%v，登陆成功，clientID==%s", id, cred, clientID)
 			return nil
 		} else {
-			logger.Logger.Info(fmt.Sprintf("mysql : 账号：%s，密码：%v，登陆失败", id, cred))
+			logger.Logger.Infof("mysql : 账号：%s，密码：%v，登陆失败", id, cred)
 			return ErrAuthFailure
 		}
 	}
