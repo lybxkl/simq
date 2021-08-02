@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket 测试界面</title>
+    <link rel="stylesheet" href="stype.css" />
+    <link rel="shortcut icon" href="favicon.png">
+</head>
+
+<body>
+<div class="container">
+    <div style="position: relative;width: 100%; margin-bottom: 20px;">
+        <div>
+            <h2 class="title">WebSocket 测试界面</h2>
+        </div>
+        <div class="outer2 ty" id="out">
+            <div class="inner"></div>
+        </div>
+    </div>
+    <div class="contentSend">
+        <div class="left">
+            <div class="topC">
+                <p>
+                    <label>服务IP:</label>
+                    <input name="serverIp" type="text" value="127.0.0.1">
+                </p>
+                <p>
+                    <label>服务端口:</label>
+                    <input name="port" type="text" value="8883">
+                </p>
+                <p>
+                    <label>客户端ID:</label>
+                    <input name="clientId" type="text" value="client_test_id">
+                </p>
+                <button class="connect" style="top: 60px; right: 80px;">连接</button>
+                <button class="disConnect" style="top: 120px; right: 70px;">断开连接</button>
+            </div>
+            <div class="bottomC">
+                <div class="bottomContent">
+                    <p>
+                        <label>订阅主题:</label>
+                        <input name="subTopic" type="text" value="T_WEBSOCKET_TEST">
+                    </p>
+                    <p>
+                        <label>qos:</label>
+                        <input name="qos" type="number" min=0 max=3 value=0 style="width: 50px;">
+                    </p>
+                    <button class="sub" style="top: 35px; right: 80px;">订阅</button>
+                    <button class="unSub" style="top: 85px; right: 70px;">取消订阅</button>
+                </div>
+
+            </div>
+        </div>
+        <div>
+            <p>
+                <label>发布到主题:</label>
+                <input name="topic" type="text" value="T_WEBSOCKET_TEST" style="width: 250px;">
+            </p>
+            <p>
+                <label>qos:</label>
+                <input name="qos" type="number" min=0 max=3 value=0 style="width: 50px;">
+            </p>
+            <p>
+                <label>retained:</label>
+                <input type="radio" name="retained" value="true">true
+                <input type="radio" name="retained" value="false" checked="checked">false
+            </p>
+            <p>
+                <label>duplicate:</label>
+                <input type="radio" name="duplicate" value="true">true
+                <input type="radio" name="duplicate" value="false" checked="checked">false
+            </p>
+            <p>
+                <label>消息体:</label>
+                <input name="message" type="text" value="this is a message from webSocket client"
+                       style="width: 300px;">
+            </p>
+            <div style="text-align: center">
+                <button class="pub" style="width: 70px;height: 30px;">发布</button>
+            </div>
+
+        </div>
+    </div>
+
+    <div>
+
+    </div>
+
+
+
+
+</div>
+<div class="resContent">
+    <div>
+        <h4>客户端已发送数据：</h4>
+        <textarea id="message" name="message" style="width: 700px;height: 150px"></textarea>
+        <br />
+        <input type="button" onclick="javascript:document.getElementById('message').value=''" value="清空发送区数据">
+    </div>
+    <div>
+        <h4>MQTT服务器返回消息：</h4>
+        <textarea id="responseText" name="message" style="width: 700px;height: 150px"></textarea>
+        <br />
+        <input type="button" onclick="javascript:document.getElementById('responseText').value=''" value="清空接收区数据">
+    </div>
+
+</div>
+
+
+
+
+
+</body>
+<script src="http://libs.baidu.com/jquery/2.1.4/jquery.min.js"></script>
+<script src="paho-mqtt-min.js" type="text/javascript"></script>
+<script>
+    $(function () {
+        var client;
+        $(".connect").click(function () {
+            var ip = $("input[name='serverIp']").val();
+            var port = $("input[name='port']").val();
+            var clientId = $("input[name='clientId']").val();
+            client = connect(ip, port, clientId);
+        })
+        $(".pub").click(function () {
+            var topic = $("input[name='topic']").val();
+            var message = $("input[name='message']").val();
+            var qos1 = $("input[name='qos']").val();
+            var retained = $("input[name='retained']").val();
+            var duplicate = $("input[name='duplicate']").val();
+            pubMessage(client, topic, message, qos1, retained, duplicate);
+        })
+        $(".sub").click(function () {
+            var subTopic = $("input[name='subTopic']").val();
+            var qos = $("input[name='qos']").val();
+            subscribe(client, subTopic, qos);
+        })
+        $(".unSub").click(function () {
+            var subTopic = $("input[name='subTopic']").val();
+            unSubscribe(client, subTopic);
+        })
+        $(".disConnect").click(function () {
+            client = disConnect(client);
+        })
+
+    })
+
+    function disConnect(client) {
+        if (check(client)) {
+            client.disconnect();
+            arrivedInfo("主动断开连接");
+            light(false)
+        }
+    }
+
+    function connect(ip, port, clientId) {
+        console.log("ip:" + ip);
+        console.log("port:" + port);
+        console.log("clientId:" + clientId);
+        var client = new Paho.MQTT.Client(ip, Number(port), "/mqtt", clientId);
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+        client.onMessageDelivered = onMessageDelivered;
+        client.connect({
+            onSuccess: onConnect,
+            onFailure: onFailConnect
+        });
+        return client;
+    }
+
+    function check(client) {
+        if (client == null) {
+            arrivedInfo("连接未建立");
+            return false;
+        } else if (!client.isConnected()) {
+            arrivedInfo("连接不可用");
+            return false;
+        }
+        return true;
+    }
+
+    function pubMessage(client, topic, message, qos, retained, duplicate) {
+        var message = new Paho.MQTT.Message(message);
+        message.destinationName = topic;
+        message.qos = parseInt(qos);
+        if (retained === "true") {
+            message.retained = true;
+        }
+        if (duplicate === "true") {
+            message.duplicate = true;
+        }
+        if (check(client)) {
+            client.send(message);
+        }
+    }
+
+    function subscribe(client, subTopic, qos) {
+        if (check(client)) {
+            client.subscribe(subTopic, {
+                qos: parseInt(qos),
+                onSuccess: function () {
+                    arrivedInfo("订阅主题: " + subTopic + "");
+                },
+                onFailure: function () {
+                    arrivedInfo("订阅主题: " + subTopic + "失败");
+                },
+                timeout: 2000,
+            });
+            //alert("sub topic success");
+
+        }
+    }
+
+    function unSubscribe(client, subTopic) {
+        if (check(client)) {
+            client.unsubscribe(subTopic, {
+                onSuccess: function () {
+                    arrivedInfo("取消订阅主题: " + subTopic + "");
+                },
+                onFailure: function () {
+                    arrivedInfo("取消订阅主题: " + subTopic + "失败");
+                },
+                timeout: 2000,
+            });
+            //alert("un sub topic success");
+
+        }
+    }
+    // 发送出去的消息打印
+    function sendInfo(msg) {
+        var contents = document.getElementById("message");
+        contents.value = contents.value + "\n" + msg;
+        contents.scrollTop = contents.scrollHeight;
+    }
+    // 接收与系统的消息打印
+    function arrivedInfo(msg) {
+        var contents = document.getElementById("responseText");
+        contents.value = contents.value + "\n" + msg;
+        contents.scrollTop = contents.scrollHeight;
+    }
+
+    function onMessageArrived(message) {
+        console.log("receive message:" + message.payloadString);
+        arrivedInfo("==>> " + message.payloadString);
+    }
+
+    function onMessageDelivered(message) {
+        console.log("pub message" + message.payloadString)
+        //alert("pub message success,message: " + message.payloadString);
+        sendInfo(message.payloadString);
+    }
+
+    function light(tag) {
+        if (tag) {
+            document.getElementById("out").className = "outer ty"
+        } else {
+            document.getElementById("out").className = "outer2 ty"
+        }
+    }
+    // called when the client connects
+    function onConnect() {
+        //alert("connect success.");
+        arrivedInfo("与服务器端建立连接成功");
+        light(true)
+    }
+
+    function onFailConnect() {
+        arrivedInfo("与服务器端建立连接失败！！！");
+        light(false)
+    }
+    // called when the client loses its connection
+    function onConnectionLost(responseObject) {
+        if (responseObject.errorCode !== 0) {
+            console.log("onConnectionLost:" + responseObject.errorMessage);
+            arrivedInfo("与服务器端的websocket连接断开！！！");
+            light(false)
+        }
+    }
+</script>
+
+</html>

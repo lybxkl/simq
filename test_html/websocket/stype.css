@@ -1,0 +1,99 @@
+body html{
+    width: 100%;
+    height: 100%;
+}
+.container{
+    padding: 0 20px;
+}
+.title{
+    text-align: center;
+}
+.left{
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #000;
+    padding-right: 80px;
+}
+.topC{
+    position: relative;
+    border-bottom: 1px solid #000;
+}
+.topC button{
+    position: absolute;
+}
+.topC p label{
+    display: inline-block;
+    width: 80px;
+    height: 40px;
+    text-align: right;
+    margin-right: 20px;
+}
+.ty{
+    position: absolute;
+    top: 3px;
+    left: 500px;
+    width: 30px;
+    height: 30px;
+    margin: 0 auto;
+    margin-top: 0px;
+    border-radius: 50%;
+}
+.outer {
+
+    background-color: green;
+    box-shadow: green 0px 0px 80px ;
+}
+.outer2{
+
+    background-color: red;
+    box-shadow: red 0px 0px 80px ;
+}
+.inner{
+    float: left;
+    margin-left: -100px;
+    margin-top: -100px;
+    width: 20px;
+    height: 20px;
+    background-color: #ffffff;
+    opacity: 0.7;
+    animation-name: move;
+    animation-duration: 3s;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+.contentSend{
+    display: flex;
+    margin-bottom: 20px;
+    border: 1px solid #000;
+    padding: 10px;
+    justify-content: space-around;
+}
+.contentSend p label{
+    width: 100px;
+    height: 50px;
+    display: inline-block;
+    text-align: right;
+    margin-right: 15px;
+}
+.bottomC{
+    position: relative;
+    width: 500px;
+    margin-top: 30px;
+}
+.bottomC button{
+    position: absolute;
+}
+
+.resContent{
+    display: flex;
+    justify-content: space-between;
+    padding: 0 20px;
+}
+@keyframes move{
+    from{
+        opacity: 0;
+    }
+    to{
+        opacity: 0.7
+    }
+}
