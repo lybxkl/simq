@@ -36,8 +36,8 @@ type service struct {
 	// incremented for every new service.
 	//这个服务的ID，它与客户ID无关，只是一个数字而已
 	//每增加一个新服务。
-	id uint64
-
+	id   uint64
+	ccid string
 	// Is this a client or server. It's set by either Connect (client) or
 	// HandleConnection (server).
 	//这是客户端还是服务器?它是由Connect (client)或
@@ -135,7 +135,7 @@ type service struct {
 
 func (this *service) start() error {
 	var err error
-
+	this.ccid = fmt.Sprintf("%d/%s", this.id, this.sess.IDs())
 	// Create the incoming ring buffer
 	this.in, err = newBuffer(defaultBufferSize)
 	if err != nil {
@@ -467,5 +467,5 @@ func (this *service) isDone() bool {
 }
 
 func (this *service) cid() string {
-	return fmt.Sprintf("%d/%s", this.id, this.sess.ID())
+	return this.ccid
 }

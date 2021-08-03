@@ -338,7 +338,7 @@ func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 		//是的，我没有检查错误。如果有错误，我们不想
 		//订阅要停止，就放手吧。
 		this.topicsMgr.Retained(t, &this.rmsgs)
-		logger.Logger.Debugf("(%s) topic = %s, retained count = %d", this.cid(), string(t), len(this.rmsgs))
+		logger.Logger.Debugf("(%s) topic = %s, retained count = %d", this.cid(), t, len(this.rmsgs))
 
 		/**
 		* 可以在这里向其它集群节点发送添加主题消息
@@ -423,7 +423,7 @@ func (this *service) pubFn(msg *message.PublishMessage, shareName string, onlySh
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to topic %q and %d subscribers：%v", this.cid(), string(msg.Topic()), len(this.subs), shareName)
+	logger.Logger.Debugf("(%s) Publishing to topic %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs), shareName)
 	for i, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
@@ -447,7 +447,7 @@ func (this *service) pubFnPlus(msg *message.PublishMessage) error {
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %q and %d subscribers：%v", this.cid(), string(msg.Topic()), len(this.subs))
+	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs))
 	for i, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)

@@ -334,7 +334,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 
 	if req.KeepAlive() == 0 {
 		//设置默认的keepalive数
-		req.SetKeepAlive(minKeepAlive)
+		req.SetKeepAlive(30)
 	}
 	svc = &service{
 		id:     atomic.AddUint64(&gsvcid, 1),
