@@ -25,7 +25,6 @@ type SIConfig struct {
 	ServerVersion string        `toml:"serverVersion"`
 	Log           Log           `toml:"log"`
 	Broker        Broker        `toml:"broker"`
-	Cluster       Cluster       `toml:"cluster"`
 	DefaultConfig DefaultConfig `toml:"defaultConfig"`
 	Store         Store         `toml:"store"`
 	PProf         PProf         `toml:"pprof"`
@@ -46,17 +45,6 @@ type Broker struct {
 	WssCertPath string `toml:"wssCertPath"`
 	WssKeyPath  string `toml:"wssKeyPath"`
 	Ca          string `toml:"ca"`
-}
-type Cluster struct {
-	Enabled        bool   `toml:"enabled"`
-	ClusterName    string `toml:"clusterName"`
-	ClusterHost    string `toml:"clusterHost"`
-	ClusterPort    int    `toml:"clusterPort"`
-	ClusterTLS     bool   `toml:"clusterTls"`
-	ServerCertFile string `toml:"serverCertFile"`
-	ServerKeyFile  string `toml:"serverKeyFile"`
-	ClientCertFile string `toml:"clientCertFile"`
-	ClientKeyFile  string `toml:"clientKeyFile"`
 }
 type Connect struct {
 	Keepalive      int `toml:"keepalive"`
@@ -113,16 +101,6 @@ func Configure(args []string) error {
 	fs.StringVar(&cfg.Broker.WssAddr, "wss-addr", cfg.Broker.WssAddr, "HTTPS websocket broker addr, eg. ':8081'")
 	fs.StringVar(&cfg.Broker.WssCertPath, "wss-certpath", cfg.Broker.WssCertPath, "HTTPS websocket broker public key file")
 	fs.StringVar(&cfg.Broker.WssKeyPath, "wss-keypath", cfg.Broker.WssKeyPath, "HTTPS websocket broker private key file")
-
-	fs.BoolVar(&cfg.Cluster.Enabled, "cluster-open", cfg.Cluster.Enabled, "open cluster.")
-	fs.StringVar(&cfg.Cluster.ClusterName, "node-name", cfg.Cluster.ClusterName, "current node name of the cluster.")
-	fs.StringVar(&cfg.Cluster.ClusterHost, "cluster-host", cfg.Cluster.ClusterHost, "cluster tcp host to listen on.")
-	fs.IntVar(&cfg.Cluster.ClusterPort, "cluster-port", cfg.Cluster.ClusterPort, "cluster tcp port to listen on.")
-	fs.BoolVar(&cfg.Cluster.ClusterTLS, "cluster-tls", cfg.Cluster.ClusterTLS, "whether cluster tcp use tls")
-	fs.StringVar(&cfg.Cluster.ServerCertFile, "server-certfile", cfg.Cluster.ServerCertFile, "path of tls server cert file.")
-	fs.StringVar(&cfg.Cluster.ServerKeyFile, "server-keyfile", cfg.Cluster.ServerKeyFile, "path of tls server key file.")
-	fs.StringVar(&cfg.Cluster.ClientCertFile, "client-certfile", cfg.Cluster.ClientCertFile, "path of tls client cert file.")
-	fs.StringVar(&cfg.Cluster.ClientKeyFile, "client-keyfile", cfg.Cluster.ClientKeyFile, "path of tls client key file.")
 
 	fs.IntVar(&cfg.DefaultConfig.Connect.Keepalive, "keepalive", cfg.DefaultConfig.Connect.Keepalive, "Keepalive (sec)")
 	fs.IntVar(&cfg.DefaultConfig.Connect.ConnectTimeOut, "connect-timeout", cfg.DefaultConfig.Connect.ConnectTimeOut, "Connect Timeout (sec)")
