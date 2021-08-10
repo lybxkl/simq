@@ -321,7 +321,8 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		}
 		return nil, err
 	}
-
+	// 版本
+	logger.Logger.Debugf("client mqtt version :%v", req.Version())
 	// Authenticate the user, if error, return error and exit
 	//登陆认证
 	if err = this.authMgr.Authenticate(string(req.Username()), string(req.Password())); err != nil {

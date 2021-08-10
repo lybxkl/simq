@@ -624,8 +624,8 @@ func (this *ConnectMessage) validClientId(cid []byte) bool {
 	//if len(cid) > 23 {
 	//	return false
 	//}
-
-	if this.Version() == 0x3 {
+	// todo v5版本是否和v3隔离
+	if this.Version() == 0x3 || this.Version() == 0x05 {
 		return true
 	}
 

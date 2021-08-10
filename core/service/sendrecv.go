@@ -47,7 +47,11 @@ func (this *service) receiver() {
 	switch conn := this.conn.(type) {
 	// 普通tcp连接
 	case net.Conn:
-		//glog.Debugf("server/handleConnection: Setting read deadline to %d", time.Second*time.Duration(this.keepAlive))
+		// 如果保持连接的值非零，并且服务端在1.5倍的保持连接时间内没有收到客户端的控制报文，
+		// 它必须断开客户端的网络连接，并判定网络连接已断开
+		// 保持连接的实际值是由应用指定的，一般是几分钟。允许的最大值是18小时12分15秒(两个字节)
+		// 保持连接（Keep Alive）值为零的结果是关闭保持连接（Keep Alive）机制。
+		// 如果保持连接（Keep Alive）612 值为零，客户端不必按照任何特定的时间发送MQTT控制报文。
 		keepAlive := time.Second * time.Duration(this.keepAlive)
 		r := timeoutReader{
 			d:    keepAlive + (keepAlive / 2),

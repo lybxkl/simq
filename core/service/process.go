@@ -165,6 +165,7 @@ func (this *service) processIncoming(msg message.Message) error {
 
 	case *message.DisconnectMessage:
 		// For DISCONNECT message, we should quit
+		// 主动断开连接，不需要发送will消息，这里直接设置为false，外面处理就不会发送will了
 		this.sess.Cmsg.SetWillFlag(false)
 		return errDisconnect
 
