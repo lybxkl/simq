@@ -6,6 +6,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNil(t *testing.T) {
+	// fmt.Println(nil == nil) // panic : invalid operation: nil == nil (operator == not defined on nil)
+}
 func TestConnectMessageFields(t *testing.T) {
 	msg := NewConnectMessage()
 

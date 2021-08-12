@@ -143,7 +143,7 @@ func TestMessageHeaderEncode3(t *testing.T) {
 
 func TestMessageHeaderEncode4(t *testing.T) {
 	header := &header{
-		mtypeflags: []byte{byte(RESERVED2) << 4},
+		mtypeflags: []byte{byte(RESERVED) << 4},
 		//mtype:      6,
 		//flags:      2,
 	}

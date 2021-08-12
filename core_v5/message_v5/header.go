@@ -9,23 +9,17 @@ var (
 	gPacketId uint64 = 0
 )
 
-// Fixed header
-// - 1 byte for control packet type (bits 7-4) and flags (bits 3-0)
-// - up to 4 byte for remaining length
+// Support v5
 // 固定头
 // - 1字节的控制包类型(位7-4)和标志(位3-0)
 // -最多4字节的剩余长度
 type header struct {
-	// Header fields
-	//mtype  MessageType
-	//flags  byte
-	//头字段
-	// mtype MessageType
-	//标志字节
+	// 剩余长度 变长字节整数, 用来表示当前控制报文剩余部分的字节数, 包括可变报头和负载的数据.
+	// 剩余长度不包括用于编码剩余长度字段本身的字节数.
+	// MQTT控制报文总长度等于固定报头的长度加上剩余长度.
 	remlen int32
 
-	// mtypeflags is the first byte of the buffer, 4 bits for mtype, 4 bits for flags
-	// mtypeflags是缓冲区的第一个字节，4位是mtype, 4位是flags
+	// mtypeflags是固定报头的第一个字节，前四位4位是mtype, 4位是flags标志
 	mtypeflags []byte
 
 	// Some messages need packet ID, 2 byte uint16
@@ -197,34 +191,36 @@ func (this *header) decode(src []byte) (int, error) {
 	this.mtypeflags = src[total : total+1]
 	//mtype := MessageType(src[total] >> 4)
 	if !this.Type().Valid() {
-		return total, fmt.Errorf("header/Decode: Invalid message type %d.", mtype)
+		return total, InvalidMessage //fmt.Errorf("header/Decode: Invalid message type %d.", mtype)
 	}
 
 	if mtype != this.Type() {
-		return total, fmt.Errorf("header/Decode: Invalid message type %d. Expecting %d.", this.Type(), mtype)
+		return total, InvalidMessage //fmt.Errorf("header/Decode: Invalid message type %d. Expecting %d.", this.Type(), mtype)
 	}
-
 	//this.flags = src[total] & 0x0f
 	if this.Type() != PUBLISH && this.Flags() != this.Type().DefaultFlags() {
-		return total, fmt.Errorf("header/Decode: Invalid message (%d) flags. Expecting %d, got %d", this.Type(), this.Type().DefaultFlags(), this.Flags())
+		return total, InvalidMessage //fmt.Errorf("header/Decode: Invalid message (%d) flags. Expecting %d, got %d", this.Type(), this.Type().DefaultFlags(), this.Flags())
 	}
-
+	// Bit 3	Bit 2	Bit 1	 Bit 0
+	// DUP	         QOS	     RETAIN
+	// publish 报文，验证qos，第一个字节的第1，2位
 	if this.Type() == PUBLISH && !ValidQos((this.Flags()>>1)&0x3) {
-		return total, fmt.Errorf("header/Decode: Invalid QoS (%d) for PUBLISH message.", (this.Flags()>>1)&0x3)
+		return total, InvalidMessage //fmt.Errorf("header/Decode: Invalid QoS (%d) for PUBLISH message.", (this.Flags()>>1)&0x3)
 	}
 
-	total++
+	total++ // 第一个字节处理完毕
 
+	// 剩余长度，传进来的就是只有固定报头数据，所以剩下的就是剩余长度变长解码的数据
 	remlen, m := binary.Uvarint(src[total:])
 	total += m
 	this.remlen = int32(remlen)
 
 	if this.remlen > maxRemainingLength || remlen < 0 {
-		return total, fmt.Errorf("header/Decode: Remaining length (%d) out of bound (max %d, min 0)", this.remlen, maxRemainingLength)
+		return total, InvalidMessage //fmt.Errorf("header/Decode: Remaining length (%d) out of bound (max %d, min 0)", this.remlen, maxRemainingLength)
 	}
 
 	if int(this.remlen) > len(src[total:]) {
-		return total, fmt.Errorf("header/Decode: Remaining length (%d) is greater than remaining buffer (%d)", this.remlen, len(src[total:]))
+		return total, InvalidMessage //fmt.Errorf("header/Decode: Remaining length (%d) is greater than remaining buffer (%d)", this.remlen, len(src[total:]))
 	}
 
 	return total, nil

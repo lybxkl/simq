@@ -41,7 +41,7 @@ const (
 var SupportedVersions map[byte]string = map[byte]string{
 	0x3: "MQIsdp",
 	0x4: "MQTT",
-	0x5: "MQTT",
+	0x5: "MQTTv5",
 }
 
 // MessageType is the type representing the MQTT packet types. In the MQTT spec,
@@ -149,7 +149,9 @@ const (
 
 	// DISCONNECT: Client to Server. Client is disconnecting.
 	DISCONNECT
-
+	// AUTH: Client to Server, AUTH
+	// 两个方向都允许	认证信息交换
+	AUTH
 	// RESERVED2 is a reserved value and should be considered an invalid message type.
 	// RESERVED2是一个保留值，应该被认为是一个无效的消息类型。
 	// 两个RESERVED是方便做校验，直接判断是否处在这两个中间即可判断合法性
@@ -195,8 +197,8 @@ func (this MessageType) Name() string {
 		return "PINGRESP"
 	case DISCONNECT:
 		return "DISCONNECT"
-	case RESERVED2:
-		return "RESERVED2"
+	case AUTH:
+		return "AUTH"
 	}
 
 	return "UNKNOWN"
@@ -234,8 +236,8 @@ func (this MessageType) Desc() string {
 		return "PING response"
 	case DISCONNECT:
 		return "Client is disconnecting"
-	case RESERVED2:
-		return "Reserved"
+	case AUTH:
+		return "Client auth"
 	}
 
 	return "UNKNOWN"
@@ -275,7 +277,7 @@ func (this MessageType) DefaultFlags() byte {
 		return 0
 	case DISCONNECT:
 		return 0
-	case RESERVED2:
+	case AUTH:
 		return 0
 	}
 
@@ -317,6 +319,8 @@ func (this MessageType) New() (Message, error) {
 		return NewPingrespMessage(), nil
 	case DISCONNECT:
 		return NewDisconnectMessage(), nil
+	case AUTH:
+		return NewAuthMessage(), nil
 	}
 
 	return nil, fmt.Errorf("msgtype/NewMessage: Invalid message type %d", this)
@@ -358,19 +362,19 @@ func ValidConnackError(err error) bool {
 }
 
 // Read length prefixed bytes
-//读取带前缀的字节长度
+//读取带前缀的字节长度，2 byte
 func readLPBytes(buf []byte) ([]byte, int, error) {
 	if len(buf) < 2 {
-		return nil, 0, fmt.Errorf("utils/readLPBytes: Insufficient buffer size. Expecting %d, got %d.", 2, len(buf))
+		return nil, 0, InvalidMessage // fmt.Errorf("utils/readLPBytes: Insufficient buffer size. Expecting %d, got %d.", 2, len(buf))
 	}
 
 	n, total := 0, 0
-
+	// 两个字节长度
 	n = int(binary.BigEndian.Uint16(buf))
 	total += 2
 
 	if len(buf) < n {
-		return nil, total, fmt.Errorf("utils/readLPBytes: Insufficient buffer size. Expecting %d, got %d.", n, len(buf))
+		return nil, total, InvalidMessage // fmt.Errorf("utils/readLPBytes: Insufficient buffer size. Expecting %d, got %d.", n, len(buf))
 	}
 
 	total += n
