@@ -80,7 +80,7 @@ func NewConnectMessage() *ConnectMessage {
 
 // String returns a string representation of the CONNECT message
 func (this ConnectMessage) String() string {
-	return fmt.Sprintf("Header==>> \n\t\t%s\nVariable header==>> \n\t\tRemLen=%v\n\t\tProtocol Name=%s\n\t\tProtocol Version=%v\n\t\t"+
+	return fmt.Sprintf("Header==>> \n\t\t%s\nVariable header==>> \n\t\tProtocol Name=%s\n\t\tProtocol Version=%v\n\t\t"+
 		"Connect Flags=%08b\n\t\t\t"+
 		"User Name Flag=%v\n\t\t\tPassword Flag=%v\n\t\t\tWill Retain=%v\n\t\t\tWill QoS=%d\n\t\t\tWill Flag=%v\n\t\t\tClean Start=%v\n\t\t\tReserved=%v\n\t\t"+
 		"KeepAlive=%v\n\t\t"+
@@ -96,7 +96,6 @@ func (this ConnectMessage) String() string {
 		"Will Topic=%q\n\t\tWill Payload=%q\n\t\tUsername=%q\n\t\tPassword=%q",
 		this.header,
 
-		this.remlen,
 		this.protoName,
 		this.Version(),
 		this.connectFlags,
@@ -480,36 +479,159 @@ func (this *ConnectMessage) Encode(dst []byte) (int, error) {
 
 func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 	total := 0
-
-	n, err := writeLPBytes(dst[total:], []byte(SupportedVersions[this.version]))
+	/**
+		===可变报头===
+	**/
+	n, err := writeLPBytes(dst[total:], []byte(SupportedVersions[this.version])) // 写入协议长度和协议名称
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	dst[total] = this.version
+	dst[total] = this.version // 写入协议版本号
 	total += 1
 
-	dst[total] = this.connectFlags
+	dst[total] = this.connectFlags // 写入连接标志
 	total += 1
 
-	binary.BigEndian.PutUint16(dst[total:], this.keepAlive)
+	binary.BigEndian.PutUint16(dst[total:], this.keepAlive) // 写入保持连接
 	total += 2
 
-	n, err = writeLPBytes(dst[total:], this.clientId)
+	// 属性
+	pLen := lbEncode(int32(this.propertiesLen)) // 属性长度
+	copy(dst[total:], pLen)
+	total += len(pLen)
+
+	if this.sessionExpiryInterval > 0 {
+		dst[total] = SessionExpirationInterval
+		total++
+		binary.BigEndian.PutUint32(dst[total:], this.sessionExpiryInterval) // 会话过期间隔
+		total += 4
+	}
+
+	if this.receiveMaximum > 0 {
+		dst[total] = MaximumQuantityReceived
+		total++
+		binary.BigEndian.PutUint16(dst[total:], this.receiveMaximum) // 接收最大值
+		total += 2
+	}
+
+	dst[total] = MaximumMessageLength
+	total++
+	binary.BigEndian.PutUint32(dst[total:], this.maxPacketSize) // 最大报文长度
+	total += 4
+
+	if this.topicAliasMax > 0 {
+		dst[total] = MaximumLengthOfTopicAlias
+		total++
+		binary.BigEndian.PutUint16(dst[total:], this.topicAliasMax) // 主题别名最大值
+		total += 2
+	}
+
+	// TODO if this.requestRespInfo == 0 ==>> 可发可不发
+	if this.requestRespInfo != 0 { // 默认0
+		dst[total] = RequestResponseInformation
+		total++
+		dst[total] = this.requestRespInfo // 请求响应信息
+		total++
+	}
+	if this.requestProblemInfo != 1 { // 默认1
+		dst[total] = RequestProblemInformation
+		total++
+		dst[total] = this.requestProblemInfo // 请求问题信息
+		total++
+	}
+
+	for k1, v1 := range this.userProperty {
+		dst[total] = UserProperty // 用户属性
+		total++
+		copy(dst[total:], k1)
+		total += len(k1)
+		dst[total] = ':'
+		copy(dst[total:], v1)
+		total += len(v1)
+	}
+
+	if this.authMethod != "" {
+		dst[total] = AuthenticationMethod // 认证方法
+		total++
+		copy(dst[total:], this.authMethod)
+		total += len(this.authMethod)
+	}
+	if len(this.authData) > 0 {
+		dst[total] = AuthenticationData // 认证数据
+		total++
+		copy(dst[total:], this.authData)
+		total += len(this.authData)
+	}
+
+	/**
+		===载荷===
+	**/
+	n, err = writeLPBytes(dst[total:], this.clientId) // 客户标识符
 	total += n
 	if err != nil {
 		return total, err
 	}
-
 	if this.WillFlag() {
-		n, err = writeLPBytes(dst[total:], this.willTopic)
+		// 遗嘱属性
+		wpLen := lbEncode(int32(this.willPropertiesLen)) // 遗嘱属性长度
+		copy(dst[total:], wpLen)
+		total += len(wpLen)
+
+		if this.willDelayInterval > 0 {
+			dst[total] = DelayWills
+			total++
+			binary.BigEndian.PutUint32(dst[total:], this.willDelayInterval) // 遗嘱延时间隔
+			total += 4
+		}
+		if this.payloadFormatIndicator > 0 {
+			dst[total] = LoadFormatDescription
+			total++
+			dst[total] = this.payloadFormatIndicator // 遗嘱载荷指示
+			total++
+		}
+		if this.willMsgExpiryInterval > 0 {
+			dst[total] = MessageExpirationTime
+			total++
+			binary.BigEndian.PutUint32(dst[total:], this.willMsgExpiryInterval) // 遗嘱消息过期间隔
+			total += 4
+		}
+		if len(this.contentType) > 0 {
+			dst[total] = ContentType // 遗嘱内容类型
+			total++
+			copy(dst[total:], this.contentType)
+			total += len(this.contentType)
+		}
+		if len(this.responseTopic) > 0 {
+			dst[total] = ResponseTopic // 遗嘱响应主题
+			total++
+			copy(dst[total:], this.responseTopic)
+			total += len(this.responseTopic)
+		}
+		if len(this.correlationData) > 0 {
+			dst[total] = RelatedData // 对比数据
+			total++
+			copy(dst[total:], this.correlationData)
+			total += len(this.correlationData)
+		}
+		for k1, v1 := range this.willUserProperty {
+			dst[total] = UserProperty // 遗嘱用户属性
+			total++
+			copy(dst[total:], k1)
+			total += len(k1)
+			dst[total] = ':'
+			copy(dst[total:], v1)
+			total += len(v1)
+		}
+
+		n, err = writeLPBytes(dst[total:], this.willTopic) // 遗嘱主题
 		total += n
 		if err != nil {
 			return total, err
 		}
 
-		n, err = writeLPBytes(dst[total:], this.willMessage)
+		n, err = writeLPBytes(dst[total:], this.willMessage) // 遗嘱载荷
 		total += n
 		if err != nil {
 			return total, err
@@ -519,7 +641,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 	// According to the 3.1 spec, it's possible that the usernameFlag is set,
 	// but the username string is missing.
 	if this.UsernameFlag() && len(this.username) > 0 {
-		n, err = writeLPBytes(dst[total:], this.username)
+		n, err = writeLPBytes(dst[total:], this.username) // 用户名
 		total += n
 		if err != nil {
 			return total, err
@@ -529,7 +651,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 	// According to the 3.1 spec, it's possible that the passwordFlag is set,
 	// but the password string is missing.
 	if this.PasswordFlag() && len(this.password) > 0 {
-		n, err = writeLPBytes(dst[total:], this.password)
+		n, err = writeLPBytes(dst[total:], this.password) // 密码
 		total += n
 		if err != nil {
 			return total, err

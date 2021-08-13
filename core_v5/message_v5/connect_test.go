@@ -2,6 +2,7 @@ package message
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,15 @@ func TestDecode(t *testing.T) {
 	msg := NewConnectMessage()
 	msg.Decode(testData)
 	fmt.Printf("%v\n", msg)
+	dst := make([]byte, 81)
+	msg.Encode(dst)
+	fmt.Println(reflect.DeepEqual(testData, dst))
+	fmt.Println(testData)
+	fmt.Println(dst)
+
+	msg2 := NewConnectMessage()
+	msg2.Decode(dst)
+	fmt.Printf("%v\n", msg2)
 }
 
 func TestNil(t *testing.T) {
