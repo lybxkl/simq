@@ -41,7 +41,7 @@ const (
 var SupportedVersions map[byte]string = map[byte]string{
 	0x3: "MQIsdp",
 	0x4: "MQTT",
-	0x5: "MQTTv5",
+	0x5: "MQTT",
 }
 
 // MessageType is the type representing the MQTT packet types. In the MQTT spec,
