@@ -17,7 +17,7 @@ func init() {
 	clientIdRegexp = regexp.MustCompile("^[/\\-0-9a-zA-Z _]*$")
 }
 
-// After a Network Connection is established by a Client to a Server, the first Packet
+// ConnectMessage After a Network Connection is established by a Client to a Server, the first Packet
 // sent from the Client to the Server MUST be a CONNECT Packet [MQTT-3.1.0-1].
 //
 // A Client can only send the CONNECT Packet once over a Network Connection. The Server
@@ -73,7 +73,7 @@ var _ Message = (*ConnectMessage)(nil)
 // NewConnectMessage creates a new CONNECT message.
 func NewConnectMessage() *ConnectMessage {
 	msg := &ConnectMessage{}
-	msg.SetType(CONNECT)
+	_ = msg.SetType(CONNECT)
 
 	return msg
 }
@@ -406,7 +406,7 @@ func (this *ConnectMessage) Len() int {
 	return this.header.msglen() + ml
 }
 
-// For the CONNECT message, the error returned could be a ConnackReturnCode, so
+// Decode For the CONNECT message, the error returned could be a ConnackReturnCode, so
 // be sure to check that. Otherwise it's a generic error. If a generic error is
 // returned, this Message should be considered invalid.
 //
