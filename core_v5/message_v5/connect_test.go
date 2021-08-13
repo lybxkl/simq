@@ -8,6 +8,54 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFillDecode(t *testing.T) {
+	msg := NewConnectMessage()
+
+	msg.SetCleanSession(true)
+	msg.SetWillFlag(true)
+	msg.SetWillQos(0x00)
+	msg.SetWillRetain(false)
+	msg.SetUsernameFlag(true)
+	msg.SetPasswordFlag(true)
+
+	msg.SetVersion(0x05)
+	msg.SetKeepAlive(100)
+	msg.protoName = []byte("MQTT")
+	msg.SetClientId([]byte("aaaaaasssss"))
+	msg.SetWillTopic([]byte("willtp1"))
+	msg.SetWillMessage([]byte("will ploay"))
+	msg.SetUsername([]byte("name"))
+	msg.SetPassword([]byte("pwd"))
+	msg.SetSessionExpiryInterval(132)
+	msg.SetReceiveMaximum(900)
+	msg.SetMaxPacketSize(100)
+	msg.SetTopicAliasMax(20)
+	msg.SetRequestRespInfo(0)
+	msg.SetRequestProblemInfo(1)
+	msg.SetUserProperty(map[string]string{"aa": "bb"})
+	msg.SetWillUserProperty(map[string]string{"cc": "dd"})
+	msg.SetAuthMethod("abcd")
+	msg.SetAuthData([]byte("abcd"))
+	msg.SetWillDelayInterval(30)
+	msg.SetPayloadFormatIndicator(1)
+	msg.SetWillMsgExpiryInterval(20)
+	msg.SetContentType("type")
+	msg.SetResponseTopic("/a/p")
+	msg.SetCorrelationData([]byte("db"))
+	msg.build()
+	b := make([]byte, 150)
+	n, err := msg.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(msg)
+	fmt.Printf("%q", b[:n])
+	msg1 := NewConnectMessage()
+	msg1.Decode(b[:n])
+	fmt.Println(msg1)
+	fmt.Println(reflect.DeepEqual(msg1, msg1))
+}
+
 func TestDecode(t *testing.T) {
 	// 此数据并非全部按协议来，比如contextType后面居然是payloadFormatIndicator
 	var testData = []byte{

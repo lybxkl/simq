@@ -25,6 +25,7 @@ func init() {
 // disconnect the Client [MQTT-3.1.0-2].  See section 4.8 for information about
 // handling errors.
 type ConnectMessage struct {
+	buildTag bool
 	header
 
 	// 7: username flag
@@ -55,17 +56,17 @@ type ConnectMessage struct {
 	requestRespInfo       byte              // 一个字节表示的 0 或 1, 请求响应信息
 	requestProblemInfo    byte              // 一个字节表示的 0 或 1 , 请求问题信息
 	userProperty          map[string]string // 用户属性，可变报头的
-	willUserProperty      map[string]string // 用户属性，载荷遗嘱属性的
 	authMethod            string            // 认证方法
 	authData              []byte            // 认证数据
 
-	willPropertiesLen      int    // 遗嘱属性长度
-	willDelayInterval      uint32 // 遗嘱延时间隔
-	payloadFormatIndicator byte   // 载荷格式指示
-	willMsgExpiryInterval  uint32 // 遗嘱消息过期间隔
-	contentType            string // 遗嘱内容类型 UTF-8 格式编码，fixme 长度未知
-	responseTopic          string // 响应主题
-	correlationData        []byte // 对比数据
+	willPropertiesLen      int               // 遗嘱属性长度
+	willDelayInterval      uint32            // 遗嘱延时间隔
+	payloadFormatIndicator byte              // 载荷格式指示
+	willMsgExpiryInterval  uint32            // 遗嘱消息过期间隔
+	contentType            string            // 遗嘱内容类型 UTF-8 格式编码
+	willUserProperty       map[string]string // 用户属性，载荷遗嘱属性的
+	responseTopic          string            // 响应主题
+	correlationData        []byte            // 对比数据
 }
 
 var _ Message = (*ConnectMessage)(nil)
@@ -135,6 +136,267 @@ func (this ConnectMessage) String() string {
 		this.Username(),
 		this.Password(),
 	)
+}
+
+// 自动设置remlen , 属性长度， 遗嘱属性长度
+func (this *ConnectMessage) build() {
+	if this.buildTag {
+		return
+	}
+	remlen := 0
+	remlen += 4
+	//  protoName,
+	//	clientId,
+	//	willTopic,
+	//	willMessage,
+	//	username,
+	//	password []byte
+	remlen += 2
+	remlen += len(this.protoName)
+	remlen += 2
+	remlen += len(this.clientId)
+	if this.WillFlag() && len(this.willTopic) > 0 {
+		remlen += 2
+		remlen += len(this.willTopic)
+	}
+	if this.WillFlag() && len(this.willMessage) > 0 {
+		remlen += 2
+		remlen += len(this.willMessage)
+	}
+	if this.UsernameFlag() {
+		remlen += 2
+		remlen += len(this.username)
+	}
+	if this.PasswordFlag() {
+		remlen += 2
+		remlen += len(this.password)
+	}
+	// 属性长度
+	//  sessionExpiryInterval uint32            // 会话过期间隔
+	//	receiveMaximum        uint16            // 接收最大值
+	//	maxPacketSize         uint32            // 最大报文长度是 MQTT 控制报文的总长度
+	//	topicAliasMax         uint16            // 主题别名最大值（Topic Alias Maximum）
+	//	requestRespInfo       byte              // 一个字节表示的 0 或 1, 请求响应信息
+	//	requestProblemInfo    byte              // 一个字节表示的 0 或 1 , 请求问题信息
+	//	userProperty          map[string]string // 用户属性，可变报头的
+	//	authMethod            string            // 认证方法
+	//	authData              []byte            // 认证数据
+	propertiesLen := 0
+	if this.sessionExpiryInterval > 0 {
+		propertiesLen += 5
+	}
+	if this.receiveMaximum > 0 {
+		propertiesLen += 3
+	}
+	if this.maxPacketSize > 0 {
+		propertiesLen += 5
+	}
+	if this.topicAliasMax > 0 {
+		propertiesLen += 3
+	}
+	if this.requestRespInfo == 1 {
+		propertiesLen += 2
+	}
+	if this.requestProblemInfo != 1 {
+		propertiesLen += 2
+	}
+	for k, v := range this.userProperty {
+		propertiesLen += 1
+		propertiesLen += len(k)
+		propertiesLen += 1
+		propertiesLen += len(v)
+	}
+	if this.authMethod != "" {
+		propertiesLen += 1
+		propertiesLen += len(this.authMethod)
+	}
+	if len(this.authData) > 0 {
+		propertiesLen += 1
+		propertiesLen += len(this.authData)
+	}
+	this.propertiesLen = propertiesLen
+
+	//	willDelayInterval      uint32            // 遗嘱延时间隔
+	//	payloadFormatIndicator byte              // 载荷格式指示
+	//	willMsgExpiryInterval  uint32            // 遗嘱消息过期间隔
+	//	contentType            string            // 遗嘱内容类型 UTF-8 格式编码
+	//	willUserProperty       map[string]string // 用户属性，载荷遗嘱属性的
+	//	responseTopic          string            // 响应主题
+	//	correlationData        []byte            // 对比数据
+	willPropertiesLen := 0
+	if this.willDelayInterval > 0 {
+		willPropertiesLen += 5
+	}
+	if this.payloadFormatIndicator == 1 {
+		willPropertiesLen += 2
+	}
+	if this.willMsgExpiryInterval > 0 {
+		willPropertiesLen += 5
+	}
+	if this.contentType != "" {
+		willPropertiesLen += 1
+		willPropertiesLen += len(this.contentType)
+	}
+	for k, v := range this.willUserProperty {
+		willPropertiesLen += 1
+		willPropertiesLen += len(k)
+		willPropertiesLen += 1
+		willPropertiesLen += len(v)
+	}
+	if this.responseTopic != "" {
+		willPropertiesLen += 1
+		willPropertiesLen += len(this.responseTopic)
+	}
+	if len(this.correlationData) > 0 {
+		willPropertiesLen += 1
+		willPropertiesLen += len(this.correlationData)
+	}
+	this.willPropertiesLen = willPropertiesLen
+	this.header.SetRemainingLength(int32(remlen + propertiesLen + willPropertiesLen))
+	this.buildTag = true
+}
+func (this *ConnectMessage) PropertiesLen() int {
+	return this.propertiesLen
+}
+
+func (this *ConnectMessage) SetPropertiesLen(propertiesLen int) {
+	this.propertiesLen = propertiesLen
+}
+
+func (this *ConnectMessage) SessionExpiryInterval() uint32 {
+	return this.sessionExpiryInterval
+}
+
+func (this *ConnectMessage) SetSessionExpiryInterval(sessionExpiryInterval uint32) {
+	this.sessionExpiryInterval = sessionExpiryInterval
+}
+
+func (this *ConnectMessage) ReceiveMaximum() uint16 {
+	return this.receiveMaximum
+}
+
+func (this *ConnectMessage) SetReceiveMaximum(receiveMaximum uint16) {
+	this.receiveMaximum = receiveMaximum
+}
+
+func (this *ConnectMessage) MaxPacketSize() uint32 {
+	return this.maxPacketSize
+}
+
+func (this *ConnectMessage) SetMaxPacketSize(maxPacketSize uint32) {
+	this.maxPacketSize = maxPacketSize
+}
+
+func (this *ConnectMessage) TopicAliasMax() uint16 {
+	return this.topicAliasMax
+}
+
+func (this *ConnectMessage) SetTopicAliasMax(topicAliasMax uint16) {
+	this.topicAliasMax = topicAliasMax
+}
+
+func (this *ConnectMessage) RequestRespInfo() byte {
+	return this.requestRespInfo
+}
+
+func (this *ConnectMessage) SetRequestRespInfo(requestRespInfo byte) {
+	this.requestRespInfo = requestRespInfo
+}
+
+func (this *ConnectMessage) RequestProblemInfo() byte {
+	return this.requestProblemInfo
+}
+
+func (this *ConnectMessage) SetRequestProblemInfo(requestProblemInfo byte) {
+	this.requestProblemInfo = requestProblemInfo
+}
+
+func (this *ConnectMessage) UserProperty() map[string]string {
+	return this.userProperty
+}
+
+func (this *ConnectMessage) SetUserProperty(userProperty map[string]string) {
+	this.userProperty = userProperty
+}
+
+func (this *ConnectMessage) WillUserProperty() map[string]string {
+	return this.willUserProperty
+}
+
+func (this *ConnectMessage) SetWillUserProperty(willUserProperty map[string]string) {
+	this.willUserProperty = willUserProperty
+}
+
+func (this *ConnectMessage) AuthMethod() string {
+	return this.authMethod
+}
+
+func (this *ConnectMessage) SetAuthMethod(authMethod string) {
+	this.authMethod = authMethod
+}
+
+func (this *ConnectMessage) AuthData() []byte {
+	return this.authData
+}
+
+func (this *ConnectMessage) SetAuthData(authData []byte) {
+	this.authData = authData
+}
+
+func (this *ConnectMessage) WillPropertiesLen() int {
+	return this.willPropertiesLen
+}
+
+func (this *ConnectMessage) SetWillPropertiesLen(willPropertiesLen int) {
+	this.willPropertiesLen = willPropertiesLen
+}
+
+func (this *ConnectMessage) WillDelayInterval() uint32 {
+	return this.willDelayInterval
+}
+
+func (this *ConnectMessage) SetWillDelayInterval(willDelayInterval uint32) {
+	this.willDelayInterval = willDelayInterval
+}
+
+func (this *ConnectMessage) PayloadFormatIndicator() byte {
+	return this.payloadFormatIndicator
+}
+
+func (this *ConnectMessage) SetPayloadFormatIndicator(payloadFormatIndicator byte) {
+	this.payloadFormatIndicator = payloadFormatIndicator
+}
+
+func (this *ConnectMessage) WillMsgExpiryInterval() uint32 {
+	return this.willMsgExpiryInterval
+}
+
+func (this *ConnectMessage) SetWillMsgExpiryInterval(willMsgExpiryInterval uint32) {
+	this.willMsgExpiryInterval = willMsgExpiryInterval
+}
+
+func (this *ConnectMessage) ContentType() string {
+	return this.contentType
+}
+
+func (this *ConnectMessage) SetContentType(contentType string) {
+	this.contentType = contentType
+}
+
+func (this *ConnectMessage) ResponseTopic() string {
+	return this.responseTopic
+}
+
+func (this *ConnectMessage) SetResponseTopic(responseTopic string) {
+	this.responseTopic = responseTopic
+}
+
+func (this *ConnectMessage) CorrelationData() []byte {
+	return this.correlationData
+}
+
+func (this *ConnectMessage) SetCorrelationData(correlationData []byte) {
+	this.correlationData = correlationData
 }
 
 // Version returns the the 8 bit unsigned value that represents the revision level
@@ -413,6 +675,7 @@ func (this *ConnectMessage) Len() int {
 // a Connack error. If so, caller should send the Client back the corresponding
 // CONNACK message.
 func (this *ConnectMessage) Decode(src []byte) (int, error) {
+	this.build()
 	total := 0
 
 	n, err := this.header.decode(src[total:])
@@ -432,6 +695,7 @@ func (this *ConnectMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *ConnectMessage) Encode(dst []byte) (int, error) {
+	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("connect/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -548,6 +812,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 		copy(dst[total:], k1)
 		total += len(k1)
 		dst[total] = ':'
+		total++
 		copy(dst[total:], v1)
 		total += len(v1)
 	}
@@ -621,6 +886,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 			copy(dst[total:], k1)
 			total += len(k1)
 			dst[total] = ':'
+			total++
 			copy(dst[total:], v1)
 			total += len(v1)
 		}
@@ -812,6 +1078,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 			return total, ProtocolError
 		}
 		splitTag := 0
+		this.userProperty = make(map[string]string)
 		for ; i < nextLen; i++ {
 			switch src[total+i] {
 			case ':':
@@ -822,17 +1089,26 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 					// 或者最后一个字节才是分隔符，协议错误
 					return total, ProtocolError
 				}
-				this.userProperty[string(src[total:total+splitTag])] = string(src[total : total+i])
+				this.userProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
 				splitTag = 0
 			case AuthenticationMethod:
+				if splitTag > 0 && splitTag != nextLen-1 {
+					this.userProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
+					splitTag = 0
+				} else if splitTag == 0 || splitTag == nextLen-1 {
+					// 遇到了下一个用户属性都还没有遇到分隔符
+					// 或者最后一个字节才是分隔符，协议错误
+					return total, ProtocolError
+				}
 				if len(this.userProperty) == 0 { // 没有用户属性，协议错误
 					return total, ProtocolError
 				}
-				break
+				goto PP
 			case AuthenticationData: // 没有遇到认证方法，却遇到了认证数据，协议错误
 				return total, ProtocolError
 			}
 		}
+	PP:
 		if i == 0 {
 			return total, ProtocolError
 		} else if i == nextLen {
@@ -841,7 +1117,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				// 或者最后一个字节才是分隔符，协议错误
 				return total, ProtocolError
 			}
-			this.userProperty[string(src[total:total+splitTag])] = string(src[total : total+i])
+			this.userProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
 		}
 		total += i
 	}
@@ -850,7 +1126,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		// 如果客户端在 CONNECT 报文中设置了认证方法，则客户端在收到 CONNACK 报文之前不能发送除AUTH 或 DISCONNECT 之外的报文 [MQTT-3.1.2-30]。
 		total++
 
-		i, nextLen := 0, total-oldIndex-this.propertiesLen
+		i, nextLen := 0, oldIndex+this.propertiesLen-total
 		for ; i < nextLen; i++ {
 			if src[total+i] == AuthenticationData {
 				break
@@ -872,7 +1148,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		if len(this.authMethod) == 0 {
 			return total, ProtocolError
 		}
-		this.authData = src[oldIndex+this.propertiesLen-total : oldIndex+this.propertiesLen]
+		this.authData = src[total : oldIndex+this.propertiesLen]
 		total = oldIndex + this.propertiesLen
 
 		if src[total] == AuthenticationData {
@@ -954,13 +1230,13 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				case ResponseTopic, RelatedData, UserProperty:
 					if i == 0 {
 						return total + i, ProtocolError
-					} else {
-						break
 					}
+					goto CT
 				case ContentType:
 					return total + i, ProtocolError
 				}
 			}
+		CT:
 			if i == 0 {
 				return total, ProtocolError
 			}
@@ -979,13 +1255,13 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				case RelatedData, UserProperty:
 					if i == 0 {
 						return total + i, ProtocolError
-					} else {
-						break
 					}
+					goto RT
 				case ResponseTopic:
 					return total + i, ProtocolError
 				}
 			}
+		RT:
 			if i == 0 {
 				return total, ProtocolError
 			}
@@ -1004,17 +1280,17 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				case UserProperty:
 					if i == 0 {
 						return total + i, ProtocolError
-					} else {
-						break
 					}
+					goto RD
 				case RelatedData:
 					return total + i, ProtocolError
 				}
 			}
+		RD:
 			if i == 0 {
 				return total, ProtocolError
 			}
-			this.contentType = string(src[total : total+i])
+			this.correlationData = src[total : total+i]
 			total += i
 			if src[total] == RelatedData {
 				return total, ProtocolError
@@ -1028,6 +1304,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				return total, ProtocolError
 			}
 			splitTag := 0
+			this.willUserProperty = make(map[string]string)
 			for ; i < nextLen; i++ {
 				switch src[total+i] {
 				case ':':
@@ -1038,7 +1315,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 						// 或者最后一个字节才是分隔符，协议错误
 						return total, ProtocolError
 					}
-					this.userProperty[string(src[total:total+splitTag])] = string(src[total : total+i])
+					this.willUserProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
 					splitTag = 0
 				}
 			}
@@ -1050,7 +1327,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 					// 或者最后一个字节才是分隔符，协议错误
 					return total, ProtocolError
 				}
-				this.userProperty[string(src[total:total+splitTag])] = string(src[total : total+i])
+				this.willUserProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
 			}
 			total += i
 		}
@@ -1097,43 +1374,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 }
 
 func (this *ConnectMessage) msglen() int {
-	total := 0
-
-	verstr, ok := SupportedVersions[this.version]
-	if !ok {
-		return total
-	}
-
-	// 2 bytes protocol name length
-	// n bytes protocol name
-	// 1 byte protocol version
-	// 1 byte connect flags
-	// 2 bytes keep alive timer
-	total += 2 + len(verstr) + 1 + 1 + 2
-
-	// Add the clientID length, 2 is the length prefix
-	total += 2 + len(this.clientId)
-
-	// Add the will topic and will message length, and the length prefixes
-	if this.WillFlag() {
-		total += 2 + len(this.willTopic) + 2 + len(this.willMessage)
-	}
-
-	// Add the username length
-	// According to the 3.1 spec, it's possible that the usernameFlag is set,
-	// but the user name string is missing.
-	if this.UsernameFlag() && len(this.username) > 0 {
-		total += 2 + len(this.username)
-	}
-
-	// Add the password length
-	// According to the 3.1 spec, it's possible that the passwordFlag is set,
-	// but the password string is missing.
-	if this.PasswordFlag() && len(this.password) > 0 {
-		total += 2 + len(this.password)
-	}
-
-	return total
+	return int(this.remlen)
 }
 
 // validClientId checks the client ID, which is a slice of bytes, to see if it's valid.
