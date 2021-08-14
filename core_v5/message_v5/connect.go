@@ -261,6 +261,7 @@ func (this *ConnectMessage) PropertiesLen() int {
 
 func (this *ConnectMessage) SetPropertiesLen(propertiesLen int) {
 	this.propertiesLen = propertiesLen
+	this.dirty = true
 }
 
 func (this *ConnectMessage) SessionExpiryInterval() uint32 {
@@ -269,6 +270,7 @@ func (this *ConnectMessage) SessionExpiryInterval() uint32 {
 
 func (this *ConnectMessage) SetSessionExpiryInterval(sessionExpiryInterval uint32) {
 	this.sessionExpiryInterval = sessionExpiryInterval
+	this.dirty = true
 }
 
 func (this *ConnectMessage) ReceiveMaximum() uint16 {
@@ -277,6 +279,7 @@ func (this *ConnectMessage) ReceiveMaximum() uint16 {
 
 func (this *ConnectMessage) SetReceiveMaximum(receiveMaximum uint16) {
 	this.receiveMaximum = receiveMaximum
+	this.dirty = true
 }
 
 func (this *ConnectMessage) MaxPacketSize() uint32 {
@@ -285,6 +288,7 @@ func (this *ConnectMessage) MaxPacketSize() uint32 {
 
 func (this *ConnectMessage) SetMaxPacketSize(maxPacketSize uint32) {
 	this.maxPacketSize = maxPacketSize
+	this.dirty = true
 }
 
 func (this *ConnectMessage) TopicAliasMax() uint16 {
@@ -293,6 +297,7 @@ func (this *ConnectMessage) TopicAliasMax() uint16 {
 
 func (this *ConnectMessage) SetTopicAliasMax(topicAliasMax uint16) {
 	this.topicAliasMax = topicAliasMax
+	this.dirty = true
 }
 
 func (this *ConnectMessage) RequestRespInfo() byte {
@@ -301,6 +306,7 @@ func (this *ConnectMessage) RequestRespInfo() byte {
 
 func (this *ConnectMessage) SetRequestRespInfo(requestRespInfo byte) {
 	this.requestRespInfo = requestRespInfo
+	this.dirty = true
 }
 
 func (this *ConnectMessage) RequestProblemInfo() byte {
@@ -309,6 +315,7 @@ func (this *ConnectMessage) RequestProblemInfo() byte {
 
 func (this *ConnectMessage) SetRequestProblemInfo(requestProblemInfo byte) {
 	this.requestProblemInfo = requestProblemInfo
+	this.dirty = true
 }
 
 func (this *ConnectMessage) UserProperty() map[string]string {
@@ -317,6 +324,7 @@ func (this *ConnectMessage) UserProperty() map[string]string {
 
 func (this *ConnectMessage) SetUserProperty(userProperty map[string]string) {
 	this.userProperty = userProperty
+	this.dirty = true
 }
 
 func (this *ConnectMessage) WillUserProperty() map[string]string {
@@ -325,6 +333,7 @@ func (this *ConnectMessage) WillUserProperty() map[string]string {
 
 func (this *ConnectMessage) SetWillUserProperty(willUserProperty map[string]string) {
 	this.willUserProperty = willUserProperty
+	this.dirty = true
 }
 
 func (this *ConnectMessage) AuthMethod() string {
@@ -333,6 +342,7 @@ func (this *ConnectMessage) AuthMethod() string {
 
 func (this *ConnectMessage) SetAuthMethod(authMethod string) {
 	this.authMethod = authMethod
+	this.dirty = true
 }
 
 func (this *ConnectMessage) AuthData() []byte {
@@ -341,6 +351,7 @@ func (this *ConnectMessage) AuthData() []byte {
 
 func (this *ConnectMessage) SetAuthData(authData []byte) {
 	this.authData = authData
+	this.dirty = true
 }
 
 func (this *ConnectMessage) WillPropertiesLen() int {
@@ -349,6 +360,7 @@ func (this *ConnectMessage) WillPropertiesLen() int {
 
 func (this *ConnectMessage) SetWillPropertiesLen(willPropertiesLen int) {
 	this.willPropertiesLen = willPropertiesLen
+	this.dirty = true
 }
 
 func (this *ConnectMessage) WillDelayInterval() uint32 {
@@ -357,6 +369,7 @@ func (this *ConnectMessage) WillDelayInterval() uint32 {
 
 func (this *ConnectMessage) SetWillDelayInterval(willDelayInterval uint32) {
 	this.willDelayInterval = willDelayInterval
+	this.dirty = true
 }
 
 func (this *ConnectMessage) PayloadFormatIndicator() byte {
@@ -365,6 +378,7 @@ func (this *ConnectMessage) PayloadFormatIndicator() byte {
 
 func (this *ConnectMessage) SetPayloadFormatIndicator(payloadFormatIndicator byte) {
 	this.payloadFormatIndicator = payloadFormatIndicator
+	this.dirty = true
 }
 
 func (this *ConnectMessage) WillMsgExpiryInterval() uint32 {
@@ -373,6 +387,7 @@ func (this *ConnectMessage) WillMsgExpiryInterval() uint32 {
 
 func (this *ConnectMessage) SetWillMsgExpiryInterval(willMsgExpiryInterval uint32) {
 	this.willMsgExpiryInterval = willMsgExpiryInterval
+	this.dirty = true
 }
 
 func (this *ConnectMessage) ContentType() string {
@@ -381,6 +396,7 @@ func (this *ConnectMessage) ContentType() string {
 
 func (this *ConnectMessage) SetContentType(contentType string) {
 	this.contentType = contentType
+	this.dirty = true
 }
 
 func (this *ConnectMessage) ResponseTopic() string {
@@ -389,6 +405,7 @@ func (this *ConnectMessage) ResponseTopic() string {
 
 func (this *ConnectMessage) SetResponseTopic(responseTopic string) {
 	this.responseTopic = responseTopic
+	this.dirty = true
 }
 
 func (this *ConnectMessage) CorrelationData() []byte {
@@ -397,6 +414,7 @@ func (this *ConnectMessage) CorrelationData() []byte {
 
 func (this *ConnectMessage) SetCorrelationData(correlationData []byte) {
 	this.correlationData = correlationData
+	this.dirty = true
 }
 
 // Version returns the the 8 bit unsigned value that represents the revision level
@@ -675,7 +693,6 @@ func (this *ConnectMessage) Len() int {
 // a Connack error. If so, caller should send the Client back the corresponding
 // CONNACK message.
 func (this *ConnectMessage) Decode(src []byte) (int, error) {
-	this.build()
 	total := 0
 
 	n, err := this.header.decode(src[total:])

@@ -27,6 +27,7 @@ func lbEncode(x int32) []byte {
 	return b[:i+1]
 }
 
+// 返回值，字节数，错误
 func lbDecode(b []byte) (int32, int, error) {
 	if len(b) == 0 {
 		return 0, 0, nil

@@ -15,10 +15,40 @@
 package message
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestDecodeV5(t *testing.T) {
+	conack := NewConnackMessage()
+	conack.SetReasonCode(Success)
+	conack.SetMaxPacketSize(300)
+	conack.SetAuthData([]byte("abc"))
+	conack.SetAuthMethod("auth")
+	conack.SetSessionExpiryInterval(30)
+	conack.SetMaxQos(0x02)
+	conack.SetReasonStr("测试消息")
+	conack.SetSessionPresent(true)
+	b := make([]byte, 150)
+	n, err := conack.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(b[:n])
+	fmt.Println(conack)
+	conack2 := NewConnackMessage()
+	n, err = conack2.Decode(b[:n])
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(conack2)
+	conack2.header.dbuf = nil
+	conack2.header.dirty = true
+	fmt.Println(reflect.DeepEqual(conack, conack2)) // 最大报文长度，编码前可以为0
+}
 
 func TestConnackMessageFields(t *testing.T) {
 	msg := NewConnackMessage()
@@ -29,8 +59,8 @@ func TestConnackMessageFields(t *testing.T) {
 	msg.SetSessionPresent(false)
 	require.False(t, msg.SessionPresent(), "Error setting session present flag.")
 
-	msg.SetReturnCode(ConnectionAccepted)
-	require.Equal(t, ConnectionAccepted, msg.ReturnCode(), "Error setting return code.")
+	msg.SetReasonCode(Success)
+	require.Equal(t, ConnectionAccepted, msg.ReasonCode(), "Error setting return code.")
 }
 
 func TestConnackMessageDecode(t *testing.T) {
@@ -48,7 +78,7 @@ func TestConnackMessageDecode(t *testing.T) {
 	require.NoError(t, err, "Error decoding message.")
 	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 	require.False(t, msg.SessionPresent(), "Error decoding session present flag.")
-	require.Equal(t, ConnectionAccepted, msg.ReturnCode(), "Error decoding return code.")
+	require.Equal(t, Success, msg.ReasonCode(), "Error decoding return code.")
 }
 
 // testing wrong message length
@@ -119,7 +149,7 @@ func TestConnackMessageEncode(t *testing.T) {
 	}
 
 	msg := NewConnackMessage()
-	msg.SetReturnCode(ConnectionAccepted)
+	msg.SetReasonCode(Success)
 	msg.SetSessionPresent(true)
 
 	dst := make([]byte, 10)
