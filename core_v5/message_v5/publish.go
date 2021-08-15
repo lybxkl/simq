@@ -265,53 +265,53 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 	total += n
 	this.propertiesLen = propertiesLen
 
-	if src[total] == LoadFormatDescription { // 载荷格式
+	if total < len(src) && src[total] == LoadFormatDescription { // 载荷格式
 		total++
 		this.payloadFormatIndicator = src[total]
 		total++
-		if src[total] == LoadFormatDescription {
+		if total < len(src) && src[total] == LoadFormatDescription {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == MessageExpirationTime { // 消息过期间隔
+	if total < len(src) && src[total] == MessageExpirationTime { // 消息过期间隔
 		total++
 		this.messageExpiryInterval = binary.BigEndian.Uint32(src[total:])
 		total += 4
-		if src[total] == MessageExpirationTime {
+		if total < len(src) && src[total] == MessageExpirationTime {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == ThemeAlias { // 主题别名
+	if total < len(src) && src[total] == ThemeAlias { // 主题别名
 		total++
 		this.topicAlias = binary.BigEndian.Uint16(src[total:])
 		total += 2
-		if this.topicAlias == 0 || src[total] == ThemeAlias {
+		if this.topicAlias == 0 || (total < len(src) && src[total] == ThemeAlias) {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == ResponseTopic { // 响应主题
+	if total < len(src) && src[total] == ResponseTopic { // 响应主题
 		total++
 		this.responseTopic, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
-		if len(this.responseTopic) == 0 || src[total] == ResponseTopic {
+		if len(this.responseTopic) == 0 || (total < len(src) && src[total] == ResponseTopic) {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == RelatedData { // 对比数据
+	if total < len(src) && src[total] == RelatedData { // 对比数据
 		total++
 		this.correlationData, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
-		if len(this.correlationData) == 0 || src[total] == RelatedData {
+		if len(this.correlationData) == 0 || (total < len(src) && src[total] == RelatedData) {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == UserProperty { // 用户属性
+	if total < len(src) && src[total] == UserProperty { // 用户属性
 		total++
 		this.userProperty = make([][]byte, 0)
 		userP1, n1, err1 := readLPBytes(src[total:])
@@ -320,7 +320,7 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 			return total, err1
 		}
 		this.userProperty = append(this.userProperty, userP1)
-		for src[total] == UserProperty {
+		for total < len(src) && src[total] == UserProperty {
 			total++
 			userP1, n1, err1 = readLPBytes(src[total:])
 			total += n1
@@ -330,25 +330,25 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 			this.userProperty = append(this.userProperty, userP1)
 		}
 	}
-	if src[total] == DefiningIdentifiers { // 订阅标识符
+	if total < len(src) && src[total] == DefiningIdentifiers { // 订阅标识符
 		total++
 		this.subscriptionIdentifier, n, err = lbDecode(src[total:])
 		if err != nil {
 			return 0, ProtocolError
 		}
 		total += n
-		if this.subscriptionIdentifier == 0 || src[total] == DefiningIdentifiers {
+		if this.subscriptionIdentifier == 0 || (total < len(src) && src[total] == DefiningIdentifiers) {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == ContentType { // 内容类型
+	if total < len(src) && src[total] == ContentType { // 内容类型
 		total++
 		this.contentType, n, err = readLPBytes(src[total:])
 		if err != nil {
 			return 0, ProtocolError
 		}
 		total += n
-		if len(this.contentType) == 0 || src[total] == ContentType {
+		if len(this.contentType) == 0 || (total < len(src) && src[total] == ContentType) {
 			return 0, ProtocolError
 		}
 	}

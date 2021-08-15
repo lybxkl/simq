@@ -396,79 +396,85 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	total++
 	// Connack 属性
 
-	if src[total] == SessionExpirationInterval { // 会话过期间隔
+	if total < len(src) && src[total] == SessionExpirationInterval { // 会话过期间隔
 		total++
 		this.sessionExpiryInterval = binary.BigEndian.Uint32(src[total:])
 		total += 4
-		if src[total] == SessionExpirationInterval {
+		if total < len(src) && src[total] == SessionExpirationInterval {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == MaximumQuantityReceived { // 接收最大值
+	if total < len(src) && src[total] == MaximumQuantityReceived { // 接收最大值
 		total++
 		this.receiveMaximum = binary.BigEndian.Uint16(src[total:])
 		total += 2
-		if this.receiveMaximum == 0 || src[total] == MaximumQuantityReceived {
+		if this.receiveMaximum == 0 || (total < len(src) && src[total] == MaximumQuantityReceived) {
 			return 0, ProtocolError
 		}
 	} else {
 		this.receiveMaximum = 65535
 	}
-	if src[total] == MaximumQoS { // 最大服务质量
+	if total < len(src) && src[total] == MaximumQoS { // 最大服务质量
 		total++
 		this.maxQos = src[total]
 		total++
-		if this.maxQos > 2 || this.maxQos < 0 || src[total] == MaximumQoS {
+		if this.maxQos > 2 || this.maxQos < 0 || (total < len(src) && src[total] == MaximumQoS) {
 			return 0, ProtocolError
 		}
 	} else {
 		this.maxQos = 2 //  默认2
 	}
-	if src[total] == PreservePropertyAvailability { // 保留可用
+	if total < len(src) && src[total] == PreservePropertyAvailability { // 保留可用
 		total++
 		this.retainAvailable = src[total]
 		total++
-		if (this.retainAvailable != 0 && this.retainAvailable != 1) || src[total] == PreservePropertyAvailability {
+		if (this.retainAvailable != 0 && this.retainAvailable != 1) || (total < len(src) && src[total] == PreservePropertyAvailability) {
 			return 0, ProtocolError
 		}
 	} else {
 		this.retainAvailable = 0x01
 	}
-	if src[total] == MaximumMessageLength { // 最大报文长度
+	if total < len(src) && src[total] == MaximumMessageLength { // 最大报文长度
 		total++
 		this.maxPacketSize = binary.BigEndian.Uint32(src[total:])
 		total += 4
-		if this.maxPacketSize == 0 || src[total] == MaximumMessageLength {
+		if this.maxPacketSize == 0 || (total < len(src) && src[total] == MaximumMessageLength) {
 			return 0, ProtocolError
 		}
 	} else {
 		// TODO 按照协议由固定报头中的剩余长度可编码最大值和协议报头对数据包的大小做限制
 	}
-	if src[total] == AssignCustomerIdentifiers { // 分配的客户端标识符
+	if total < len(src) && src[total] == AssignCustomerIdentifiers { // 分配的客户端标识符
 		total++
 		this.assignedIdentifier, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
+		if total < len(src) && src[total] == AssignCustomerIdentifiers {
+			return total, ProtocolError
+		}
 	}
-	if src[total] == MaximumLengthOfTopicAlias { // 主题别名最大值
+	if total < len(src) && src[total] == MaximumLengthOfTopicAlias { // 主题别名最大值
 		total++
 		this.topicAliasMax = binary.BigEndian.Uint16(src[total:])
 		total += 2
-		if src[total] == MaximumLengthOfTopicAlias {
+		if total < len(src) && src[total] == MaximumLengthOfTopicAlias {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == ReasonString { // 分配的客户端标识符
+	if total < len(src) && src[total] == ReasonString { // 分配的客户端标识符
 		total++
 		this.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
+		if total < len(src) && src[total] == ReasonString {
+			return total, ProtocolError
+		}
 	}
-	if src[total] == UserProperty { // 用户属性
+	if total < len(src) && src[total] == UserProperty { // 用户属性
 		total++
 		this.userProperties = make([][]byte, 0)
 		var up []byte
@@ -478,7 +484,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 			return total, err
 		}
 		this.userProperties = append(this.userProperties, up)
-		for src[total] == UserProperty {
+		for total < len(src) && src[total] == UserProperty {
 			total++
 			up, n, err = readLPBytes(src[total:])
 			total += n
@@ -488,77 +494,89 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 			this.userProperties = append(this.userProperties, up)
 		}
 	}
-	if src[total] == WildcardSubscriptionAvailability { // 通配符订阅可用
+	if total < len(src) && src[total] == WildcardSubscriptionAvailability { // 通配符订阅可用
 		total++
 		this.wildcardSubscriptionAvailable = src[total]
 		total++
 		if (this.wildcardSubscriptionAvailable != 0 && this.wildcardSubscriptionAvailable != 1) ||
-			src[total] == WildcardSubscriptionAvailability {
+			(total < len(src) && src[total] == WildcardSubscriptionAvailability) {
 			return 0, ProtocolError
 		}
 	} else {
 		this.wildcardSubscriptionAvailable = 0x01
 	}
-	if src[total] == AvailabilityOfSubscriptionIdentifiers { // 订阅标识符可用
+	if total < len(src) && src[total] == AvailabilityOfSubscriptionIdentifiers { // 订阅标识符可用
 		total++
 		this.subscriptionIdentifierAvailable = src[total]
 		total++
 		if (this.subscriptionIdentifierAvailable != 0 && this.subscriptionIdentifierAvailable != 1) ||
-			src[total] == AvailabilityOfSubscriptionIdentifiers {
+			(total < len(src) && src[total] == AvailabilityOfSubscriptionIdentifiers) {
 			return 0, ProtocolError
 		}
 	} else {
 		this.subscriptionIdentifierAvailable = 0x01
 	}
-	if src[total] == SharedSubscriptionAvailability { // 共享订阅标识符可用
+	if total < len(src) && src[total] == SharedSubscriptionAvailability { // 共享订阅标识符可用
 		total++
 		this.sharedSubscriptionAvailable = src[total]
 		total++
 		if (this.sharedSubscriptionAvailable != 0 && this.sharedSubscriptionAvailable != 1) ||
-			src[total] == SharedSubscriptionAvailability {
+			(total < len(src) && src[total] == SharedSubscriptionAvailability) {
 			return 0, ProtocolError
 		}
 	} else {
 		this.subscriptionIdentifierAvailable = 0x01
 	}
-	if src[total] == ServerSurvivalTime { // 服务保持连接
+	if total < len(src) && src[total] == ServerSurvivalTime { // 服务保持连接
 		total++
 		this.serverKeepAlive = binary.BigEndian.Uint16(src[total:])
 		total++
-		if src[total] == ServerSurvivalTime {
+		if total < len(src) && src[total] == ServerSurvivalTime {
 			return 0, ProtocolError
 		}
 	}
-	if src[total] == SolicitedMessage { // 响应信息
+	if total < len(src) && src[total] == SolicitedMessage { // 响应信息
 		total++
 		this.responseInformation, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
+		if total < len(src) && src[total] == SolicitedMessage {
+			return total, ProtocolError
+		}
 	}
-	if src[total] == ServerReference { // 服务端参考
+	if total < len(src) && src[total] == ServerReference { // 服务端参考
 		total++
 		this.serverReference, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
+		if total < len(src) && src[total] == ServerReference {
+			return total, ProtocolError
+		}
 	}
-	if src[total] == AuthenticationMethod { // 认证方法
+	if total < len(src) && src[total] == AuthenticationMethod { // 认证方法
 		total++
 		this.authMethod, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
+		if total < len(src) && src[total] == AuthenticationMethod {
+			return total, ProtocolError
+		}
 	}
-	if src[total] == AuthenticationData { // 认证数据
+	if total < len(src) && src[total] == AuthenticationData { // 认证数据
 		total++
 		this.authData, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
+		}
+		if total < len(src) && src[total] == AuthenticationData {
+			return total, ProtocolError
 		}
 	}
 	this.dirty = false

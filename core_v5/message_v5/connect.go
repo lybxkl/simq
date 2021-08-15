@@ -1031,31 +1031,31 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		return total, InvalidMessage
 	}
 
-	if src[total] == SessionExpirationInterval { //会话过期间隔（Session Expiry Interval）标识符。 四字节过期间隔，0xFFFFFFFF表示永不过期，0或者不设置，则为网络连接关闭时立即结束
+	if total < len(src) && src[total] == SessionExpirationInterval { //会话过期间隔（Session Expiry Interval）标识符。 四字节过期间隔，0xFFFFFFFF表示永不过期，0或者不设置，则为网络连接关闭时立即结束
 		total++
 		this.sessionExpiryInterval = binary.BigEndian.Uint32(src[total:])
 		total += 4
-		if src[total] == SessionExpirationInterval {
+		if total < len(src) && src[total] == SessionExpirationInterval {
 			return total, ProtocolError
 		}
 	}
 
-	if src[total] == MaximumQuantityReceived { // 接收最大值（Receive Maximum）标识符。
+	if total < len(src) && src[total] == MaximumQuantityReceived { // 接收最大值（Receive Maximum）标识符。
 		total++
 		this.receiveMaximum = binary.BigEndian.Uint16(src[total:])
 		total += 2
-		if this.receiveMaximum == 0 || src[total] == MaximumQuantityReceived {
+		if this.receiveMaximum == 0 || (total < len(src) && src[total] == MaximumQuantityReceived) {
 			return total, ProtocolError
 		}
 	} else {
 		this.receiveMaximum = 65535
 	}
 
-	if src[total] == MaximumMessageLength { // 最大报文长度（Maximum Packet Size）标识符。
+	if total < len(src) && src[total] == MaximumMessageLength { // 最大报文长度（Maximum Packet Size）标识符。
 		total++
 		this.maxPacketSize = binary.BigEndian.Uint32(src[total:])
 		total += 4
-		if this.maxPacketSize == 0 || src[total] == MaximumMessageLength {
+		if this.maxPacketSize == 0 || (total < len(src) && src[total] == MaximumMessageLength) {
 			return total, ProtocolError
 		}
 	} else {
@@ -1066,7 +1066,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		// 共享订阅的情况下，如果一条消息对于部分客户端来说太长而不能发送，服务端可以选择丢弃此消息或者把消息发送给剩余能够接收此消息的客户端
 	}
 
-	if src[total] == MaximumLengthOfTopicAlias { // 主题别名最大值
+	if total < len(src) && src[total] == MaximumLengthOfTopicAlias { // 主题别名最大值
 		total++
 		// 服务端在一个 PUBLISH 报文中发送的主题别名不能超过客户端设置的
 		// 主题别名最大值（Topic Alias Maximum） [MQTT-3.1.2-26]。值为零表示本次连接客户端不接受任何主题
@@ -1074,34 +1074,36 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		// 户端发送任何主题别名（Topic Alias）
 		this.topicAliasMax = binary.BigEndian.Uint16(src[total:])
 		total += 2
-		if src[total] == MaximumLengthOfTopicAlias {
+		if total < len(src) && src[total] == MaximumLengthOfTopicAlias {
 			return total, ProtocolError
 		}
 	}
 
-	if src[total] == RequestResponseInformation { // 请求响应信息
+	if total < len(src) && src[total] == RequestResponseInformation { // 请求响应信息
 		total++
 		this.requestRespInfo = src[total]
 		total++
-		if (this.requestRespInfo != 0 && this.requestRespInfo != 1) || src[total] == RequestResponseInformation {
+		if (this.requestRespInfo != 0 && this.requestRespInfo != 1) ||
+			(total < len(src) && src[total] == RequestResponseInformation) {
 			return total, ProtocolError
 		}
 	}
 
-	if src[total] == RequestProblemInformation { // 请求问题信息
+	if total < len(src) && src[total] == RequestProblemInformation { // 请求问题信息
 		total++
 		// 客户端使用此值指示遇到错误时是否发送原因字符串（Reason String）或用户属性（User Properties）
 		// 如果此值为 1，服务端可以在任何被允许的报文中返回原因字符串（Reason String）或用户属性（User Properties）
 		this.requestProblemInfo = src[total]
 		total++
-		if (this.requestProblemInfo != 0 && this.requestProblemInfo != 1) || src[total] == RequestProblemInformation {
+		if (this.requestProblemInfo != 0 && this.requestProblemInfo != 1) ||
+			(total < len(src) && src[total] == RequestProblemInformation) {
 			return total, ProtocolError
 		}
 	} else {
 		this.requestProblemInfo = 0x01
 	}
 
-	if src[total] == UserProperty {
+	if total < len(src) && src[total] == UserProperty {
 		total++
 		this.userProperty = make([][]byte, 0)
 		var up []byte
@@ -1111,7 +1113,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 			return total, err
 		}
 		this.userProperty = append(this.userProperty, up)
-		for src[total] == UserProperty {
+		for total < len(src) && src[total] == UserProperty {
 			total++
 			up, n, err = readLPBytes(src[total:])
 			total += n
@@ -1122,7 +1124,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		}
 	}
 
-	if src[total] == AuthenticationMethod { // 认证方法
+	if total < len(src) && src[total] == AuthenticationMethod { // 认证方法
 		// 如果客户端在 CONNECT 报文中设置了认证方法，则客户端在收到 CONNACK 报文之前不能发送除AUTH 或 DISCONNECT 之外的报文 [MQTT-3.1.2-30]。
 		total++
 
@@ -1132,19 +1134,19 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 			return total, err
 		}
 
-		if src[total] == AuthenticationMethod {
+		if total < len(src) && src[total] == AuthenticationMethod {
 			return total, ProtocolError
 		}
 	}
 
-	if src[total] == AuthenticationData { // 认证数据
+	if total < len(src) && src[total] == AuthenticationData { // 认证数据
 		total++
 		this.authData, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
-		if src[total] == AuthenticationData {
+		if total < len(src) && src[total] == AuthenticationData {
 			return total, ProtocolError
 		}
 	} else if len(this.authMethod) != 0 { // 有认证方法，却没有认证数据
@@ -1182,67 +1184,67 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		if err != nil {
 			return total, ProtocolError
 		}
-		if src[total] == DelayWills { // 遗嘱延时间隔
+		if total < len(src) && src[total] == DelayWills { // 遗嘱延时间隔
 			total++
 			this.willDelayInterval = binary.BigEndian.Uint32(src[total:])
 			total += 4
-			if src[total] == DelayWills {
+			if total < len(src) && src[total] == DelayWills {
 				return total, ProtocolError
 			}
 		}
-		if src[total] == LoadFormatDescription { // 载荷格式指示
+		if total < len(src) && src[total] == LoadFormatDescription { // 载荷格式指示
 			total++
 			this.payloadFormatIndicator = src[total]
 			total++
 			if this.payloadFormatIndicator != 0x00 && this.payloadFormatIndicator != 0x01 {
 				return total, ProtocolError
 			}
-			if src[total] == LoadFormatDescription {
+			if total < len(src) && src[total] == LoadFormatDescription {
 				return total, ProtocolError
 			}
 		}
-		if src[total] == MessageExpirationTime { // 消息过期间隔
+		if total < len(src) && src[total] == MessageExpirationTime { // 消息过期间隔
 			total++
 			this.willMsgExpiryInterval = binary.BigEndian.Uint32(src[total:])
 			total += 4
-			if src[total] == MessageExpirationTime {
+			if total < len(src) && src[total] == MessageExpirationTime {
 				return total, ProtocolError
 			}
 		}
-		if src[total] == ContentType { // 内容类型
+		if total < len(src) && src[total] == ContentType { // 内容类型
 			total++
 			this.contentType, n, err = readLPBytes(src[total:])
 			total += n
 			if err != nil {
 				return total, err
 			}
-			if src[total] == ContentType {
+			if total < len(src) && src[total] == ContentType {
 				return total, ProtocolError
 			}
 		}
-		if src[total] == ResponseTopic { // 响应主题的存在将遗嘱消息（Will Message）标识为一个请求报文
+		if total < len(src) && src[total] == ResponseTopic { // 响应主题的存在将遗嘱消息（Will Message）标识为一个请求报文
 			total++
 			this.responseTopic, n, err = readLPBytes(src[total:])
 			total += n
 			if err != nil {
 				return total, err
 			}
-			if src[total] == ResponseTopic {
+			if total < len(src) && src[total] == ResponseTopic {
 				return total, ProtocolError
 			}
 		}
-		if src[total] == RelatedData { // 对比数据 只对请求消息（Request Message）的发送端和响应消息（Response Message）的接收端有意义。
+		if total < len(src) && src[total] == RelatedData { // 对比数据 只对请求消息（Request Message）的发送端和响应消息（Response Message）的接收端有意义。
 			total++
 			this.correlationData, n, err = readLPBytes(src[total:])
 			total += n
 			if err != nil {
 				return total, err
 			}
-			if src[total] == RelatedData {
+			if total < len(src) && src[total] == RelatedData {
 				return total, ProtocolError
 			}
 		}
-		if src[total] == UserProperty { // 用户属性
+		if total < len(src) && src[total] == UserProperty { // 用户属性
 			total++
 			this.willUserProperty = make([][]byte, 0)
 			var tp []byte
@@ -1252,7 +1254,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				return total, err
 			}
 			this.willUserProperty = append(this.willUserProperty, tp)
-			for src[total] == UserProperty {
+			for total < len(src) && src[total] == UserProperty {
 				total++
 				tp, n, err = readLPBytes(src[total:])
 				total += n

@@ -1,11 +1,34 @@
 package message
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+func TestPubAckDecodeEncode(t *testing.T) {
+	puback := NewPubackMessage()
+	puback.SetPacketId(123)
+	puback.SetReasonCode(Success)
+	puback.SetReasonStr([]byte("aaa"))
+	puback.SetUserProperty([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	puback.build()
+	b := make([]byte, 100)
+	n, err := puback.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(puback)
+	fmt.Println(b[:n])
+	puback1 := NewPubackMessage()
+	puback1.Decode(b[:n])
+	puback1.dirty = true
+	puback1.dbuf = nil
+	fmt.Println(puback1)
+	fmt.Println(reflect.DeepEqual(puback1, puback))
+}
 func TestPubackMessageFields(t *testing.T) {
 	msg := NewPubackMessage()
 
