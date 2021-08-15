@@ -48,25 +48,25 @@ type ConnectMessage struct {
 	username,
 	password []byte
 
-	propertiesLen         int               // 属性长度
-	sessionExpiryInterval uint32            // 会话过期间隔
-	receiveMaximum        uint16            // 接收最大值
-	maxPacketSize         uint32            // 最大报文长度是 MQTT 控制报文的总长度
-	topicAliasMax         uint16            // 主题别名最大值（Topic Alias Maximum）
-	requestRespInfo       byte              // 一个字节表示的 0 或 1, 请求响应信息
-	requestProblemInfo    byte              // 一个字节表示的 0 或 1 , 请求问题信息
-	userProperty          map[string]string // 用户属性，可变报头的
-	authMethod            string            // 认证方法
-	authData              []byte            // 认证数据
+	propertiesLen         uint32   // 属性长度
+	sessionExpiryInterval uint32   // 会话过期间隔
+	receiveMaximum        uint16   // 接收最大值
+	maxPacketSize         uint32   // 最大报文长度是 MQTT 控制报文的总长度
+	topicAliasMax         uint16   // 主题别名最大值（Topic Alias Maximum）
+	requestRespInfo       byte     // 一个字节表示的 0 或 1, 请求响应信息
+	requestProblemInfo    byte     // 一个字节表示的 0 或 1 , 请求问题信息
+	userProperty          [][]byte // 用户属性，可变报头的
+	authMethod            []byte   // 认证方法
+	authData              []byte   // 认证数据
 
-	willPropertiesLen      int               // 遗嘱属性长度
-	willDelayInterval      uint32            // 遗嘱延时间隔
-	payloadFormatIndicator byte              // 载荷格式指示
-	willMsgExpiryInterval  uint32            // 遗嘱消息过期间隔
-	contentType            string            // 遗嘱内容类型 UTF-8 格式编码
-	willUserProperty       map[string]string // 用户属性，载荷遗嘱属性的
-	responseTopic          string            // 响应主题
-	correlationData        []byte            // 对比数据
+	willPropertiesLen      uint32   // 遗嘱属性长度
+	willDelayInterval      uint32   // 遗嘱延时间隔
+	payloadFormatIndicator byte     // 载荷格式指示
+	willMsgExpiryInterval  uint32   // 遗嘱消息过期间隔
+	contentType            []byte   // 遗嘱内容类型 UTF-8 格式编码
+	willUserProperty       [][]byte // 用户属性，载荷遗嘱属性的
+	responseTopic          []byte   // 响应主题
+	correlationData        []byte   // 对比数据
 }
 
 var _ Message = (*ConnectMessage)(nil)
@@ -88,13 +88,13 @@ func (this ConnectMessage) String() string {
 		"Properties\n\t\t\t"+
 		"Length=%v\n\t\t\tSession Expiry Interval=%v\n\t\t\tReceive Maximum=%v\n\t\t\tMaximum Packet Size=%v\n\t\t\t"+
 		"Topic Alias Maximum=%v\n\t\t\tRequest Response Information=%v\n\t\t\tRequest Problem Information=%v\n\t\t\t"+
-		"User Property=%v\n\t\t\tAuthentication Method=%v\n\t\t\tAuthentication Data=%v\n"+
+		"User Property=%s\n\t\t\tAuthentication Method=%s\n\t\t\tAuthentication Data=%s\n"+
 		"载荷==>>\n\t\t"+
 		"Client ID=%q\n\t\t"+
 		"Will Properties\n\t\t\t"+
 		"Will Properties Len=%v\n\t\t\tWill Delay Interval=%v\n\t\t\tPayload Format Indicator=%v\n\t\t\tMessage Expiry Interval=%v\n\t\t\t"+
-		"Content Type=%v\n\t\t\tResponse Topic=%v\n\t\t\tCorrelation Data=%v\n\t\t\tUser Property=%v\n\t\t"+
-		"Will Topic=%q\n\t\tWill Payload=%q\n\t\tUsername=%q\n\t\tPassword=%q",
+		"Content Type=%s\n\t\t\tResponse Topic=%s\n\t\t\tCorrelation Data=%v\n\t\t\tUser Property=%s\n\t\t"+
+		"Will Topic=%s\n\t\tWill Payload=%s\n\t\tUsername=%s\n\t\tPassword=%s",
 		this.header,
 
 		this.protoName,
@@ -200,21 +200,22 @@ func (this *ConnectMessage) build() {
 	if this.requestProblemInfo != 1 {
 		propertiesLen += 2
 	}
-	for k, v := range this.userProperty {
+	for _, v := range this.userProperty {
 		propertiesLen += 1
-		propertiesLen += len(k)
-		propertiesLen += 1
+		propertiesLen += 2
 		propertiesLen += len(v)
 	}
-	if this.authMethod != "" {
+	if len(this.authMethod) > 0 {
 		propertiesLen += 1
+		propertiesLen += 2
 		propertiesLen += len(this.authMethod)
 	}
 	if len(this.authData) > 0 {
 		propertiesLen += 1
+		propertiesLen += 2
 		propertiesLen += len(this.authData)
 	}
-	this.propertiesLen = propertiesLen
+	this.propertiesLen = uint32(propertiesLen)
 
 	//	willDelayInterval      uint32            // 遗嘱延时间隔
 	//	payloadFormatIndicator byte              // 载荷格式指示
@@ -233,33 +234,35 @@ func (this *ConnectMessage) build() {
 	if this.willMsgExpiryInterval > 0 {
 		willPropertiesLen += 5
 	}
-	if this.contentType != "" {
+	if len(this.contentType) > 0 {
 		willPropertiesLen += 1
+		propertiesLen += 2
 		willPropertiesLen += len(this.contentType)
 	}
-	for k, v := range this.willUserProperty {
+	for _, v := range this.willUserProperty {
 		willPropertiesLen += 1
-		willPropertiesLen += len(k)
-		willPropertiesLen += 1
+		propertiesLen += 2
 		willPropertiesLen += len(v)
 	}
-	if this.responseTopic != "" {
+	if len(this.responseTopic) > 0 {
 		willPropertiesLen += 1
+		propertiesLen += 2
 		willPropertiesLen += len(this.responseTopic)
 	}
 	if len(this.correlationData) > 0 {
 		willPropertiesLen += 1
+		propertiesLen += 2
 		willPropertiesLen += len(this.correlationData)
 	}
-	this.willPropertiesLen = willPropertiesLen
+	this.willPropertiesLen = uint32(willPropertiesLen)
 	this.header.SetRemainingLength(int32(remlen + propertiesLen + willPropertiesLen))
 	this.buildTag = true
 }
-func (this *ConnectMessage) PropertiesLen() int {
+func (this *ConnectMessage) PropertiesLen() uint32 {
 	return this.propertiesLen
 }
 
-func (this *ConnectMessage) SetPropertiesLen(propertiesLen int) {
+func (this *ConnectMessage) SetPropertiesLen(propertiesLen uint32) {
 	this.propertiesLen = propertiesLen
 	this.dirty = true
 }
@@ -318,29 +321,29 @@ func (this *ConnectMessage) SetRequestProblemInfo(requestProblemInfo byte) {
 	this.dirty = true
 }
 
-func (this *ConnectMessage) UserProperty() map[string]string {
+func (this *ConnectMessage) UserProperty() [][]byte {
 	return this.userProperty
 }
 
-func (this *ConnectMessage) SetUserProperty(userProperty map[string]string) {
+func (this *ConnectMessage) SetUserProperty(userProperty [][]byte) {
 	this.userProperty = userProperty
 	this.dirty = true
 }
 
-func (this *ConnectMessage) WillUserProperty() map[string]string {
+func (this *ConnectMessage) WillUserProperty() [][]byte {
 	return this.willUserProperty
 }
 
-func (this *ConnectMessage) SetWillUserProperty(willUserProperty map[string]string) {
+func (this *ConnectMessage) SetWillUserProperty(willUserProperty [][]byte) {
 	this.willUserProperty = willUserProperty
 	this.dirty = true
 }
 
-func (this *ConnectMessage) AuthMethod() string {
+func (this *ConnectMessage) AuthMethod() []byte {
 	return this.authMethod
 }
 
-func (this *ConnectMessage) SetAuthMethod(authMethod string) {
+func (this *ConnectMessage) SetAuthMethod(authMethod []byte) {
 	this.authMethod = authMethod
 	this.dirty = true
 }
@@ -354,11 +357,11 @@ func (this *ConnectMessage) SetAuthData(authData []byte) {
 	this.dirty = true
 }
 
-func (this *ConnectMessage) WillPropertiesLen() int {
+func (this *ConnectMessage) WillPropertiesLen() uint32 {
 	return this.willPropertiesLen
 }
 
-func (this *ConnectMessage) SetWillPropertiesLen(willPropertiesLen int) {
+func (this *ConnectMessage) SetWillPropertiesLen(willPropertiesLen uint32) {
 	this.willPropertiesLen = willPropertiesLen
 	this.dirty = true
 }
@@ -390,20 +393,20 @@ func (this *ConnectMessage) SetWillMsgExpiryInterval(willMsgExpiryInterval uint3
 	this.dirty = true
 }
 
-func (this *ConnectMessage) ContentType() string {
+func (this *ConnectMessage) ContentType() []byte {
 	return this.contentType
 }
 
-func (this *ConnectMessage) SetContentType(contentType string) {
+func (this *ConnectMessage) SetContentType(contentType []byte) {
 	this.contentType = contentType
 	this.dirty = true
 }
 
-func (this *ConnectMessage) ResponseTopic() string {
+func (this *ConnectMessage) ResponseTopic() []byte {
 	return this.responseTopic
 }
 
-func (this *ConnectMessage) SetResponseTopic(responseTopic string) {
+func (this *ConnectMessage) SetResponseTopic(responseTopic []byte) {
 	this.responseTopic = responseTopic
 	this.dirty = true
 }
@@ -779,7 +782,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 	total += 2
 
 	// 属性
-	pLen := lbEncode(int32(this.propertiesLen)) // 属性长度
+	pLen := lbEncode(this.propertiesLen) // 属性长度
 	copy(dst[total:], pLen)
 	total += len(pLen)
 
@@ -823,28 +826,33 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 		total++
 	}
 
-	for k1, v1 := range this.userProperty {
+	for _, v1 := range this.userProperty {
 		dst[total] = UserProperty // 用户属性
 		total++
-		copy(dst[total:], k1)
-		total += len(k1)
-		dst[total] = ':'
-		total++
-		copy(dst[total:], v1)
-		total += len(v1)
+		n, err = writeLPBytes(dst[total:], v1)
+		total += n
+		if err != nil {
+			return total, err
+		}
 	}
 
-	if this.authMethod != "" {
+	if len(this.authMethod) > 0 {
 		dst[total] = AuthenticationMethod // 认证方法
 		total++
-		copy(dst[total:], this.authMethod)
-		total += len(this.authMethod)
+		n, err = writeLPBytes(dst[total:], this.authMethod)
+		total += n
+		if err != nil {
+			return total, err
+		}
 	}
 	if len(this.authData) > 0 {
 		dst[total] = AuthenticationData // 认证数据
 		total++
-		copy(dst[total:], this.authData)
-		total += len(this.authData)
+		n, err = writeLPBytes(dst[total:], this.authData)
+		total += n
+		if err != nil {
+			return total, err
+		}
 	}
 
 	/**
@@ -857,7 +865,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 	}
 	if this.WillFlag() {
 		// 遗嘱属性
-		wpLen := lbEncode(int32(this.willPropertiesLen)) // 遗嘱属性长度
+		wpLen := lbEncode(this.willPropertiesLen) // 遗嘱属性长度
 		copy(dst[total:], wpLen)
 		total += len(wpLen)
 
@@ -882,30 +890,38 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 		if len(this.contentType) > 0 {
 			dst[total] = ContentType // 遗嘱内容类型
 			total++
-			copy(dst[total:], this.contentType)
-			total += len(this.contentType)
+			n, err = writeLPBytes(dst[total:], this.contentType)
+			total += n
+			if err != nil {
+				return total, err
+			}
 		}
 		if len(this.responseTopic) > 0 {
 			dst[total] = ResponseTopic // 遗嘱响应主题
 			total++
-			copy(dst[total:], this.responseTopic)
-			total += len(this.responseTopic)
+			n, err = writeLPBytes(dst[total:], this.responseTopic)
+			total += n
+			if err != nil {
+				return total, err
+			}
 		}
 		if len(this.correlationData) > 0 {
 			dst[total] = RelatedData // 对比数据
 			total++
-			copy(dst[total:], this.correlationData)
-			total += len(this.correlationData)
+			n, err = writeLPBytes(dst[total:], this.correlationData)
+			total += n
+			if err != nil {
+				return total, err
+			}
 		}
-		for k1, v1 := range this.willUserProperty {
+		for _, v1 := range this.willUserProperty {
 			dst[total] = UserProperty // 遗嘱用户属性
 			total++
-			copy(dst[total:], k1)
-			total += len(k1)
-			dst[total] = ':'
-			total++
-			copy(dst[total:], v1)
-			total += len(v1)
+			n, err = writeLPBytes(dst[total:], v1)
+			total += n
+			if err != nil {
+				return total, err
+			}
 		}
 
 		n, err = writeLPBytes(dst[total:], this.willTopic) // 遗嘱主题
@@ -1006,14 +1022,12 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 
 	// 属性
 
-	pLen, n, err := lbDecode(src[total:]) // 属性长度
-	this.propertiesLen = int(pLen)        // TODO 后面属性字段解码，需要每次校验有没有超过这个数据
+	this.propertiesLen, n, err = lbDecode(src[total:]) // 属性长度
 	total += n
-	oldIndex := total // 用来记录属性长度后面开始的total位置
 	if err != nil {
 		return total, InvalidMessage
 	}
-	if len(src[total:]) < this.propertiesLen {
+	if len(src[total:]) < int(this.propertiesLen) {
 		return total, InvalidMessage
 	}
 
@@ -1089,71 +1103,34 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 
 	if src[total] == UserProperty {
 		total++
-		// TODO 这里默认为 ':' 为分隔符
-		i, nextLen := 0, oldIndex+this.propertiesLen-total
-		if nextLen <= 1 {
-			return total, ProtocolError
+		this.userProperty = make([][]byte, 0)
+		var up []byte
+		up, n, err = readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return total, err
 		}
-		splitTag := 0
-		this.userProperty = make(map[string]string)
-		for ; i < nextLen; i++ {
-			switch src[total+i] {
-			case ':':
-				splitTag = i // 记录分隔符位置
-			case UserProperty:
-				if splitTag == 0 || splitTag == nextLen-1 {
-					// 遇到了下一个用户属性都还没有遇到分隔符
-					// 或者最后一个字节才是分隔符，协议错误
-					return total, ProtocolError
-				}
-				this.userProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
-				splitTag = 0
-			case AuthenticationMethod:
-				if splitTag > 0 && splitTag != nextLen-1 {
-					this.userProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
-					splitTag = 0
-				} else if splitTag == 0 || splitTag == nextLen-1 {
-					// 遇到了下一个用户属性都还没有遇到分隔符
-					// 或者最后一个字节才是分隔符，协议错误
-					return total, ProtocolError
-				}
-				if len(this.userProperty) == 0 { // 没有用户属性，协议错误
-					return total, ProtocolError
-				}
-				goto PP
-			case AuthenticationData: // 没有遇到认证方法，却遇到了认证数据，协议错误
-				return total, ProtocolError
+		this.userProperty = append(this.userProperty, up)
+		for src[total] == UserProperty {
+			total++
+			up, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
 			}
+			this.userProperty = append(this.userProperty, up)
 		}
-	PP:
-		if i == 0 {
-			return total, ProtocolError
-		} else if i == nextLen {
-			if splitTag == 0 || splitTag == nextLen-1 {
-				// 属性数据都到最后一个字节了，都没有分隔符
-				// 或者最后一个字节才是分隔符，协议错误
-				return total, ProtocolError
-			}
-			this.userProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
-		}
-		total += i
 	}
 
 	if src[total] == AuthenticationMethod { // 认证方法
 		// 如果客户端在 CONNECT 报文中设置了认证方法，则客户端在收到 CONNACK 报文之前不能发送除AUTH 或 DISCONNECT 之外的报文 [MQTT-3.1.2-30]。
 		total++
 
-		i, nextLen := 0, oldIndex+this.propertiesLen-total
-		for ; i < nextLen; i++ {
-			if src[total+i] == AuthenticationData {
-				break
-			}
+		this.authMethod, n, err = readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return total, err
 		}
-		if i == nextLen { // 后面都没有认证数据了
-			return total, ProtocolError
-		}
-		this.authMethod = string(src[total : total+i])
-		total += i
 
 		if src[total] == AuthenticationMethod {
 			return total, ProtocolError
@@ -1162,12 +1139,11 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 
 	if src[total] == AuthenticationData { // 认证数据
 		total++
-		if len(this.authMethod) == 0 {
-			return total, ProtocolError
+		this.authData, n, err = readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return total, err
 		}
-		this.authData = src[total : oldIndex+this.propertiesLen]
-		total = oldIndex + this.propertiesLen
-
 		if src[total] == AuthenticationData {
 			return total, ProtocolError
 		}
@@ -1201,14 +1177,9 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 	// ==== 遗嘱属性 ====
 	if this.WillFlag() { // 遗嘱属性
 		// 遗嘱属性长度
-		wpLen, n, err := lbDecode(src[total:])
-		this.willPropertiesLen = int(wpLen)
+		this.willPropertiesLen, n, err = lbDecode(src[total:])
 		total += n
-		oldTag := total
 		if err != nil {
-			return total, ProtocolError
-		}
-		if len(src[total:]) < this.willPropertiesLen {
 			return total, ProtocolError
 		}
 		if src[total] == DelayWills { // 遗嘱延时间隔
@@ -1240,113 +1211,56 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		}
 		if src[total] == ContentType { // 内容类型
 			total++
-			nextHasLen := this.willPropertiesLen + oldTag - total // 剩余还有的长度
-			i := 0
-			for ; i < nextHasLen; i++ {
-				switch src[total+i] {
-				case ResponseTopic, RelatedData, UserProperty:
-					if i == 0 {
-						return total + i, ProtocolError
-					}
-					goto CT
-				case ContentType:
-					return total + i, ProtocolError
-				}
+			this.contentType, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
 			}
-		CT:
-			if i == 0 {
-				return total, ProtocolError
-			}
-			this.contentType = string(src[total : total+i])
-			total += i
 			if src[total] == ContentType {
 				return total, ProtocolError
 			}
 		}
 		if src[total] == ResponseTopic { // 响应主题的存在将遗嘱消息（Will Message）标识为一个请求报文
 			total++
-			nextHasLen := this.willPropertiesLen + oldTag - total // 剩余还有的长度
-			i := 0
-			for ; i < nextHasLen; i++ {
-				switch src[total+i] {
-				case RelatedData, UserProperty:
-					if i == 0 {
-						return total + i, ProtocolError
-					}
-					goto RT
-				case ResponseTopic:
-					return total + i, ProtocolError
-				}
+			this.responseTopic, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
 			}
-		RT:
-			if i == 0 {
-				return total, ProtocolError
-			}
-			this.contentType = string(src[total : total+i])
-			total += i
 			if src[total] == ResponseTopic {
 				return total, ProtocolError
 			}
 		}
 		if src[total] == RelatedData { // 对比数据 只对请求消息（Request Message）的发送端和响应消息（Response Message）的接收端有意义。
 			total++
-			nextHasLen := this.willPropertiesLen + oldTag - total // 剩余还有的长度
-			i := 0
-			for ; i < nextHasLen; i++ {
-				switch src[total+i] {
-				case UserProperty:
-					if i == 0 {
-						return total + i, ProtocolError
-					}
-					goto RD
-				case RelatedData:
-					return total + i, ProtocolError
-				}
+			this.correlationData, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
 			}
-		RD:
-			if i == 0 {
-				return total, ProtocolError
-			}
-			this.correlationData = src[total : total+i]
-			total += i
 			if src[total] == RelatedData {
 				return total, ProtocolError
 			}
 		}
 		if src[total] == UserProperty { // 用户属性
 			total++
-			// TODO 这里默认为 ':' 为分隔符
-			i, nextLen := 0, oldTag+this.willPropertiesLen-total
-			if nextLen <= 1 {
-				return total, ProtocolError
+			this.willUserProperty = make([][]byte, 0)
+			var tp []byte
+			tp, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
 			}
-			splitTag := 0
-			this.willUserProperty = make(map[string]string)
-			for ; i < nextLen; i++ {
-				switch src[total+i] {
-				case ':':
-					splitTag = i // 记录分隔符位置
-				case UserProperty:
-					if splitTag == 0 || splitTag == nextLen-1 {
-						// 遇到了下一个用户属性都还没有遇到分隔符
-						// 或者最后一个字节才是分隔符，协议错误
-						return total, ProtocolError
-					}
-					this.willUserProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
-					splitTag = 0
+			this.willUserProperty = append(this.willUserProperty, tp)
+			for src[total] == UserProperty {
+				total++
+				tp, n, err = readLPBytes(src[total:])
+				total += n
+				if err != nil {
+					return total, err
 				}
+				this.willUserProperty = append(this.willUserProperty, tp)
 			}
-			if i == 0 {
-				return total, ProtocolError
-			} else if i == nextLen {
-				if splitTag == 0 || splitTag == nextLen-1 {
-					// 属性数据都到最后一个字节了，都没有分隔符
-					// 或者最后一个字节才是分隔符，协议错误
-					return total, ProtocolError
-				}
-				this.willUserProperty[string(src[total:total+splitTag])] = string(src[total+splitTag+1 : total+i])
-			}
-			total += i
 		}
 
 	}
