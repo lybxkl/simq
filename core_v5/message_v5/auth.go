@@ -3,25 +3,10 @@ package message
 import (
 	"encoding/binary"
 	"fmt"
-	"regexp"
 )
 
-var clientIdRegexp *regexp.Regexp
-
-func init() {
-	// Added space for Paho compliance test
-	// Added underscore (_) for MQTT C client test
-	clientIdRegexp = regexp.MustCompile("^[/\\-0-9a-zA-Z _]*$")
-}
-
-// After a Network Connection is established by a Client to a Server, the first Packet
-// sent from the Client to the Server MUST be a CONNECT Packet [MQTT-3.1.0-1].
-//
-// A Client can only send the CONNECT Packet once over a Network Connection. The Server
-// MUST process a second CONNECT Packet sent from a Client as a protocol violation and
-// disconnect the Client [MQTT-3.1.0-2].  See section 4.8 for information about
-// handling errors.
-type ConnectMessage struct {
+// AuthMessage v5版本新增
+type AuthMessage struct {
 	header
 
 	// 7: username flag
@@ -45,18 +30,18 @@ type ConnectMessage struct {
 	password []byte
 }
 
-var _ Message = (*ConnectMessage)(nil)
+var _ Message = (*AuthMessage)(nil)
 
-// NewConnectMessage creates a new CONNECT message.
-func NewConnectMessage() *ConnectMessage {
-	msg := &ConnectMessage{}
+// NewAuthMessage creates a new CONNECT message.
+func NewAuthMessage() *AuthMessage {
+	msg := &AuthMessage{}
 	msg.SetType(CONNECT)
 
 	return msg
 }
 
 // String returns a string representation of the CONNECT message
-func (this ConnectMessage) String() string {
+func (this AuthMessage) String() string {
 	return fmt.Sprintf("%s, Connect Flags=%08b, Version=%d, KeepAlive=%d, Client ID=%q, Will Topic=%q, Will Message=%q, Username=%q, Password=%q",
 		this.header,
 		this.connectFlags,
@@ -73,12 +58,12 @@ func (this ConnectMessage) String() string {
 // Version returns the the 8 bit unsigned value that represents the revision level
 // of the protocol used by the Client. The value of the Protocol Level field for
 // the version 3.1.1 of the protocol is 4 (0x04).
-func (this *ConnectMessage) Version() byte {
+func (this *AuthMessage) Version() byte {
 	return this.version
 }
 
 // SetVersion sets the version value of the CONNECT message
-func (this *ConnectMessage) SetVersion(v byte) error {
+func (this *AuthMessage) SetVersion(v byte) error {
 	if _, ok := SupportedVersions[v]; !ok {
 		return fmt.Errorf("connect/SetVersion: Invalid version number %d", v)
 	}
@@ -97,12 +82,12 @@ func (this *ConnectMessage) SetVersion(v byte) error {
 //客户端和服务器可以存储会话状态，以实现可靠的消息传递
 //继续通过网络连接序列。这个位用来控制
 //会话状态的生存期。
-func (this *ConnectMessage) CleanSession() bool {
+func (this *AuthMessage) CleanSession() bool {
 	return ((this.connectFlags >> 1) & 0x1) == 1
 }
 
 // SetCleanSession sets the bit that specifies the handling of the Session state.
-func (this *ConnectMessage) SetCleanSession(v bool) {
+func (this *AuthMessage) SetCleanSession(v bool) {
 	if v {
 		this.connectFlags |= 0x2 // 00000010
 	} else {
@@ -120,13 +105,13 @@ func (this *ConnectMessage) SetCleanSession(v bool) {
 //在服务器上。如果Will标志设置为1，这表示如果连接
 //请求被接受，一个Will消息必须存储在服务器上并关联
 //与网络连接。
-func (this *ConnectMessage) WillFlag() bool {
+func (this *AuthMessage) WillFlag() bool {
 	return ((this.connectFlags >> 2) & 0x1) == 1
 }
 
 // SetWillFlag sets the bit that specifies whether a Will Message should be stored
 // on the server.
-func (this *ConnectMessage) SetWillFlag(v bool) {
+func (this *AuthMessage) SetWillFlag(v bool) {
 	if v {
 		this.connectFlags |= 0x4 // 00000100
 	} else {
@@ -138,13 +123,13 @@ func (this *ConnectMessage) SetWillFlag(v bool) {
 
 // WillQos returns the two bits that specify the QoS level to be used when publishing
 // the Will Message.
-func (this *ConnectMessage) WillQos() byte {
+func (this *AuthMessage) WillQos() byte {
 	return (this.connectFlags >> 3) & 0x3
 }
 
 // SetWillQos sets the two bits that specify the QoS level to be used when publishing
 // the Will Message.
-func (this *ConnectMessage) SetWillQos(qos byte) error {
+func (this *AuthMessage) SetWillQos(qos byte) error {
 	if qos != QosAtMostOnce && qos != QosAtLeastOnce && qos != QosExactlyOnce {
 		return fmt.Errorf("connect/SetWillQos: Invalid QoS level %d", qos)
 	}
@@ -159,13 +144,13 @@ func (this *ConnectMessage) SetWillQos(qos byte) error {
 // is published.
 // Will retain返回指定Will消息是否被保留的位
 //出版。
-func (this *ConnectMessage) WillRetain() bool {
+func (this *AuthMessage) WillRetain() bool {
 	return ((this.connectFlags >> 5) & 0x1) == 1
 }
 
 // SetWillRetain sets the bit specifies if the Will Message is to be Retained when it
 // is published.
-func (this *ConnectMessage) SetWillRetain(v bool) {
+func (this *AuthMessage) SetWillRetain(v bool) {
 	if v {
 		this.connectFlags |= 32 // 00100000
 	} else {
@@ -177,13 +162,13 @@ func (this *ConnectMessage) SetWillRetain(v bool) {
 
 // UsernameFlag returns the bit that specifies whether a user name is present in the
 // payload.
-func (this *ConnectMessage) UsernameFlag() bool {
+func (this *AuthMessage) UsernameFlag() bool {
 	return ((this.connectFlags >> 7) & 0x1) == 1
 }
 
 // SetUsernameFlag sets the bit that specifies whether a user name is present in the
 // payload.
-func (this *ConnectMessage) SetUsernameFlag(v bool) {
+func (this *AuthMessage) SetUsernameFlag(v bool) {
 	if v {
 		this.connectFlags |= 128 // 10000000
 	} else {
@@ -195,13 +180,13 @@ func (this *ConnectMessage) SetUsernameFlag(v bool) {
 
 // PasswordFlag returns the bit that specifies whether a password is present in the
 // payload.
-func (this *ConnectMessage) PasswordFlag() bool {
+func (this *AuthMessage) PasswordFlag() bool {
 	return ((this.connectFlags >> 6) & 0x1) == 1
 }
 
 // SetPasswordFlag sets the bit that specifies whether a password is present in the
 // payload.
-func (this *ConnectMessage) SetPasswordFlag(v bool) {
+func (this *AuthMessage) SetPasswordFlag(v bool) {
 	if v {
 		this.connectFlags |= 64 // 01000000
 	} else {
@@ -215,13 +200,13 @@ func (this *ConnectMessage) SetPasswordFlag(v bool) {
 // it is the maximum time interval that is permitted to elapse between the point at
 // which the Client finishes transmitting one Control Packet and the point it starts
 // sending the next.
-func (this *ConnectMessage) KeepAlive() uint16 {
+func (this *AuthMessage) KeepAlive() uint16 {
 	return this.keepAlive
 }
 
 // SetKeepAlive sets the time interval in which the server should keep the connection
 // alive.
-func (this *ConnectMessage) SetKeepAlive(v uint16) {
+func (this *AuthMessage) SetKeepAlive(v uint16) {
 	this.keepAlive = v
 
 	this.dirty = true
@@ -231,12 +216,12 @@ func (this *ConnectMessage) SetKeepAlive(v uint16) {
 // connecting to the Server has a unique ClientId. The ClientId MUST be used by
 // Clients and by Servers to identify state that they hold relating to this MQTT
 // Session between the Client and the Server
-func (this *ConnectMessage) ClientId() []byte {
+func (this *AuthMessage) ClientId() []byte {
 	return this.clientId
 }
 
 // SetClientId sets an ID that identifies the Client to the Server.
-func (this *ConnectMessage) SetClientId(v []byte) error {
+func (this *AuthMessage) SetClientId(v []byte) error {
 	if len(v) > 0 && !this.validClientId(v) {
 		return ErrIdentifierRejected
 	}
@@ -249,12 +234,12 @@ func (this *ConnectMessage) SetClientId(v []byte) error {
 
 // WillTopic returns the topic in which the Will Message should be published to.
 // If the Will Flag is set to 1, the Will Topic must be in the payload.
-func (this *ConnectMessage) WillTopic() []byte {
+func (this *AuthMessage) WillTopic() []byte {
 	return this.willTopic
 }
 
 // SetWillTopic sets the topic in which the Will Message should be published to.
-func (this *ConnectMessage) SetWillTopic(v []byte) {
+func (this *AuthMessage) SetWillTopic(v []byte) {
 	this.willTopic = v
 
 	if len(v) > 0 {
@@ -267,12 +252,12 @@ func (this *ConnectMessage) SetWillTopic(v []byte) {
 }
 
 // WillMessage returns the Will Message that is to be published to the Will Topic.
-func (this *ConnectMessage) WillMessage() []byte {
+func (this *AuthMessage) WillMessage() []byte {
 	return this.willMessage
 }
 
 // SetWillMessage sets the Will Message that is to be published to the Will Topic.
-func (this *ConnectMessage) SetWillMessage(v []byte) {
+func (this *AuthMessage) SetWillMessage(v []byte) {
 	this.willMessage = v
 
 	if len(v) > 0 {
@@ -287,12 +272,12 @@ func (this *ConnectMessage) SetWillMessage(v []byte) {
 // Username returns the username from the payload. If the User Name Flag is set to 1,
 // this must be in the payload. It can be used by the Server for authentication and
 // authorization.
-func (this *ConnectMessage) Username() []byte {
+func (this *AuthMessage) Username() []byte {
 	return this.username
 }
 
 // SetUsername sets the username for authentication.
-func (this *ConnectMessage) SetUsername(v []byte) {
+func (this *AuthMessage) SetUsername(v []byte) {
 	this.username = v
 
 	if len(v) > 0 {
@@ -307,12 +292,12 @@ func (this *ConnectMessage) SetUsername(v []byte) {
 // Password returns the password from the payload. If the Password Flag is set to 1,
 // this must be in the payload. It can be used by the Server for authentication and
 // authorization.
-func (this *ConnectMessage) Password() []byte {
+func (this *AuthMessage) Password() []byte {
 	return this.password
 }
 
 // SetPassword sets the username for authentication.
-func (this *ConnectMessage) SetPassword(v []byte) {
+func (this *AuthMessage) SetPassword(v []byte) {
 	this.password = v
 
 	if len(v) > 0 {
@@ -324,7 +309,7 @@ func (this *ConnectMessage) SetPassword(v []byte) {
 	this.dirty = true
 }
 
-func (this *ConnectMessage) Len() int {
+func (this *AuthMessage) Len() int {
 	if !this.dirty {
 		return len(this.dbuf)
 	}
@@ -345,7 +330,7 @@ func (this *ConnectMessage) Len() int {
 // Caller should call ValidConnackError(err) to see if the returned error is
 // a Connack error. If so, caller should send the Client back the corresponding
 // CONNACK message.
-func (this *ConnectMessage) Decode(src []byte) (int, error) {
+func (this *AuthMessage) Decode(src []byte) (int, error) {
 	total := 0
 
 	n, err := this.header.decode(src[total:])
@@ -364,7 +349,7 @@ func (this *ConnectMessage) Decode(src []byte) (int, error) {
 	return total, nil
 }
 
-func (this *ConnectMessage) Encode(dst []byte) (int, error) {
+func (this *AuthMessage) Encode(dst []byte) (int, error) {
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("connect/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -410,7 +395,7 @@ func (this *ConnectMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 
-func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
+func (this *AuthMessage) encodeMessage(dst []byte) (int, error) {
 	total := 0
 
 	n, err := writeLPBytes(dst[total:], []byte(SupportedVersions[this.version]))
@@ -471,7 +456,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 	return total, nil
 }
 
-func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
+func (this *AuthMessage) decodeMessage(src []byte) (int, error) {
 	var err error
 	n, total := 0, 0
 
@@ -571,7 +556,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 	return total, nil
 }
 
-func (this *ConnectMessage) msglen() int {
+func (this *AuthMessage) msglen() int {
 	total := 0
 
 	verstr, ok := SupportedVersions[this.version]
@@ -619,13 +604,13 @@ func (this *ConnectMessage) msglen() int {
 //		"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 // 虽然协议写了不能超过23字节，和上面那些字符。
 // 但实现还是可以不用完全有那些限制
-func (this *ConnectMessage) validClientId(cid []byte) bool {
+func (this *AuthMessage) validClientId(cid []byte) bool {
 	// Fixed https://github.com/surgemq/surgemq/issues/4
 	//if len(cid) > 23 {
 	//	return false
 	//}
-
-	if this.Version() == 0x3 {
+	// todo v5版本是否和v3隔离
+	if this.Version() == 0x3 || this.Version() == 0x05 {
 		return true
 	}
 
