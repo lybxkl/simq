@@ -1,11 +1,45 @@
 package message
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+func TestPubRelDecodeEncode(t *testing.T) {
+	pubrel := NewPubrelMessage()
+	pubrel.SetPacketId(123)
+	pubrel.SetReasonCode(Success)
+	pubrel.SetReasonStr([]byte("aaa"))
+	pubrel.SetUserProperty([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	pubrel.build()
+	b := make([]byte, 100)
+	n, err := pubrel.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(pubrel)
+	fmt.Println(b[:n])
+	pubrel1 := NewPubrelMessage()
+	pubrel1.Decode(b[:n])
+	pubrel1.dirty = true
+	pubrel1.dbuf = nil
+	fmt.Println(pubrel1)
+	fmt.Println(reflect.DeepEqual(pubrel1, pubrel))
+}
+func TestDecodePubRel(t *testing.T) {
+	var b = []byte{98, 2, 0, 123}
+	pubrel := NewPubrelMessage()
+	pubrel.Decode(b)
+	fmt.Println(pubrel)
+	p := make([]byte, 100)
+	n, err := pubrel.Encode(p)
+	require.NoError(t, err)
+	fmt.Println(p[:n])
+	require.Equal(t, b, p[:n])
+}
 func TestPubrelMessageFields(t *testing.T) {
 	msg := NewPubrelMessage()
 
