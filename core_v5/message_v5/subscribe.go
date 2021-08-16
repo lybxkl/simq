@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 )
 
-// The SUBSCRIBE Packet is sent from the Client to the Server to create one or more
+// SubscribeMessage The SUBSCRIBE Packet is sent from the Client to the Server to create one or more
 // Subscriptions. Each Subscription registers a Client’s interest in one or more
 // Topics. The Server sends PUBLISH Packets to the Client in order to forward
 // Application Messages that were published to Topics that match these Subscriptions.
@@ -14,9 +14,38 @@ import (
 // which the Server can send Application Messages to the Client.
 type SubscribeMessage struct {
 	header
+	// 可变报头
+	propertiesLen          uint32 // 属性长度
+	subscriptionIdentifier uint32 // 订阅标识符 变长字节整数 取值范围从1到268,435,455
+	userProperty           [][]byte
+	// 载荷
 
 	topics [][]byte
 	qos    []byte
+}
+
+func (this *SubscribeMessage) PropertiesLen() uint32 {
+	return this.propertiesLen
+}
+
+func (this *SubscribeMessage) SetPropertiesLen(propertiesLen uint32) {
+	this.propertiesLen = propertiesLen
+}
+
+func (this *SubscribeMessage) SubscriptionIdentifier() uint32 {
+	return this.subscriptionIdentifier
+}
+
+func (this *SubscribeMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
+	this.subscriptionIdentifier = subscriptionIdentifier
+}
+
+func (this *SubscribeMessage) UserProperty() [][]byte {
+	return this.userProperty
+}
+
+func (this *SubscribeMessage) SetUserProperty(userProperty [][]byte) {
+	this.userProperty = userProperty
 }
 
 var _ Message = (*SubscribeMessage)(nil)
@@ -31,12 +60,13 @@ func NewSubscribeMessage() *SubscribeMessage {
 
 func (this SubscribeMessage) String() string {
 	msgstr := fmt.Sprintf("%s, Packet ID=%d", this.header, this.PacketId())
+	msgstr = fmt.Sprintf("%s, PropertiesLen=%v, Subscription Identifier=%v, User Properties=%v", msgstr, this.PropertiesLen(), this.subscriptionIdentifier, this.UserProperty())
 
 	for i, t := range this.topics {
 		msgstr = fmt.Sprintf("%s, Topic[%d]=%q/%d", msgstr, i, string(t), this.qos[i])
 	}
 
-	return msgstr
+	return msgstr + "\n"
 }
 
 // Topics returns a list of topics sent by the Client.
@@ -150,10 +180,51 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
 	this.packetId = src[total : total+2]
 	total += 2
+	var n int
+	this.propertiesLen, n, err = lbDecode(src[total:])
+	total += n
+	if err != nil {
+		return total, err
+	}
+	if int(this.propertiesLen) > len(src[total:]) {
+		return total, ProtocolError
+	}
+	if total < len(src) && src[total] == DefiningIdentifiers {
+		total++
+		this.subscriptionIdentifier, n, err = lbDecode(src[total:])
+		total += n
+		if err != nil {
+			return total, err
+		}
+		if this.subscriptionIdentifier == 0 || src[total] == DefiningIdentifiers {
+			return total, ProtocolError
+		}
+	}
+	if total < len(src) && src[total] == UserProperty {
+		total++
+		var tb []byte
+		this.userProperty = make([][]byte, 0)
+		tb, n, err = readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return total, err
+		}
+		this.userProperty = append(this.userProperty, tb)
+		for total < len(src) && src[total] == UserProperty {
+			total++
+			tb, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
+			}
+			this.userProperty = append(this.userProperty, tb)
+		}
+	}
 
 	remlen := int(this.remlen) - (total - hn)
+	var t []byte
 	for remlen > 0 {
-		t, n, err := readLPBytes(src[total:])
+		t, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -213,8 +284,31 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 	//binary.BigEndian.PutUint16(dst[total:], this.packetId)
 	total += n
 
+	tb := lbEncode(this.propertiesLen)
+	copy(dst[total:], tb)
+	total += len(tb)
+
+	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+		dst[total] = DefiningIdentifiers
+		total++
+		tb = lbEncode(this.subscriptionIdentifier)
+		copy(dst[total:], tb)
+		total += len(tb)
+	}
+	if len(this.userProperty) > 0 {
+		for i := 0; i < len(this.userProperty); i++ {
+			dst[total] = UserProperty
+			total++
+			n, err = writeLPBytes(dst[total:], this.userProperty[i])
+			total += n
+			if err != nil {
+				return total, err
+			}
+		}
+	}
+
 	for i, t := range this.topics {
-		n, err := writeLPBytes(dst[total:], t)
+		n, err = writeLPBytes(dst[total:], t)
 		total += n
 		if err != nil {
 			return total, err
@@ -231,9 +325,19 @@ func (this *SubscribeMessage) msglen() int {
 	// packet ID
 	total := 2
 
+	total += len(lbEncode(this.propertiesLen))
+	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+		total++
+		total += len(lbEncode(this.subscriptionIdentifier))
+	}
+	for i := 0; i < len(this.userProperty); i++ {
+		total++
+		total += 2
+		total += len(this.userProperty[i])
+	}
+
 	for _, t := range this.topics {
 		total += 2 + len(t) + 1
 	}
-
 	return total
 }

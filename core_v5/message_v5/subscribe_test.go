@@ -1,11 +1,47 @@
 package message
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+func TestDecodeSub(t *testing.T) {
+	sub := NewSubscribeMessage()
+
+	sub.SetPacketId(100)
+	require.Equal(t, 100, int(sub.PacketId()), "Error setting packet ID.")
+
+	sub.AddTopic([]byte("/a/b/#/c"), 1)
+	require.Equal(t, 1, len(sub.Topics()), "Error adding topic.")
+
+	require.False(t, sub.TopicExists([]byte("a/b")), "Topic should not exist.")
+
+	sub.RemoveTopic([]byte("/a/b/#/c"))
+	require.False(t, sub.TopicExists([]byte("/a/b/#/c")), "Topic should not exist.")
+	sub.AddTopic([]byte("/a/b/#/c"), 1)
+
+	sub.SetUserProperty([][]byte{[]byte("asd"), []byte("ccc:sa")})
+	require.Equal(t, [][]byte{[]byte("asd"), []byte("ccc:sa")}, sub.UserProperty(), "Error adding User Property.")
+
+	sub.SetSubscriptionIdentifier(123)
+	require.Equal(t, uint32(123), sub.SubscriptionIdentifier(), "Error adding Subscription Identifier.")
+
+	b := make([]byte, 100)
+	n, err := sub.Encode(b)
+	require.NoError(t, err)
+	fmt.Println(sub)
+	fmt.Println(b[:n])
+	sub1 := NewSubscribeMessage()
+	_, err = sub1.Decode(b[:n])
+	require.NoError(t, err)
+	fmt.Println(sub1)
+	sub1.dirty = true
+	sub1.dbuf = nil
+	require.Equal(t, true, reflect.DeepEqual(sub, sub1))
+}
 func TestSubscribeMessageFields(t *testing.T) {
 	msg := NewSubscribeMessage()
 
