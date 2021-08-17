@@ -2,15 +2,19 @@ package message
 
 import "fmt"
 
-// A SUBACK Packet is sent by the Server to the Client to confirm receipt and processing
+// SubackMessage A SUBACK Packet is sent by the Server to the Client to confirm receipt and processing
 // of a SUBSCRIBE Packet.
 //
 // A SUBACK Packet contains a list of return codes, that specify the maximum QoS level
 // that was granted in each Subscription that was requested by the SUBSCRIBE.
 type SubackMessage struct {
 	header
-
-	returnCodes []byte
+	// 可变报头
+	propertiesLen          uint32 // 属性长度
+	subscriptionIdentifier uint32 // 订阅标识符 变长字节整数 取值范围从1到268,435,455
+	userProperty           [][]byte
+	// 载荷
+	reasonCodes []byte
 }
 
 var _ Message = (*SubackMessage)(nil)
@@ -25,23 +29,49 @@ func NewSubackMessage() *SubackMessage {
 
 // String returns a string representation of the message.
 func (this SubackMessage) String() string {
-	return fmt.Sprintf("%s, Packet ID=%d, Return Codes=%v", this.header, this.PacketId(), this.returnCodes)
+	return fmt.Sprintf("%s, Packet ID=%d, Return Codes=%v, ", this.header, this.PacketId(), this.reasonCodes) +
+		fmt.Sprintf("PropertiesLen=%v, Subscription Identifier=%v, User Properties=%v", this.PropertiesLen(), this.subscriptionIdentifier, this.UserProperty()) +
+		fmt.Sprintf("%v\n", this.reasonCodes)
+
+}
+func (this *SubackMessage) PropertiesLen() uint32 {
+	return this.propertiesLen
 }
 
-// ReturnCodes returns the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.
-func (this *SubackMessage) ReturnCodes() []byte {
-	return this.returnCodes
+func (this *SubackMessage) SetPropertiesLen(propertiesLen uint32) {
+	this.propertiesLen = propertiesLen
 }
 
-// AddReturnCodes sets the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.
+func (this *SubackMessage) SubscriptionIdentifier() uint32 {
+	return this.subscriptionIdentifier
+}
+
+func (this *SubackMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
+	this.subscriptionIdentifier = subscriptionIdentifier
+}
+
+func (this *SubackMessage) UserProperty() [][]byte {
+	return this.userProperty
+}
+
+func (this *SubackMessage) SetUserProperty(userProperty [][]byte) {
+	this.userProperty = userProperty
+}
+
+// ReasonCodes returns the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.
+func (this *SubackMessage) ReasonCodes() []byte {
+	return this.reasonCodes
+}
+
+// AddreasonCodes sets the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.
 // An error is returned if any of the QoS values are not valid.
-func (this *SubackMessage) AddReturnCodes(ret []byte) error {
+func (this *SubackMessage) AddReasonCodes(ret []byte) error {
 	for _, c := range ret {
 		if c != QosAtMostOnce && c != QosAtLeastOnce && c != QosExactlyOnce && c != QosFailure {
 			return fmt.Errorf("suback/AddReturnCode: Invalid return code %d. Must be 0, 1, 2, 0x80.", c)
 		}
 
-		this.returnCodes = append(this.returnCodes, c)
+		this.reasonCodes = append(this.reasonCodes, c)
 	}
 
 	this.dirty = true
@@ -50,8 +80,8 @@ func (this *SubackMessage) AddReturnCodes(ret []byte) error {
 }
 
 // AddReturnCode adds a single QoS return value.
-func (this *SubackMessage) AddReturnCode(ret byte) error {
-	return this.AddReturnCodes([]byte{ret})
+func (this *SubackMessage) AddReasonCode(ret byte) error {
+	return this.AddReasonCodes([]byte{ret})
 }
 
 func (this *SubackMessage) Len() int {
@@ -80,14 +110,57 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
 	this.packetId = src[total : total+2]
 	total += 2
+	var n int
+	this.propertiesLen, n, err = lbDecode(src[total:])
+	total += n
+	if err != nil {
+		return total, err
+	}
+	if int(this.propertiesLen) > len(src[total:]) {
+		return total, ProtocolError
+	}
+	if total < len(src) && src[total] == DefiningIdentifiers {
+		total++
+		this.subscriptionIdentifier, n, err = lbDecode(src[total:])
+		total += n
+		if err != nil {
+			return total, err
+		}
+		if this.subscriptionIdentifier == 0 || src[total] == DefiningIdentifiers {
+			return total, ProtocolError
+		}
+	}
+	if total < len(src) && src[total] == UserProperty {
+		total++
+		var tb []byte
+		this.userProperty = make([][]byte, 0)
+		tb, n, err = readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return total, err
+		}
+		this.userProperty = append(this.userProperty, tb)
+		for total < len(src) && src[total] == UserProperty {
+			total++
+			tb, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
+			}
+			this.userProperty = append(this.userProperty, tb)
+		}
+	}
 
 	l := int(this.remlen) - (total - hn)
-	this.returnCodes = src[total : total+l]
-	total += len(this.returnCodes)
+	if l == 0 {
+		return total, ProtocolError
+	}
+	this.reasonCodes = src[total : total+l]
+	total += len(this.reasonCodes)
 
-	for i, code := range this.returnCodes {
+	for _, code := range this.reasonCodes {
 		if code != 0x00 && code != 0x01 && code != 0x02 && code != 0x80 {
-			return total, fmt.Errorf("suback/Decode: Invalid return code %d for topic %d", code, i)
+			return total, ProtocolError // fmt.Errorf("suback/Decode: Invalid return code %d for topic %d", code, i)
 		}
 	}
 
@@ -105,7 +178,7 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 		return copy(dst, this.dbuf), nil
 	}
 
-	for i, code := range this.returnCodes {
+	for i, code := range this.reasonCodes {
 		if code != 0x00 && code != 0x01 && code != 0x02 && code != 0x80 {
 			return 0, fmt.Errorf("suback/Encode: Invalid return code %d for topic %d", code, i)
 		}
@@ -135,12 +208,49 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 	}
 	total += 2
 
-	copy(dst[total:], this.returnCodes)
-	total += len(this.returnCodes)
+	tb := lbEncode(this.propertiesLen)
+	copy(dst[total:], tb)
+	total += len(tb)
+
+	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+		dst[total] = DefiningIdentifiers
+		total++
+		tb = lbEncode(this.subscriptionIdentifier)
+		copy(dst[total:], tb)
+		total += len(tb)
+	}
+	if len(this.userProperty) > 0 {
+		for i := 0; i < len(this.userProperty); i++ {
+			dst[total] = UserProperty
+			total++
+			n, err = writeLPBytes(dst[total:], this.userProperty[i])
+			total += n
+			if err != nil {
+				return total, err
+			}
+		}
+	}
+
+	copy(dst[total:], this.reasonCodes)
+	total += len(this.reasonCodes)
 
 	return total, nil
 }
 
 func (this *SubackMessage) msglen() int {
-	return 2 + len(this.returnCodes)
+	// packet ID
+	total := 2
+
+	total += len(lbEncode(this.propertiesLen))
+	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+		total++
+		total += len(lbEncode(this.subscriptionIdentifier))
+	}
+	for i := 0; i < len(this.userProperty); i++ {
+		total++
+		total += 2
+		total += len(this.userProperty[i])
+	}
+
+	return total + len(this.reasonCodes)
 }

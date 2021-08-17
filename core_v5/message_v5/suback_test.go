@@ -1,21 +1,51 @@
 package message
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+func TestDecodeSubAck(t *testing.T) {
+	sub := NewSubackMessage()
+
+	sub.SetPacketId(100)
+	require.Equal(t, 100, int(sub.PacketId()), "Error setting packet ID.")
+
+	sub.SetUserProperty([][]byte{[]byte("asd"), []byte("ccc:sa")})
+	require.Equal(t, [][]byte{[]byte("asd"), []byte("ccc:sa")}, sub.UserProperty(), "Error adding User Property.")
+
+	sub.SetSubscriptionIdentifier(123)
+	require.Equal(t, uint32(123), sub.SubscriptionIdentifier(), "Error adding Subscription Identifier.")
+
+	sub.AddReasonCode(0x00)
+	sub.AddReasonCode(0x01)
+
+	b := make([]byte, 100)
+	n, err := sub.Encode(b)
+	require.NoError(t, err)
+	fmt.Println(sub)
+	fmt.Println(b[:n])
+	sub1 := NewSubackMessage()
+	_, err = sub1.Decode(b[:n])
+	require.NoError(t, err)
+	fmt.Println(sub1)
+	sub1.dirty = true
+	sub1.dbuf = nil
+	require.Equal(t, true, reflect.DeepEqual(sub, sub1))
+}
 func TestSubackMessageFields(t *testing.T) {
 	msg := NewSubackMessage()
 
 	msg.SetPacketId(100)
 	require.Equal(t, 100, int(msg.PacketId()), "Error setting packet ID.")
 
-	msg.AddReturnCode(1)
-	require.Equal(t, 1, len(msg.ReturnCodes()), "Error adding return code.")
+	msg.AddReasonCode(1)
+	require.Equal(t, 1, len(msg.ReasonCodes()), "Error adding return code.")
 
-	err := msg.AddReturnCode(0x90)
+	err := msg.AddReasonCode(0x90)
 	require.Error(t, err)
 }
 
@@ -37,7 +67,7 @@ func TestSubackMessageDecode(t *testing.T) {
 	require.NoError(t, err, "Error decoding message.")
 	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 	require.Equal(t, SUBACK, msg.Type(), "Error decoding message.")
-	require.Equal(t, 4, len(msg.ReturnCodes()), "Error adding return code.")
+	require.Equal(t, 4, len(msg.ReasonCodes()), "Error adding return code.")
 }
 
 // test with wrong return code
@@ -73,10 +103,10 @@ func TestSubackMessageEncode(t *testing.T) {
 
 	msg := NewSubackMessage()
 	msg.SetPacketId(7)
-	msg.AddReturnCode(0)
-	msg.AddReturnCode(1)
-	msg.AddReturnCode(2)
-	msg.AddReturnCode(0x80)
+	msg.AddReasonCode(0)
+	msg.AddReasonCode(1)
+	msg.AddReasonCode(2)
+	msg.AddReasonCode(0x80)
 
 	dst := make([]byte, 10)
 	n, err := msg.Encode(dst)
