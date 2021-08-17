@@ -26,9 +26,9 @@ func (this *PubrecMessage) Decode(src []byte) (int, error) {
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
 	this.packetId = src[total : total+2]
 	total += 2
-	if this.header.remlen == 2 {
+	if this.RemainingLength() == 2 {
 		this.reasonCode = Success
 		return total, nil
 	}
-	return this.PubackMessage.decodeOther(src, total, n)
+	return this.decodeOther(src, total, n)
 }

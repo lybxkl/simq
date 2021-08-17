@@ -90,7 +90,10 @@ func (this *PubackMessage) Decode(src []byte) (int, error) {
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
 	this.packetId = src[total : total+2]
 	total += 2
-
+	if this.RemainingLength() == 2 {
+		this.reasonCode = Success
+		return total, nil
+	}
 	return this.decodeOther(src, total, n)
 }
 
@@ -99,6 +102,12 @@ func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 	var err error
 	this.reasonCode = ReasonCode(src[total])
 	total++
+	code := this.reasonCode
+	if code != 0x00 && code != 0x10 && code != 0x80 &&
+		code != 0x83 && code != 0x87 && code != 0x90 && code != 0x91 &&
+		code != 0x97 && code != 0x99 {
+		return total, ProtocolError
+	}
 	if total < len(src) && len(src[total:]) >= 4 {
 		this.propertyLen, n, err = lbDecode(src[total:])
 		total += n
