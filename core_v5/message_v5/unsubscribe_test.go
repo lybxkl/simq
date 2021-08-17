@@ -1,11 +1,36 @@
 package message
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+func TestDecodeUnSub(t *testing.T) {
+	msg := NewUnsubscribeMessage()
+
+	msg.SetPacketId(100)
+	require.Equal(t, 100, int(msg.PacketId()), "Error setting packet ID.")
+
+	msg.SetUserProperty([][]byte{[]byte("aaa"), []byte("asd:asd")})
+	msg.AddTopic([]byte("aaa"))
+	msg.AddTopic([]byte("bb/bb"))
+
+	b := make([]byte, 100)
+	n, err := msg.Encode(b)
+	fmt.Println(msg)
+	require.NoError(t, err)
+	fmt.Println(b[:n])
+	msg1 := NewUnsubscribeMessage()
+	_, err = msg1.Decode(b[:n])
+	require.NoError(t, err)
+	msg1.dirty = true
+	msg1.dbuf = nil
+	fmt.Println(msg1)
+	require.Equal(t, true, reflect.DeepEqual(msg, msg1))
+}
 func TestUnsubscribeMessageFields(t *testing.T) {
 	msg := NewUnsubscribeMessage()
 

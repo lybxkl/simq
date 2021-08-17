@@ -239,7 +239,7 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 	}
 
 	if len(this.topics) == 0 {
-		return 0, fmt.Errorf("subscribe/Decode: Empty topic list")
+		return 0, ProtocolError //fmt.Errorf("subscribe/Decode: Empty topic list")
 	}
 
 	this.dirty = false

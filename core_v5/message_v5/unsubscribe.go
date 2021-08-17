@@ -9,8 +9,28 @@ import (
 // An UNSUBSCRIBE Packet is sent by the Client to the Server, to unsubscribe from topics.
 type UnsubscribeMessage struct {
 	header
-
+	// === 可变报头 ===
+	//  属性长度
+	propertyLen  uint32
+	userProperty [][]byte
+	// 载荷
 	topics [][]byte
+}
+
+func (this *UnsubscribeMessage) PropertyLen() uint32 {
+	return this.propertyLen
+}
+
+func (this *UnsubscribeMessage) SetPropertyLen(propertyLen uint32) {
+	this.propertyLen = propertyLen
+}
+
+func (this *UnsubscribeMessage) UserProperty() [][]byte {
+	return this.userProperty
+}
+
+func (this *UnsubscribeMessage) SetUserProperty(userProperty [][]byte) {
+	this.userProperty = userProperty
 }
 
 var _ Message = (*UnsubscribeMessage)(nil)
@@ -25,6 +45,7 @@ func NewUnsubscribeMessage() *UnsubscribeMessage {
 
 func (this UnsubscribeMessage) String() string {
 	msgstr := fmt.Sprintf("%s", this.header)
+	msgstr = fmt.Sprintf("%s, PropertiesLen=%v,  User Properties=%v", msgstr, this.propertyLen, this.UserProperty())
 
 	for i, t := range this.topics {
 		msgstr = fmt.Sprintf("%s, Topic%d=%s", msgstr, i, string(t))
@@ -109,10 +130,38 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
 	this.packetId = src[total : total+2]
 	total += 2
-
+	var n int
+	if total < len(src) && len(src[total:]) >= 4 {
+		this.propertyLen, n, err = lbDecode(src[total:])
+		total += n
+		if err != nil {
+			return total, err
+		}
+	}
+	if total < len(src) && src[total] == UserProperty {
+		total++
+		this.userProperty = make([][]byte, 0)
+		var uv []byte
+		uv, n, err = readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return total, err
+		}
+		this.userProperty = append(this.userProperty, uv)
+		for total < len(src) && src[total] == UserProperty {
+			total++
+			uv, n, err = readLPBytes(src[total:])
+			total += n
+			if err != nil {
+				return total, err
+			}
+			this.userProperty = append(this.userProperty, uv)
+		}
+	}
 	remlen := int(this.remlen) - (total - hn)
+	var t []byte
 	for remlen > 0 {
-		t, n, err := readLPBytes(src[total:])
+		t, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -123,7 +172,7 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 	}
 
 	if len(this.topics) == 0 {
-		return 0, fmt.Errorf("unsubscribe/Decode: Empty topic list")
+		return 0, ProtocolError // fmt.Errorf("unsubscribe/Decode: Empty topic list")
 	}
 
 	this.dirty = false
@@ -173,8 +222,20 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 	//binary.BigEndian.PutUint16(dst[total:], this.packetId)
 	total += n
 
+	b := lbEncode(this.propertyLen)
+	copy(dst[total:], b)
+	total += len(b)
+	for i := 0; i < len(this.userProperty); i++ {
+		dst[total] = UserProperty
+		total++
+		n, err = writeLPBytes(dst[total:], this.userProperty[i])
+		total += n
+		if err != nil {
+			return total, err
+		}
+	}
 	for _, t := range this.topics {
-		n, err := writeLPBytes(dst[total:], t)
+		n, err = writeLPBytes(dst[total:], t)
 		total += n
 		if err != nil {
 			return total, err
@@ -187,10 +248,12 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 func (this *UnsubscribeMessage) msglen() int {
 	// packet ID
 	total := 2
-
+	for _, t := range this.userProperty {
+		total += 2 + len(t)
+	}
 	for _, t := range this.topics {
 		total += 2 + len(t)
 	}
-
+	total += len(lbEncode(this.propertyLen))
 	return total
 }
