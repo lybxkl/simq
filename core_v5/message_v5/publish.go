@@ -108,8 +108,12 @@ func (this *PublishMessage) UserProperty() [][]byte {
 	return this.userProperty
 }
 
-func (this *PublishMessage) SetUserProperty(userProperty [][]byte) {
-	this.userProperty = userProperty
+func (this *PublishMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperty = append(this.userProperty, userProperty...)
+	this.dirty = true
+}
+func (this *PublishMessage) AddUserProperty(userProperty []byte) {
+	this.userProperty = append(this.userProperty, userProperty)
 	this.dirty = true
 }
 
@@ -546,10 +550,6 @@ func (this *PublishMessage) build() {
 	this.tag = true
 }
 func (this *PublishMessage) msglen() int {
-	total := 2 + len(this.topic) + len(this.payload) + int(this.propertiesLen) + len(lbEncode(this.propertiesLen))
-	if this.QoS() != 0 {
-		total += 2
-	}
-
-	return total
+	this.build()
+	return int(this.remlen)
 }

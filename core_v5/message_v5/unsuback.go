@@ -19,6 +19,7 @@ func (u *UnsubackMessage) PropertyLen() uint32 {
 
 func (u *UnsubackMessage) SetPropertyLen(propertyLen uint32) {
 	u.propertyLen = propertyLen
+	u.dirty = true
 }
 
 func (u *UnsubackMessage) ReasonStr() []byte {
@@ -27,14 +28,20 @@ func (u *UnsubackMessage) ReasonStr() []byte {
 
 func (u *UnsubackMessage) SetReasonStr(reasonStr []byte) {
 	u.reasonStr = reasonStr
+	u.dirty = true
 }
 
 func (u *UnsubackMessage) UserProperty() [][]byte {
 	return u.userProperty
 }
 
-func (u *UnsubackMessage) SetUserProperty(userProperty [][]byte) {
-	u.userProperty = userProperty
+func (this *UnsubackMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperty = append(this.userProperty, userProperty...)
+	this.dirty = true
+}
+func (this *UnsubackMessage) AddUserProperty(userProperty []byte) {
+	this.userProperty = append(this.userProperty, userProperty)
+	this.dirty = true
 }
 
 func (u *UnsubackMessage) ReasonCodes() []byte {
@@ -43,9 +50,11 @@ func (u *UnsubackMessage) ReasonCodes() []byte {
 
 func (u *UnsubackMessage) AddReasonCodes(reasonCodes []byte) {
 	u.reasonCodes = append(u.reasonCodes, reasonCodes...)
+	u.dirty = true
 }
 func (u *UnsubackMessage) AddReasonCode(reasonCode byte) {
 	u.reasonCodes = append(u.reasonCodes, reasonCode)
+	u.dirty = true
 }
 
 var _ Message = (*UnsubackMessage)(nil)

@@ -13,8 +13,8 @@ func TestPubRecDecodeEncode(t *testing.T) {
 	pubrec.SetPacketId(123)
 	pubrec.SetReasonCode(Success)
 	pubrec.SetReasonStr([]byte("aaa"))
-	pubrec.SetUserProperty([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
-	pubrec.build()
+	pubrec.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	//pubrec.build()
 	b := make([]byte, 100)
 	n, err := pubrec.Encode(b)
 	if err != nil {

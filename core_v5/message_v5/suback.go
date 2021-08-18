@@ -40,6 +40,7 @@ func (this *SubackMessage) PropertiesLen() uint32 {
 
 func (this *SubackMessage) SetPropertiesLen(propertiesLen uint32) {
 	this.propertiesLen = propertiesLen
+	this.dirty = true
 }
 
 func (this *SubackMessage) SubscriptionIdentifier() uint32 {
@@ -48,14 +49,20 @@ func (this *SubackMessage) SubscriptionIdentifier() uint32 {
 
 func (this *SubackMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
 	this.subscriptionIdentifier = subscriptionIdentifier
+	this.dirty = true
 }
 
 func (this *SubackMessage) UserProperty() [][]byte {
 	return this.userProperty
 }
 
-func (this *SubackMessage) SetUserProperty(userProperty [][]byte) {
-	this.userProperty = userProperty
+func (this *SubackMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperty = append(this.userProperty, userProperty...)
+	this.dirty = true
+}
+func (this *SubackMessage) AddUserProperty(userProperty []byte) {
+	this.userProperty = append(this.userProperty, userProperty)
+	this.dirty = true
 }
 
 // ReasonCodes returns the list of QoS returns from the subscriptions sent in the SUBSCRIBE message.

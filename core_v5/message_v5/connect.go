@@ -325,8 +325,12 @@ func (this *ConnectMessage) UserProperty() [][]byte {
 	return this.userProperty
 }
 
-func (this *ConnectMessage) SetUserProperty(userProperty [][]byte) {
-	this.userProperty = userProperty
+func (this *ConnectMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperty = append(this.userProperty, userProperty...)
+	this.dirty = true
+}
+func (this *ConnectMessage) AddUserProperty(userProperty []byte) {
+	this.userProperty = append(this.userProperty, userProperty)
 	this.dirty = true
 }
 
@@ -334,11 +338,14 @@ func (this *ConnectMessage) WillUserProperty() [][]byte {
 	return this.willUserProperty
 }
 
-func (this *ConnectMessage) SetWillUserProperty(willUserProperty [][]byte) {
-	this.willUserProperty = willUserProperty
+func (this *ConnectMessage) AddWillUserPropertys(willUserProperty [][]byte) {
+	this.willUserProperty = append(this.willUserProperty, willUserProperty...)
 	this.dirty = true
 }
-
+func (this *ConnectMessage) AddWillUserProperty(willUserProperty []byte) {
+	this.willUserProperty = append(this.willUserProperty, willUserProperty)
+	this.dirty = true
+}
 func (this *ConnectMessage) AuthMethod() []byte {
 	return this.authMethod
 }
@@ -588,7 +595,7 @@ func (this *ConnectMessage) ClientId() []byte {
 // SetClientId sets an ID that identifies the Client to the Server.
 func (this *ConnectMessage) SetClientId(v []byte) error {
 	if len(v) > 0 && !this.validClientId(v) {
-		return ErrIdentifierRejected
+		return InvalidTopicName
 	}
 
 	this.clientId = v
@@ -730,7 +737,7 @@ func (this *ConnectMessage) Encode(dst []byte) (int, error) {
 
 	_, ok := SupportedVersions[this.version]
 	if !ok {
-		return 0, ErrInvalidProtocolVersion
+		return 0, UnSupportedProtocolVersion
 	}
 
 	hl := this.header.msglen()
@@ -977,7 +984,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 	if verstr, ok := SupportedVersions[this.version]; !ok { // todo 发送原因码0x84（不支持的协议版本）的CONNACK报文，然后必须关闭网络连接
 		return total, UnSupportedProtocolVersion // 如果协议版本不是 5 且服务端不愿意接受此 CONNECT 报文，可以发送包含原因码 0x84（不支持的协议版本）的CONNACK 报文，然后必须关闭网络连接
 	} else if verstr != string(this.protoName) {
-		return total, ErrInvalidProtocolVersion
+		return total, ProtocolError
 	}
 
 	// 连接标志
@@ -1307,6 +1314,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 }
 
 func (this *ConnectMessage) msglen() int {
+	this.build()
 	return int(this.remlen)
 }
 

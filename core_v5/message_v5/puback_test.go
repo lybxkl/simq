@@ -13,8 +13,8 @@ func TestPubAckDecodeEncode(t *testing.T) {
 	puback.SetPacketId(123)
 	puback.SetReasonCode(Success)
 	puback.SetReasonStr([]byte("aaa"))
-	puback.SetUserProperty([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
-	puback.build()
+	puback.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	//puback.build()
 	b := make([]byte, 100)
 	n, err := puback.Encode(b)
 	if err != nil {

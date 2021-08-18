@@ -60,7 +60,7 @@ func TestConnackMessageFields(t *testing.T) {
 	require.False(t, msg.SessionPresent(), "Error setting session present flag.")
 
 	msg.SetReasonCode(Success)
-	require.Equal(t, ConnectionAccepted, msg.ReasonCode(), "Error setting return code.")
+	require.Equal(t, Success, msg.ReasonCode(), "Error setting return code.")
 }
 
 func TestConnackMessageDecode(t *testing.T) {

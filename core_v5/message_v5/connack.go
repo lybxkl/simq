@@ -247,8 +247,12 @@ func (this *ConnackMessage) UserProperties() [][]byte {
 	return this.userProperties
 }
 
-func (this *ConnackMessage) SetUserProperties(userProperties [][]byte) {
-	this.userProperties = userProperties
+func (this *ConnackMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperties = append(this.userProperties, userProperty...)
+	this.dirty = true
+}
+func (this *ConnackMessage) AddUserProperty(userProperty []byte) {
+	this.userProperties = append(this.userProperties, userProperty)
 	this.dirty = true
 }
 
@@ -755,5 +759,6 @@ func (this *ConnackMessage) Encode(dst []byte) (int, error) {
 
 // propertiesLen
 func (this *ConnackMessage) msglen() int {
-	return int(this.propertiesLen)
+	this.build()
+	return int(this.remlen)
 }

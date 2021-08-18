@@ -23,7 +23,7 @@ func TestDecodeSub(t *testing.T) {
 	require.False(t, sub.TopicExists([]byte("/a/b/#/c")), "Topic should not exist.")
 	sub.AddTopic([]byte("/a/b/#/c"), 1)
 
-	sub.SetUserProperty([][]byte{[]byte("asd"), []byte("ccc:sa")})
+	sub.AddUserPropertys([][]byte{[]byte("asd"), []byte("ccc:sa")})
 	require.Equal(t, [][]byte{[]byte("asd"), []byte("ccc:sa")}, sub.UserProperty(), "Error adding User Property.")
 
 	sub.SetSubscriptionIdentifier(123)

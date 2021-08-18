@@ -4,6 +4,7 @@ import "fmt"
 
 // PubackMessage A PUBACK Packet is the response to a PUBLISH Packet with QoS level 1.
 type PubackMessage struct {
+	tag bool
 	header
 	// === PUBACK可变报头 ===
 	reasonCode ReasonCode // 原因码
@@ -44,8 +45,12 @@ func (this *PubackMessage) UserProperty() [][]byte {
 	return this.userProperty
 }
 
-func (this *PubackMessage) SetUserProperty(userProperty [][]byte) {
-	this.userProperty = userProperty
+func (this *PubackMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperty = append(this.userProperty, userProperty...)
+	this.dirty = true
+}
+func (this *PubackMessage) AddUserProperty(userProperty []byte) {
+	this.userProperty = append(this.userProperty, userProperty)
 	this.dirty = true
 }
 
@@ -150,13 +155,14 @@ func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 	return total, nil
 }
 func (this *PubackMessage) Encode(dst []byte) (int, error) {
+	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("puback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
 		}
 		return copy(dst, this.dbuf), nil
 	}
-	this.build()
+
 	hl := this.header.msglen()
 	ml := this.msglen()
 
@@ -214,6 +220,9 @@ func (this *PubackMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 func (this *PubackMessage) build() {
+	if this.tag {
+		return
+	}
 	total := 0
 	if len(this.reasonStr) > 0 {
 		total++
@@ -229,15 +238,7 @@ func (this *PubackMessage) build() {
 	this.dirty = true
 }
 func (this *PubackMessage) msglen() int {
-	total := 0
-	// packet ID
-	total += 2
-	// reasonCode
-	total++
-
-	if this.propertyLen < 4 {
-		total += len(lbEncode(this.propertyLen))
-	}
+	this.build()
 	if this.propertyLen == 0 && this.reasonCode == Success {
 		return 2
 	}

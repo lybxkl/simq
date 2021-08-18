@@ -14,7 +14,7 @@ func TestDecodeUnSubAck(t *testing.T) {
 	sub.SetPacketId(100)
 	require.Equal(t, 100, int(sub.PacketId()), "Error setting packet ID.")
 
-	sub.SetUserProperty([][]byte{[]byte("asd"), []byte("ccc:sa")})
+	sub.AddUserPropertys([][]byte{[]byte("asd"), []byte("ccc:sa")})
 	require.Equal(t, [][]byte{[]byte("asd"), []byte("ccc:sa")}, sub.UserProperty(), "Error adding User Property.")
 
 	sub.AddReasonCode(0x00)

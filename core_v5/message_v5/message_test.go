@@ -107,18 +107,6 @@ func TestQosCodes(t *testing.T) {
 	}
 }
 
-func TestConnackReturnCodes(t *testing.T) {
-	require.Equal(t, ErrInvalidProtocolVersion.Error(), ConnackCode(1).Error(), "Incorrect ConnackCode error value.")
-
-	require.Equal(t, ErrIdentifierRejected.Error(), ConnackCode(2).Error(), "Incorrect ConnackCode error value.")
-
-	require.Equal(t, ErrServerUnavailable.Error(), ConnackCode(3).Error(), "Incorrect ConnackCode error value.")
-
-	require.Equal(t, ErrBadUsernameOrPassword.Error(), ConnackCode(4).Error(), "Incorrect ConnackCode error value.")
-
-	require.Equal(t, ErrNotAuthorized.Error(), ConnackCode(5).Error(), "Incorrect ConnackCode error value.")
-}
-
 func TestFixedHeaderFlags(t *testing.T) {
 	type detail struct {
 		name  string

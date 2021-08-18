@@ -13,7 +13,7 @@ func TestPubCompDecodeEncode(t *testing.T) {
 	pubcomp.SetPacketId(123)
 	pubcomp.SetReasonCode(Success)
 	pubcomp.SetReasonStr([]byte("aaa"))
-	pubcomp.SetUserProperty([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	pubcomp.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
 	pubcomp.build()
 	b := make([]byte, 100)
 	n, err := pubcomp.Encode(b)

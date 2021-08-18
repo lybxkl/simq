@@ -13,8 +13,8 @@ func TestPubRelDecodeEncode(t *testing.T) {
 	pubrel.SetPacketId(123)
 	pubrel.SetReasonCode(Success)
 	pubrel.SetReasonStr([]byte("aaa"))
-	pubrel.SetUserProperty([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
-	pubrel.build()
+	pubrel.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	//pubrel.build()
 	b := make([]byte, 100)
 	n, err := pubrel.Encode(b)
 	if err != nil {

@@ -30,6 +30,7 @@ func (this *SubscribeMessage) PropertiesLen() uint32 {
 
 func (this *SubscribeMessage) SetPropertiesLen(propertiesLen uint32) {
 	this.propertiesLen = propertiesLen
+	this.dirty = true
 }
 
 func (this *SubscribeMessage) SubscriptionIdentifier() uint32 {
@@ -38,14 +39,20 @@ func (this *SubscribeMessage) SubscriptionIdentifier() uint32 {
 
 func (this *SubscribeMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
 	this.subscriptionIdentifier = subscriptionIdentifier
+	this.dirty = true
 }
 
 func (this *SubscribeMessage) UserProperty() [][]byte {
 	return this.userProperty
 }
 
-func (this *SubscribeMessage) SetUserProperty(userProperty [][]byte) {
-	this.userProperty = userProperty
+func (this *SubscribeMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperty = append(this.userProperty, userProperty...)
+	this.dirty = true
+}
+func (this *SubscribeMessage) AddUserProperty(userProperty []byte) {
+	this.userProperty = append(this.userProperty, userProperty)
+	this.dirty = true
 }
 
 var _ Message = (*SubscribeMessage)(nil)

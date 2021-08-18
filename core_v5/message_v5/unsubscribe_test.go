@@ -14,7 +14,7 @@ func TestDecodeUnSub(t *testing.T) {
 	msg.SetPacketId(100)
 	require.Equal(t, 100, int(msg.PacketId()), "Error setting packet ID.")
 
-	msg.SetUserProperty([][]byte{[]byte("aaa"), []byte("asd:asd")})
+	msg.AddUserPropertys([][]byte{[]byte("aaa"), []byte("asd:asd")})
 	msg.AddTopic([]byte("aaa"))
 	msg.AddTopic([]byte("bb/bb"))
 

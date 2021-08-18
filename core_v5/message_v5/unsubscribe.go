@@ -23,14 +23,20 @@ func (this *UnsubscribeMessage) PropertyLen() uint32 {
 
 func (this *UnsubscribeMessage) SetPropertyLen(propertyLen uint32) {
 	this.propertyLen = propertyLen
+	this.dirty = true
 }
 
 func (this *UnsubscribeMessage) UserProperty() [][]byte {
 	return this.userProperty
 }
 
-func (this *UnsubscribeMessage) SetUserProperty(userProperty [][]byte) {
-	this.userProperty = userProperty
+func (this *UnsubscribeMessage) AddUserPropertys(userProperty [][]byte) {
+	this.userProperty = append(this.userProperty, userProperty...)
+	this.dirty = true
+}
+func (this *UnsubscribeMessage) AddUserProperty(userProperty []byte) {
+	this.userProperty = append(this.userProperty, userProperty)
+	this.dirty = true
 }
 
 var _ Message = (*UnsubscribeMessage)(nil)
