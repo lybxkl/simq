@@ -81,7 +81,7 @@ const (
 	UnsupportedRetention               ReasonCode = 0x9A    // 不支持保留 CONNACK, DISCONNECT
 	UnsupportedQoSLevel                ReasonCode = 0x9B    // 不支持的 QoS 等级 CONNACK, DISCONNECT
 	UseOtherServers                    ReasonCode = 0x9C    //（临时）使用其他服务端 CONNACK, DISCONNECT
-	serverHasMoved                     ReasonCode = 0x9D    // 服务端已（永久）移动 CONNACK, DISCONNECT
+	ServerHasMoved                     ReasonCode = 0x9D    // 服务端已（永久）移动 CONNACK, DISCONNECT
 	UnsupportedSharedSubscriptions     ReasonCode = 0x9E    // 不支持共享订阅 SUBACK, DISCONNECT
 	ExceededConnectionRateLimit        ReasonCode = 0x9F    // 超出连接速率限制 CONNACK, DISCONNECT
 	MaximumConnectionTime              ReasonCode = 0xA0    // 最大连接时间 DISCONNECT
@@ -174,8 +174,8 @@ func (this ReasonCode) Desc() string {
 		return "UnsupportedQoSLevel 不支持的 QoS 等级"
 	case UseOtherServers:
 		return "UseOtherServers （临时）使用其他服务端"
-	case serverHasMoved:
-		return "serverHasMoved 服务端已（永久）移动"
+	case ServerHasMoved:
+		return "ServerHasMoved 服务端已（永久）移动"
 	case UnsupportedSharedSubscriptions:
 		return "UnsupportedSharedSubscriptions 不支持共享订阅"
 	case ExceededConnectionRateLimit:

@@ -89,7 +89,7 @@ func (this *ConnackMessage) build() {
 	if this.buildTag {
 		return
 	}
-	propertiesLen := 2
+	propertiesLen := 0
 	// 属性
 	if this.sessionExpiryInterval > 0 { // 会话过期间隔
 		propertiesLen += 5
@@ -159,8 +159,8 @@ func (this *ConnackMessage) build() {
 		propertiesLen += len(this.authData)
 	}
 	this.propertiesLen = uint32(propertiesLen)
-	if err := this.SetRemainingLength(int32(propertiesLen)); err != nil {
-	}
+	this.SetRemainingLength(int32(1 + 1 + propertiesLen + len(lbEncode(this.propertiesLen))))
+	this.buildTag = true
 }
 func (this *ConnackMessage) PropertiesLen() uint32 {
 	return this.propertiesLen
@@ -378,7 +378,6 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	if err != nil {
 		return total, err
 	}
-	this.propertiesLen = uint32(this.header.RemainingLength()) // 剩余长度字段
 
 	b := src[total] // 连接确认标志，7-1必须设置为0
 
@@ -398,7 +397,17 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 
 	this.reasonCode = ReasonCode(b)
 	total++
+	if !ValidConnAckReasonCode(this.reasonCode) {
+		return total, ProtocolError
+	}
+
 	// Connack 属性
+
+	this.propertiesLen, n, err = lbDecode(src[total:])
+	total += n
+	if err != nil {
+		return total, err
+	}
 
 	if total < len(src) && src[total] == SessionExpirationInterval { // 会话过期间隔
 		total++
@@ -629,6 +638,9 @@ func (this *ConnackMessage) Encode(dst []byte) (int, error) {
 
 	dst[total] = this.reasonCode.Value() // 原因码
 	total++
+
+	n = copy(dst[total:], lbEncode(this.propertiesLen))
+	total += n
 
 	// 属性
 	if this.sessionExpiryInterval > 0 { // 会话过期间隔

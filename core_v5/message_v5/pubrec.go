@@ -72,7 +72,9 @@ func (this *PubrecMessage) Encode(dst []byte) (int, error) {
 	}
 	dst[total] = this.reasonCode.Value()
 	total++
-
+	if !ValidPubRecReasonCode(this.reasonCode) {
+		return total, ProtocolError
+	}
 	if this.propertyLen >= 4 {
 		b := lbEncode(this.propertyLen)
 		copy(dst[total:], b)

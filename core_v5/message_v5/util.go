@@ -1,6 +1,8 @@
 package message
 
-import "errors"
+import (
+	"errors"
+)
 
 // 变长字节整数解决方案
 
@@ -51,13 +53,108 @@ func lbDecode(b []byte) (uint32, int, error) {
 	return value, i, nil
 }
 
-// 判断下一个标识符是哪个
-func endIndexByTags(src []byte) int {
-	for i := 0; i < len(src); i++ {
-		switch src[i] {
-		case UserProperty:
-
-		}
+// ValidDisconnectReasonCode 验证disconnect原因码
+func ValidDisconnectReasonCode(code ReasonCode) bool {
+	switch code {
+	case NormalDisconnected, DisconnectionIncludesWill, UnspecifiedError, ProtocolError,
+		ImplementError, UnAuthorized, ServiceBusy, ServerBeingShutDown, KeepAliveTimeout, SessionTakeover,
+		InvalidTopicFilter, InvalidTopicName, MaximumNumberReceivedExceeded, InvalidTopicAlias,
+		MessageTooLong, TooManyMessages, BeyondQuota, ManagementBehavior, InvalidLoadFormat,
+		UnsupportedRetention, UnsupportedQoSLevel, UseOtherServers, ServerHasMoved,
+		UnsupportedSharedSubscriptions, ExceededConnectionRateLimit, MaximumConnectionTime,
+		UnsupportedSubscriptionIdentifiers, UnsupportedWildcardSubscriptions:
+		return true
+	default:
+		return false
 	}
-	return -1
+}
+
+// ValidAuthReasonCode 验证auth原因码
+func ValidAuthReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, ContinueAuthentication, ReAuthentication:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidUnSubAckReasonCode 验证UnSubAck原因码
+func ValidUnSubAckReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, NoExistSubscription, UnspecifiedError, ImplementError,
+		UnAuthorized, InvalidTopicFilter, PacketIdentifierIsOccupied:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidSubAckReasonCode 验证SubAck原因码
+func ValidSubAckReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, Qos1, Qos2, UnspecifiedError, ImplementError,
+		UnAuthorized, InvalidTopicFilter, PacketIdentifierIsOccupied, BeyondQuota,
+		UnsupportedSharedSubscriptions, UnsupportedSubscriptionIdentifiers,
+		UnsupportedWildcardSubscriptions:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidPubCompReasonCode 验证PubComp原因码
+func ValidPubCompReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, PacketIdentifierInvalid:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidPubRelReasonCode 验证PubRel原因码
+func ValidPubRelReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, PacketIdentifierInvalid:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidPubRecReasonCode 验证PubRec原因码
+func ValidPubRecReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, NoMatchSubscription, UnspecifiedError, ImplementError, UnAuthorized,
+		InvalidTopicName, PacketIdentifierIsOccupied, BeyondQuota, InvalidLoadFormat:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidPubAckReasonCode 验证PubAck原因码
+func ValidPubAckReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, NoMatchSubscription, UnspecifiedError, ImplementError, UnAuthorized,
+		InvalidTopicName, PacketIdentifierIsOccupied, BeyondQuota, InvalidLoadFormat:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidConnAckReasonCode 验证ConnAck原因码
+func ValidConnAckReasonCode(code ReasonCode) bool {
+	switch code {
+	case Success, UnspecifiedError, InvalidMessage, ProtocolError, ImplementError,
+		UnSupportedProtocolVersion, CustomerIdentifierInvalid, UserNameOrPasswordIsIncorrect,
+		UnAuthorized, ServerUnavailable, ServiceBusy, Forbid, InvalidAuthenticationMethod,
+		InvalidTopicName, MessageTooLong, BeyondQuota, InvalidLoadFormat, UnsupportedRetention,
+		UnsupportedQoSLevel, UseOtherServers, ServerHasMoved, ExceededConnectionRateLimit:
+		return true
+	default:
+		return false
+	}
 }

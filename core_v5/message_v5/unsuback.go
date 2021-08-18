@@ -130,7 +130,7 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 	total += len(this.reasonCodes)
 
 	for _, code := range this.reasonCodes {
-		if code != 0x00 && code != 0x11 && code != 0x80 && code != 0x83 && code != 0x87 && code != 0x8F && code != 0x91 {
+		if !ValidUnSubAckReasonCode(ReasonCode(code)) {
 			return total, ProtocolError // fmt.Errorf("unsuback/Decode: Invalid return code %d for topic %d", code, i)
 		}
 	}

@@ -1,6 +1,7 @@
 package message
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -32,6 +33,25 @@ func TestDisconnectMessageEncode(t *testing.T) {
 	n, err := msg.Encode(dst)
 
 	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
+}
+func TestDisconnectMessageEncode2(t *testing.T) {
+	msgBytes := []byte{
+		byte(DISCONNECT << 4),
+		12, 0, 10, 31, 0, 3, 97, 97, 97, 38, 0, 3, 97, 115, 100,
+	}
+
+	msg := NewDisconnectMessage()
+	msg.SetReasonStr([]byte("aaa"))
+	msg.SetReasonCode(Success)
+	msg.AddUserProperty([]byte("asd"))
+	dst := make([]byte, 100)
+	n, err := msg.Encode(dst)
+
+	require.NoError(t, err, "Error decoding message.")
+	fmt.Println(dst[:n])
+	fmt.Println(msg)
 	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
 }

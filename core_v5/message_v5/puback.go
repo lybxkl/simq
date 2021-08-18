@@ -192,7 +192,9 @@ func (this *PubackMessage) Encode(dst []byte) (int, error) {
 	}
 	dst[total] = this.reasonCode.Value()
 	total++
-
+	if !ValidPubAckReasonCode(this.reasonCode) {
+		return total, ProtocolError
+	}
 	if this.propertyLen >= 4 {
 		b := lbEncode(this.propertyLen)
 		copy(dst[total:], b)
@@ -235,6 +237,7 @@ func (this *PubackMessage) build() {
 		total += len(this.userProperty[i])
 	}
 	this.propertyLen = uint32(total)
+	this.SetRemainingLength(int32(2 + 1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
 	this.dirty = true
 }
 func (this *PubackMessage) msglen() int {
@@ -242,5 +245,5 @@ func (this *PubackMessage) msglen() int {
 	if this.propertyLen == 0 && this.reasonCode == Success {
 		return 2
 	}
-	return 2 + 1 + int(this.propertyLen)
+	return int(this.remlen)
 }

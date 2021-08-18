@@ -134,7 +134,9 @@ func (this *AuthMessage) Decode(src []byte) (int, error) {
 
 	this.reasonCode = ReasonCode(src[total])
 	total++
-
+	if !ValidAuthReasonCode(this.reasonCode) {
+		return total, ProtocolError
+	}
 	this.propertiesLen, n, err = lbDecode(src[total:])
 	total += n
 	if err != nil {

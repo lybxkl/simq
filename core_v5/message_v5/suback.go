@@ -166,7 +166,7 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 	total += len(this.reasonCodes)
 
 	for _, code := range this.reasonCodes {
-		if code != 0x00 && code != 0x01 && code != 0x02 && code != 0x80 {
+		if !ValidSubAckReasonCode(ReasonCode(code)) {
 			return total, ProtocolError // fmt.Errorf("suback/Decode: Invalid return code %d for topic %d", code, i)
 		}
 	}

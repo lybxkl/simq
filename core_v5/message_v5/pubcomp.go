@@ -39,8 +39,7 @@ func (this *PubcompMessage) decodeOther(src []byte, total, n int) (int, error) {
 	var err error
 	this.reasonCode = ReasonCode(src[total])
 	total++
-	code := this.reasonCode
-	if code != 0x00 && code != 0x92 {
+	if !ValidPubCompReasonCode(this.reasonCode) {
 		return total, ProtocolError
 	}
 	if total < len(src) && len(src[total:]) >= 4 {
