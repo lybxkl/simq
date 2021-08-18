@@ -354,13 +354,6 @@ func ValidVersion(v byte) bool {
 	return ok
 }
 
-// ValidConnackError checks to see if the error is a Connack Error or not
-// ValidConnackError检查该错误是否是Connack错误
-func ValidConnackError(err error) bool {
-	return err == ErrInvalidProtocolVersion || err == ErrIdentifierRejected ||
-		err == ErrServerUnavailable || err == ErrBadUsernameOrPassword || err == ErrNotAuthorized
-}
-
 // Read length prefixed bytes
 //读取带前缀的字节长度，2 byte
 func readLPBytes(buf []byte) ([]byte, int, error) {

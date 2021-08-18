@@ -215,7 +215,7 @@ func (this *header) decode(src []byte) (int, error) {
 	total += m
 	this.remlen = int32(remlen)
 
-	if this.remlen > maxRemainingLength || (this.Type() != PINGREQ && this.Type() != PINGRESP && remlen == 0) {
+	if this.remlen > maxRemainingLength || (this.Type() != PINGREQ && this.Type() != PINGRESP && this.Type() != AUTH && remlen == 0) {
 		return total, InvalidMessage //fmt.Errorf("header/Decode: Remaining length (%d) out of bound (max %d, min 0)", this.remlen, maxRemainingLength)
 	}
 
