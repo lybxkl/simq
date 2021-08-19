@@ -1,8 +1,8 @@
 package config
 
 import (
-	"SI-MQTT/core/logger"
-	"SI-MQTT/core/utils"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/utils"
 	"bytes"
 	_ "embed"
 	"encoding/json"

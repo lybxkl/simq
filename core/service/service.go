@@ -1,10 +1,10 @@
 package service
 
 import (
-	"SI-MQTT/core/logger"
-	"SI-MQTT/core/message"
-	"SI-MQTT/core/sessions"
-	"SI-MQTT/core/topics"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/sessions"
+	"gitee.com/Ljolan/si-mqtt/core/topics"
 	"fmt"
 	"io"
 	"sync"

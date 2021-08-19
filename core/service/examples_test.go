@@ -1,6 +1,6 @@
 package service
 
-import "SI-MQTT/core/message"
+import "gitee.com/Ljolan/si-mqtt/core/message"
 
 func ExampleServer() {
 	// Create a new server

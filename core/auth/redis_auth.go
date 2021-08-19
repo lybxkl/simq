@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"SI-MQTT/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
 )
 
 type redisAuthenticator bool

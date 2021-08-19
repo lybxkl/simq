@@ -1,7 +1,7 @@
 package sessions
 
 import (
-	"SI-MQTT/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"

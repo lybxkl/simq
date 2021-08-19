@@ -1,9 +1,9 @@
 package service
 
 import (
-	"SI-MQTT/core/auth"
-	"SI-MQTT/core/logger"
-	"SI-MQTT/core/topics"
+	"gitee.com/Ljolan/si-mqtt/core/auth"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/topics"
 	"errors"
 	"fmt"
 	"io"
@@ -13,8 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"SI-MQTT/core/message"
-	"SI-MQTT/core/sessions"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/sessions"
 )
 
 var (

@@ -1,10 +1,10 @@
 package topics
 
 import (
-	"SI-MQTT/core/logger"
-	"SI-MQTT/core/message"
-	"SI-MQTT/core/topics/share"
-	"SI-MQTT/core/topics/sys"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/topics/share"
+	"gitee.com/Ljolan/si-mqtt/core/topics/sys"
 	"fmt"
 	"reflect"
 	"sync"

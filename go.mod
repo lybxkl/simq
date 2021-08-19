@@ -1,4 +1,4 @@
-module SI-MQTT
+module gitee.com/Ljolan/si-mqtt
 
 go 1.16
 

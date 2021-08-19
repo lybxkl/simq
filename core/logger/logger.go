@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"SI-MQTT/core/logger/logs"
+	"gitee.com/Ljolan/si-mqtt/core/logger/logs"
 	"bytes"
 	"github.com/buguang01/util"
 )

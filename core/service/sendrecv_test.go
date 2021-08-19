@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"SI-MQTT/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/message"
 	"github.com/stretchr/testify/require"
 )
 

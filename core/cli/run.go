@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"SI-MQTT/core/auth"
-	"SI-MQTT/core/config"
-	"SI-MQTT/core/logger"
-	"SI-MQTT/core/service"
-	"SI-MQTT/core/sessions"
-	"SI-MQTT/core/topics"
-	"SI-MQTT/core/utils"
+	"gitee.com/Ljolan/si-mqtt/core/auth"
+	"gitee.com/Ljolan/si-mqtt/core/config"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/service"
+	"gitee.com/Ljolan/si-mqtt/core/sessions"
+	"gitee.com/Ljolan/si-mqtt/core/topics"
+	"gitee.com/Ljolan/si-mqtt/core/utils"
 	"golang.org/x/net/websocket"
 	"io"
 	"net"

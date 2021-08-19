@@ -1,6 +1,6 @@
 package auth
 
-import "SI-MQTT/core/logger"
+import "gitee.com/Ljolan/si-mqtt/core/logger"
 
 type noAuthenticator bool
 

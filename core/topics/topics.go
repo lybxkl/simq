@@ -9,8 +9,8 @@
 package topics
 
 import (
-	"SI-MQTT/core/logger"
-	"SI-MQTT/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"gitee.com/Ljolan/si-mqtt/core/message"
 	"errors"
 	"fmt"
 )
