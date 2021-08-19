@@ -3,8 +3,8 @@ package sys
 
 import (
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/core/logger"
 	"gitee.com/Ljolan/si-mqtt/core/message"
+	"gitee.com/Ljolan/si-mqtt/corev5/logger"
 	"reflect"
 	"sync"
 )

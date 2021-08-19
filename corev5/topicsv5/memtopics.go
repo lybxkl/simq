@@ -2,10 +2,10 @@ package topicsv5
 
 import (
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/core/logger"
 	"gitee.com/Ljolan/si-mqtt/core/message"
 	"gitee.com/Ljolan/si-mqtt/core/topics/share"
 	"gitee.com/Ljolan/si-mqtt/core/topics/sys"
+	"gitee.com/Ljolan/si-mqtt/corev5/logger"
 	"reflect"
 	"sync"
 )

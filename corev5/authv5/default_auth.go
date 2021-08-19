@@ -1,6 +1,6 @@
 package authv5
 
-import "gitee.com/Ljolan/si-mqtt/core/logger"
+import "gitee.com/Ljolan/si-mqtt/corev5/logger"
 
 type noAuthenticator bool
 

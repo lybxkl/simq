@@ -3,7 +3,7 @@ package authv5
 import (
 	"errors"
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"gitee.com/Ljolan/si-mqtt/corev5/logger"
 )
 
 var (
