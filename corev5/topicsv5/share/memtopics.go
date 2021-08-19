@@ -3,8 +3,8 @@ package share
 
 import (
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/logger"
+	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -13,7 +13,7 @@ import (
 
 var (
 	// MaxQosAllowed is the maximum QOS supported by this server
-	MaxQosAllowed = message.QosExactlyOnce
+	MaxQosAllowed = messagev5.QosExactlyOnce
 )
 
 var _ ShareTopicsProvider = (*memTopics)(nil)
@@ -24,7 +24,7 @@ type memTopics struct {
 	// Subscription tree
 	sroot *snode
 
-	// Retained message mutex
+	// Retained messagev5 mutex
 	rmu sync.RWMutex
 	// Retained messages topic tree
 	rroot *rnode
@@ -52,12 +52,12 @@ func NewMemProvider() *memTopics {
 
 //订阅主题
 func (this *memTopics) Subscribe(topic, shareName []byte, qos byte, sub interface{}) (byte, error) {
-	if !message.ValidQos(qos) {
-		return message.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
+	if !messagev5.ValidQos(qos) {
+		return messagev5.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
 	}
 
 	if sub == nil {
-		return message.QosFailure, fmt.Errorf("Subscriber cannot be nil")
+		return messagev5.QosFailure, fmt.Errorf("Subscriber cannot be nil")
 	}
 
 	this.smu.Lock()
@@ -67,7 +67,7 @@ func (this *memTopics) Subscribe(topic, shareName []byte, qos byte, sub interfac
 		qos = MaxQosAllowed
 	}
 	if err := this.sroot.sinsert(topic, shareName, qos, sub); err != nil {
-		return message.QosFailure, err
+		return messagev5.QosFailure, err
 	}
 
 	return qos, nil
@@ -83,7 +83,7 @@ func (this *memTopics) Unsubscribe(topic, shareName []byte, sub interface{}) err
 // Returned values will be invalidated by the next Subscribers call
 //返回的值将在下一次订阅者调用时失效
 func (this *memTopics) Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
-	if !message.ValidQos(qos) {
+	if !messagev5.ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
 
@@ -106,12 +106,12 @@ func (this *memTopics) AllSubInfo() (map[string][]string, error) {
 	return v, err
 }
 
-func (this *memTopics) Retain(msg *message.PublishMessage, shareName []byte) error {
+func (this *memTopics) Retain(msg *messagev5.PublishMessage, shareName []byte) error {
 	this.rmu.Lock()
 	defer this.rmu.Unlock()
 
 	// So apparently, at least according to the MQTT Conformance/Interoperability
-	// Testing, that a payload of 0 means delete the retain message.
+	// Testing, that a payload of 0 means delete the retain messagev5.
 	//很明显，至少根据MQTT一致性/互操作性
 	//测试，有效载荷为0表示删除retain消息。
 	// https://eclipse.org/paho/clients/testing/
@@ -122,7 +122,7 @@ func (this *memTopics) Retain(msg *message.PublishMessage, shareName []byte) err
 	return this.rroot.rinsert(msg.Topic(), shareName, msg)
 }
 
-func (this *memTopics) Retained(topic, shareName []byte, msgs *[]*message.PublishMessage) error {
+func (this *memTopics) Retained(topic, shareName []byte, msgs *[]*messagev5.PublishMessage) error {
 	this.rmu.RLock()
 	defer this.rmu.RUnlock()
 
@@ -381,12 +381,12 @@ func (this *snode) smatchAll(v map[string][]string) error {
 	return nil
 }
 
-// retained message nodes
+// retained messagev5 nodes
 //保留信息节点
 type rnode struct {
 	// If this is the end of the topic string, then add retained messages here
 	//如果这是主题字符串的结尾，那么在这里添加保留的消息
-	msg *message.PublishMessage
+	msg *messagev5.PublishMessage
 	buf []byte
 
 	// Otherwise add the next topic level here
@@ -399,7 +399,7 @@ func newRNode() *rnode {
 	}
 }
 
-func (this *rnode) rinsert(topic, shareName []byte, msg *message.PublishMessage) error {
+func (this *rnode) rinsert(topic, shareName []byte, msg *messagev5.PublishMessage) error {
 	// If there's no more topic levels, that means we are at the matching rnode.
 	if len(topic) == 0 {
 		l := msg.Len()
@@ -415,9 +415,9 @@ func (this *rnode) rinsert(topic, shareName []byte, msg *message.PublishMessage)
 			return err
 		}
 
-		// Reuse the message if possible
+		// Reuse the messagev5 if possible
 		if this.msg == nil {
-			this.msg = message.NewPublishMessage()
+			this.msg = messagev5.NewPublishMessage()
 		}
 
 		if _, err := this.msg.Decode(this.buf); err != nil {
@@ -448,10 +448,10 @@ func (this *rnode) rinsert(topic, shareName []byte, msg *message.PublishMessage)
 	return n.rinsert(rem, shareName, msg)
 }
 
-// Remove the retained message for the supplied topic
+// Remove the retained messagev5 for the supplied topic
 func (this *rnode) rremove(topic, shareName []byte) error {
 	// If the topic is empty, it means we are at the final matching rnode. If so,
-	// let's remove the buffer and message.
+	// let's remove the buffer and messagev5.
 	if len(topic) == 0 {
 		this.buf = nil
 		this.msg = nil
@@ -490,8 +490,8 @@ func (this *rnode) rremove(topic, shareName []byte) error {
 
 // rmatch() finds the retained messages for the topic and qos provided. It's somewhat
 // of a reverse match compare to match() since the supplied topic can contain
-// wildcards, whereas the retained message topic is a full (no wildcard) topic.
-func (this *rnode) rmatch(topic, shareName []byte, msgs *[]*message.PublishMessage) error {
+// wildcards, whereas the retained messagev5 topic is a full (no wildcard) topic.
+func (this *rnode) rmatch(topic, shareName []byte, msgs *[]*messagev5.PublishMessage) error {
 	// If the topic is empty, it means we are at the final matching rnode. If so,
 	// add the retained msg to the list.
 	if len(topic) == 0 {
@@ -531,7 +531,7 @@ func (this *rnode) rmatch(topic, shareName []byte, msgs *[]*message.PublishMessa
 	return nil
 }
 
-func (this *rnode) allRetained(msgs *[]*message.PublishMessage) {
+func (this *rnode) allRetained(msgs *[]*messagev5.PublishMessage) {
 	if this.msg != nil {
 		*msgs = append(*msgs, this.msg)
 	}
@@ -613,14 +613,14 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 }
 
 // The QoS of the payload messages sent in response to a subscription must be the
-// minimum of the QoS of the originally published message (in this case, it's the
+// minimum of the QoS of the originally published messagev5 (in this case, it's the
 // qos parameter) and the maximum QoS granted by the server (in this case, it's
 // the QoS in the topic tree).
 //
 // It's also possible that even if the topic matches, the subscriber is not included
-// due to the QoS granted is lower than the published message QoS. For example,
-// if the client is granted only QoS 0, and the publish message is QoS 1, then this
-// client is not to be send the published message.
+// due to the QoS granted is lower than the published messagev5 QoS. For example,
+// if the client is granted only QoS 0, and the publish messagev5 is QoS 1, then this
+// client is not to be send the published messagev5.
 //响应订阅发送的有效负载消息的QoS必须为
 //原始发布消息的QoS的最小值(在本例中为
 // qos参数)和服务器授予的最大qos(在本例中为

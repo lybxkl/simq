@@ -11,8 +11,8 @@ package topicsv5
 import (
 	"errors"
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/logger"
+	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 )
 
 const (
@@ -58,8 +58,8 @@ type TopicsProvider interface {
 	// if onlyShare == true && shareName != ""  ===>> 仅仅获取主题的共享组名为shareName的订阅者一个
 	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte, svc bool, shareName string, onlyShare bool) error
 	AllSubInfo() (map[string][]string, error) // 获取所有的共享订阅，k: 主题，v: 该主题的所有共享组
-	Retain(msg *message.PublishMessage) error
-	Retained(topic []byte, msgs *[]*message.PublishMessage) error
+	Retain(msg *messagev5.PublishMessage) error
+	Retained(topic []byte, msgs *[]*messagev5.PublishMessage) error
 	Close() error
 }
 
@@ -123,11 +123,11 @@ func (this *Manager) AllSubInfo() (map[string][]string, error) {
 	return this.p.AllSubInfo()
 }
 
-func (this *Manager) Retain(msg *message.PublishMessage) error {
+func (this *Manager) Retain(msg *messagev5.PublishMessage) error {
 	return this.p.Retain(msg)
 }
 
-func (this *Manager) Retained(topic []byte, msgs *[]*message.PublishMessage) error {
+func (this *Manager) Retained(topic []byte, msgs *[]*messagev5.PublishMessage) error {
 	return this.p.Retained(topic, msgs)
 }
 

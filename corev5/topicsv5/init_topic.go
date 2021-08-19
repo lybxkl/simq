@@ -1,8 +1,8 @@
 package topicsv5
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/topics/share"
-	"gitee.com/Ljolan/si-mqtt/core/topics/sys"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5/share"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5/sys"
 )
 
 func TopicInit(topicPro string) {

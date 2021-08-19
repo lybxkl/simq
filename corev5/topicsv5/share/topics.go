@@ -4,8 +4,8 @@ package share
 import (
 	"errors"
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/logger"
+	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 )
 
 const (
@@ -43,8 +43,8 @@ type ShareTopicsProvider interface {
 	Unsubscribe(topic, shareName []byte, subscriber interface{}) error
 	Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
 	AllSubInfo() (map[string][]string, error) // 获取所有的共享订阅，k: 主题，v: 该主题的所有共享组
-	Retain(msg *message.PublishMessage, shareName []byte) error
-	Retained(topic, shareName []byte, msgs *[]*message.PublishMessage) error
+	Retain(msg *messagev5.PublishMessage, shareName []byte) error
+	Retained(topic, shareName []byte, msgs *[]*messagev5.PublishMessage) error
 	Close() error
 }
 
@@ -104,11 +104,11 @@ func (this *Manager) Subscribers(topic, shareName []byte, qos byte, subs *[]inte
 	return this.p.Subscribers(topic, shareName, qos, subs, qoss)
 }
 
-func (this *Manager) Retain(msg *message.PublishMessage, shareName []byte) error {
+func (this *Manager) Retain(msg *messagev5.PublishMessage, shareName []byte) error {
 	return this.p.Retain(msg, shareName)
 }
 
-func (this *Manager) Retained(topic, shareName []byte, msgs *[]*message.PublishMessage) error {
+func (this *Manager) Retained(topic, shareName []byte, msgs *[]*messagev5.PublishMessage) error {
 	return this.p.Retained(topic, shareName, msgs)
 }
 

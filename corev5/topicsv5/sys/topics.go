@@ -4,8 +4,8 @@ package sys
 import (
 	"errors"
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/logger"
+	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 )
 
 const (
@@ -42,8 +42,8 @@ type SysTopicsProvider interface {
 	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error
 	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
-	Retain(msg *message.PublishMessage) error
-	Retained(topic []byte, msgs *[]*message.PublishMessage) error
+	Retain(msg *messagev5.PublishMessage) error
+	Retained(topic []byte, msgs *[]*messagev5.PublishMessage) error
 	Close() error
 }
 
@@ -99,11 +99,11 @@ func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qo
 	return this.p.Subscribers(topic, qos, subs, qoss)
 }
 
-func (this *Manager) Retain(msg *message.PublishMessage) error {
+func (this *Manager) Retain(msg *messagev5.PublishMessage) error {
 	return this.p.Retain(msg)
 }
 
-func (this *Manager) Retained(topic []byte, msgs *[]*message.PublishMessage) error {
+func (this *Manager) Retained(topic []byte, msgs *[]*messagev5.PublishMessage) error {
 	return this.p.Retained(topic, msgs)
 }
 

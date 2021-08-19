@@ -3,7 +3,7 @@ package topicsv5
 import (
 	"testing"
 
-	"gitee.com/Ljolan/si-mqtt/core/message"
+	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -452,7 +452,7 @@ func TestRNodeMatch(t *testing.T) {
 	err = n.rinsert(msg3.Topic(), msg3)
 	require.NoError(t, err)
 
-	var msglist []*message.PublishMessage
+	var msglist []*messagev5.PublishMessage
 
 	// ---
 
@@ -567,7 +567,7 @@ func TestMemTopicsRetained(t *testing.T) {
 	err = mgr.Retain(msg3)
 	require.NoError(t, err)
 
-	var msglist []*message.PublishMessage
+	var msglist []*messagev5.PublishMessage
 
 	// ---
 
@@ -625,8 +625,8 @@ func TestMemTopicsRetained(t *testing.T) {
 	require.Equal(t, 3, len(msglist))
 }
 
-func newPublishMessageLarge(topic []byte, qos byte) *message.PublishMessage {
-	msg := message.NewPublishMessage()
+func newPublishMessageLarge(topic []byte, qos byte) *messagev5.PublishMessage {
+	msg := messagev5.NewPublishMessage()
 	msg.SetTopic(topic)
 	msg.SetPayload(make([]byte, 1024))
 	msg.SetQoS(qos)
