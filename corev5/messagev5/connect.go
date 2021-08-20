@@ -75,7 +75,8 @@ var _ Message = (*ConnectMessage)(nil)
 func NewConnectMessage() *ConnectMessage {
 	msg := &ConnectMessage{}
 	_ = msg.SetType(CONNECT)
-
+	msg.SetRequestProblemInfo(1)
+	msg.SetMaxPacketSize(1024)
 	return msg
 }
 
@@ -144,7 +145,9 @@ func (this *ConnectMessage) build() {
 		return
 	}
 	remlen := 0
-	remlen += 4
+	remlen += 1 // version
+	remlen += 1 // 连接标志
+	remlen += 2 // keep alive
 	//  protoName,
 	//	clientId,
 	//	willTopic,
@@ -153,8 +156,10 @@ func (this *ConnectMessage) build() {
 	//	password []byte
 	remlen += 2
 	remlen += len(this.protoName)
+	// 载荷 客户端标识符
 	remlen += 2
 	remlen += len(this.clientId)
+	// 载荷 遗嘱
 	if this.WillFlag() && len(this.willTopic) > 0 {
 		remlen += 2
 		remlen += len(this.willTopic)
@@ -185,7 +190,7 @@ func (this *ConnectMessage) build() {
 	if this.sessionExpiryInterval > 0 {
 		propertiesLen += 5
 	}
-	if this.receiveMaximum > 0 {
+	if this.receiveMaximum > 0 && this.receiveMaximum < 65535 {
 		propertiesLen += 3
 	}
 	if this.maxPacketSize > 0 {
@@ -194,7 +199,7 @@ func (this *ConnectMessage) build() {
 	if this.topicAliasMax > 0 {
 		propertiesLen += 3
 	}
-	if this.requestRespInfo == 1 {
+	if this.requestRespInfo != 0 {
 		propertiesLen += 2
 	}
 	if this.requestProblemInfo != 1 {
@@ -224,6 +229,7 @@ func (this *ConnectMessage) build() {
 	//	willUserProperty       map[string]string // 用户属性，载荷遗嘱属性的
 	//	responseTopic          string            // 响应主题
 	//	correlationData        []byte            // 对比数据
+	// 载荷 遗嘱属性
 	willPropertiesLen := 0
 	if this.willDelayInterval > 0 {
 		willPropertiesLen += 5
@@ -236,26 +242,26 @@ func (this *ConnectMessage) build() {
 	}
 	if len(this.contentType) > 0 {
 		willPropertiesLen += 1
-		propertiesLen += 2
+		willPropertiesLen += 2
 		willPropertiesLen += len(this.contentType)
 	}
 	for _, v := range this.willUserProperty {
 		willPropertiesLen += 1
-		propertiesLen += 2
+		willPropertiesLen += 2
 		willPropertiesLen += len(v)
 	}
 	if len(this.responseTopic) > 0 {
 		willPropertiesLen += 1
-		propertiesLen += 2
+		willPropertiesLen += 2
 		willPropertiesLen += len(this.responseTopic)
 	}
 	if len(this.correlationData) > 0 {
 		willPropertiesLen += 1
-		propertiesLen += 2
+		willPropertiesLen += 2
 		willPropertiesLen += len(this.correlationData)
 	}
 	this.willPropertiesLen = uint32(willPropertiesLen)
-	this.header.SetRemainingLength(int32(remlen + propertiesLen + willPropertiesLen))
+	this.header.SetRemainingLength(int32(remlen + propertiesLen + len(lbEncode(this.propertiesLen)) + willPropertiesLen + len(lbEncode(this.willPropertiesLen))))
 	this.buildTag = true
 }
 func (this *ConnectMessage) PropertiesLen() uint32 {
@@ -436,8 +442,10 @@ func (this *ConnectMessage) Version() byte {
 
 // SetVersion sets the version value of the CONNECT message
 func (this *ConnectMessage) SetVersion(v byte) error {
-	if _, ok := SupportedVersions[v]; !ok {
+	if pn, ok := SupportedVersions[v]; !ok {
 		return fmt.Errorf("connect/SetVersion: Invalid version number %d", v)
+	} else {
+		this.protoName = []byte(pn)
 	}
 
 	this.version = v
@@ -800,7 +808,7 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 		total += 4
 	}
 
-	if this.receiveMaximum > 0 {
+	if this.receiveMaximum > 0 && this.receiveMaximum < 65535 {
 		dst[total] = MaximumQuantityReceived
 		total++
 		binary.BigEndian.PutUint16(dst[total:], this.receiveMaximum) // 接收最大值
