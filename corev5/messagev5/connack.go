@@ -47,7 +47,8 @@ var _ Message = (*ConnackMessage)(nil)
 func NewConnackMessage() *ConnackMessage {
 	msg := &ConnackMessage{}
 	msg.SetType(CONNACK)
-
+	msg.SetRetainAvailable(0x01)
+	msg.SetMaxPacketSize(1024) // FIXME 更新为根据connect中的最大来取
 	return msg
 }
 
@@ -105,8 +106,10 @@ func (this *ConnackMessage) build() {
 	if this.retainAvailable != 1 { // 保留可用
 		propertiesLen += 2
 	}
-	if this.maxPacketSize != 1 { // 最大报文长度
+	if this.maxPacketSize > 0 { // 最大报文长度
 		propertiesLen += 5
+	} else {
+		// todo this.maxPacketSize = ?
 	}
 	if len(this.assignedIdentifier) > 0 { // 分配客户标识符
 		propertiesLen++
