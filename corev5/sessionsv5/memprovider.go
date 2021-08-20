@@ -2,7 +2,7 @@ package sessionsv5
 
 import (
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/corev5/logger"
+	"gitee.com/Ljolan/si-mqtt/logger"
 	"strconv"
 	"sync"
 )

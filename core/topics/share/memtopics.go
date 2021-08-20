@@ -2,9 +2,9 @@
 package share
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -32,7 +32,7 @@ type memTopics struct {
 
 func memTopicInit() {
 	Register("", NewMemProvider())
-	logger.Logger.Info("开启mem进行share topic管理")
+	logger2.Logger.Info("开启mem进行share topic管理")
 }
 
 // NewMemProvider returns an new instance of the memTopics, which is implements the

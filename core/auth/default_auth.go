@@ -1,6 +1,8 @@
 package auth
 
-import "gitee.com/Ljolan/si-mqtt/core/logger"
+import (
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
+)
 
 type noAuthenticator bool
 
@@ -13,7 +15,7 @@ var (
 // default auth的初始化
 func defaultAuthInit() {
 	Register("", NewDefaultAuth()) //开启默认验证
-	logger.Logger.Info("开启default进行账号认证")
+	logger2.Logger.Info("开启default进行账号认证")
 }
 func NewDefaultAuth() Authenticator {
 	return &noAuth

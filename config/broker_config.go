@@ -1,24 +1,23 @@
 package config
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
-	"gitee.com/Ljolan/si-mqtt/core/utils"
 	"bytes"
-	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
+	utils2 "gitee.com/Ljolan/si-mqtt/utils"
 	"github.com/BurntSushi/toml"
 )
 
 var cfg SIConfig
 
 func init() {
-	if _, err := toml.DecodeFile(utils.GetConfigPath(utils.GetCurrentDirectory(), "config.toml"), &cfg); err != nil {
+	if _, err := toml.DecodeFile(utils2.GetConfigPath(utils2.GetCurrentDirectory(), "config.toml"), &cfg); err != nil {
 		panic(err)
 	}
 	fmt.Println(cfg.String())
-	logger.LogInit(cfg.Log.Level) // 日志必须提前初始化
+	logger2.LogInit(cfg.Log.Level) // 日志必须提前初始化
 }
 
 type SIConfig struct {

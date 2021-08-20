@@ -1,11 +1,11 @@
 package service
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
+	"fmt"
 	"gitee.com/Ljolan/si-mqtt/core/message"
 	"gitee.com/Ljolan/si-mqtt/core/sessions"
 	"gitee.com/Ljolan/si-mqtt/core/topics"
-	"fmt"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -154,10 +154,10 @@ func (this *service) start() error {
 		// 这个是发送给订阅者的，是每个订阅者都有一份的方法
 		this.onpub = func(msg *message.PublishMessage) error {
 			if err := this.publish(msg, func(msg, ack message.Message, err error) error {
-				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
+				logger2.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
 				return nil
 			}); err != nil {
-				logger.Logger.Errorf("service/onPublish: Error publishing message: %v", err)
+				logger2.Logger.Errorf("service/onPublish: Error publishing message: %v", err)
 				return err
 			}
 
@@ -210,7 +210,7 @@ func (this *service) stop() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			logger2.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 	}()
 
@@ -221,13 +221,13 @@ func (this *service) stop() {
 
 	// Close quit channel, effectively telling all the goroutines it's time to quit
 	if this.done != nil {
-		logger.Logger.Debugf("(%s) closing this.done", this.cid())
+		logger2.Logger.Debugf("(%s) closing this.done", this.cid())
 		close(this.done)
 	}
 
 	// Close the network connection
 	if this.conn != nil {
-		logger.Logger.Debugf("(%s) closing this.conn", this.cid())
+		logger2.Logger.Debugf("(%s) closing this.conn", this.cid())
 		this.conn.Close()
 	}
 
@@ -238,19 +238,19 @@ func (this *service) stop() {
 	this.wgStopped.Wait()
 
 	//打印该客户端生命周期内的接收字节与消息条数、发送字节与消息条数
-	logger.Logger.Debugf("(%s) Received %d bytes in %d messages.", this.cid(), this.inStat.bytes, this.inStat.msgs)
-	logger.Logger.Debugf("(%s) Sent %d bytes in %d messages.", this.cid(), this.outStat.bytes, this.outStat.msgs)
+	logger2.Logger.Debugf("(%s) Received %d bytes in %d messages.", this.cid(), this.inStat.bytes, this.inStat.msgs)
+	logger2.Logger.Debugf("(%s) Sent %d bytes in %d messages.", this.cid(), this.outStat.bytes, this.outStat.msgs)
 
 	// Unsubscribe from all the topics for this client, only for the server side though
 	// 取消订阅该客户机的所有主题，但只针对服务器端
 	if !this.client && this.sess != nil {
 		tpc, _, err := this.sess.Topics()
 		if err != nil {
-			logger.Logger.Errorf("(%s/%d): %v", this.cid(), this.id, err)
+			logger2.Logger.Errorf("(%s/%d): %v", this.cid(), this.id, err)
 		} else {
 			for _, t := range tpc {
 				if err := this.topicsMgr.Unsubscribe([]byte(t), &this.onpub); err != nil {
-					logger.Logger.Errorf("(%s): Error unsubscribing topic %q: %v", this.cid(), t, err)
+					logger2.Logger.Errorf("(%s): Error unsubscribing topic %q: %v", this.cid(), t, err)
 				}
 			}
 		}
@@ -258,7 +258,7 @@ func (this *service) stop() {
 	//如果设置了遗嘱消息，则发送遗嘱消息
 	// Publish will message if WillFlag is set. Server side only.
 	if !this.client && this.sess.Cmsg.WillFlag() {
-		logger.Logger.Infof("(%s) service/stop: connection unexpectedly closed. Sending Will：.", this.cid())
+		logger2.Logger.Infof("(%s) service/stop: connection unexpectedly closed. Sending Will：.", this.cid())
 		this.onPublish(this.sess.Will)
 	}
 	//移除这个客户端的主题管理

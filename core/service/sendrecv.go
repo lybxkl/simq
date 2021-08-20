@@ -1,10 +1,10 @@
 package service
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"encoding/binary"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"net"
 	"time"
@@ -32,15 +32,15 @@ func (this *service) receiver() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			logger2.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 
-		logger.Logger.Debugf("(%s) Stopping receiver", this.cid())
+		logger2.Logger.Debugf("(%s) Stopping receiver", this.cid())
 	}()
 
-	logger.Logger.Debugf("(%s) Starting receiver", this.cid())
+	logger2.Logger.Debugf("(%s) Starting receiver", this.cid())
 
 	this.wgStarted.Done()
 
@@ -74,7 +74,7 @@ func (this *service) receiver() {
 	//	glog.Errorf("(%s) Websocket: %v", this.cid(), ErrInvalidConnectionType)
 
 	default:
-		logger.Logger.Errorf("未知异常 (%s) %v", this.cid(), ErrInvalidConnectionType)
+		logger2.Logger.Errorf("未知异常 (%s) %v", this.cid(), ErrInvalidConnectionType)
 	}
 }
 
@@ -83,15 +83,15 @@ func (this *service) sender() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			logger2.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 
-		logger.Logger.Debugf("(%s) Stopping sender", this.cid())
+		logger2.Logger.Debugf("(%s) Stopping sender", this.cid())
 	}()
 
-	logger.Logger.Debugf("(%s) Starting sender", this.cid())
+	logger2.Logger.Debugf("(%s) Starting sender", this.cid())
 
 	this.wgStarted.Done()
 
@@ -102,7 +102,7 @@ func (this *service) sender() {
 
 			if err != nil {
 				if err != io.EOF {
-					logger.Logger.Errorf("(%s) error writing data: %v", this.cid(), err)
+					logger2.Logger.Errorf("(%s) error writing data: %v", this.cid(), err)
 				}
 				return
 			}
@@ -112,7 +112,7 @@ func (this *service) sender() {
 	//	glog.Errorf("(%s) Websocket not supported", this.cid())
 
 	default:
-		logger.Logger.Infof("(%s) Invalid connection type", this.cid())
+		logger2.Logger.Infof("(%s) Invalid connection type", this.cid())
 	}
 }
 
@@ -245,7 +245,7 @@ func (this *service) readMessage(mtype message.MessageType, total int) (message.
 	for l < total {
 		n, err = this.in.Read(this.intmp[l:])
 		l += n
-		logger.Logger.Debugf("read %d bytes, total %d", n, l)
+		logger2.Logger.Debugf("read %d bytes, total %d", n, l)
 		if err != nil {
 			return nil, 0, err
 		}

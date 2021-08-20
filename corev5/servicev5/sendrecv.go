@@ -3,8 +3,8 @@ package servicev5
 import (
 	"encoding/binary"
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/corev5/logger"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"net"
 	"time"

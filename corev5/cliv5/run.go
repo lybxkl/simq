@@ -1,12 +1,12 @@
-package cli
+package cliv5
 
 import (
 	config2 "gitee.com/Ljolan/si-mqtt/config"
-	"gitee.com/Ljolan/si-mqtt/core/auth"
-	"gitee.com/Ljolan/si-mqtt/core/service"
-	"gitee.com/Ljolan/si-mqtt/core/sessions"
-	"gitee.com/Ljolan/si-mqtt/core/topics"
-	logger2 "gitee.com/Ljolan/si-mqtt/logger"
+	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/servicev5"
+	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
+	"gitee.com/Ljolan/si-mqtt/logger"
 	utils2 "gitee.com/Ljolan/si-mqtt/utils"
 	"golang.org/x/net/websocket"
 	"io"
@@ -23,15 +23,15 @@ import (
 func init() {
 	utils2.MustPanic(config2.Configure(nil))
 	cfg := config2.GetConfig()
-	auth.AuthInit(cfg.DefaultConfig.Provider.Authenticator)
-	sessions.SessionInit(cfg.DefaultConfig.Provider.SessionsProvider)
-	topics.TopicInit(cfg.DefaultConfig.Provider.TopicsProvider)
+	authv5.AuthInit(cfg.DefaultConfig.Provider.Authenticator)
+	sessionsv5.SessionInit(cfg.DefaultConfig.Provider.SessionsProvider)
+	topicsv5.TopicInit(cfg.DefaultConfig.Provider.TopicsProvider)
 }
 func Run() {
 	cfg := config2.GetConfig()
 	conCif := cfg.DefaultConfig.Connect
 	proCif := cfg.DefaultConfig.Provider
-	svr := &service.Server{
+	svr := &servicev5.Server{
 		KeepAlive:        conCif.Keepalive,
 		ConnectTimeout:   conCif.ConnectTimeOut,
 		AckTimeout:       conCif.AckTimeOut,
@@ -54,7 +54,7 @@ func Run() {
 			// go tool pprof -http=:8000 http://localhost:8080/debug/pprof/heap    查看内存使用
 			// go tool pprof -http=:8000 http://localhost:8080/debug/pprof/profile 查看cpu占用
 			// 注意，需要提前安装 Graphviz 用于画图
-			logger2.Logger.Info(http.ListenAndServe(":"+strconv.Itoa(int(cfg.PProf.Port)), nil).Error())
+			logger.Logger.Info(http.ListenAndServe(":"+strconv.Itoa(int(cfg.PProf.Port)), nil).Error())
 		}()
 	}
 	go func() {
@@ -64,11 +64,11 @@ func Run() {
 			}
 		}()
 		sig := <-sigchan
-		logger2.Logger.Infof("服务停止：Existing due to trapped signal; %v", sig)
+		logger.Logger.Infof("服务停止：Existing due to trapped signal; %v", sig)
 
 		err := svr.Close()
 		if err != nil {
-			logger2.Logger.Errorf("server close err: %v", err)
+			logger.Logger.Errorf("server close err: %v", err)
 		}
 		os.Exit(0)
 	}()
@@ -95,7 +95,7 @@ func Run() {
 	/* create plain MQTT listener */
 	err = svr.ListenAndServe(mqttaddr)
 	if err != nil {
-		logger2.Logger.Errorf("MQTT 启动异常错误 simq/main: %v", err)
+		logger.Logger.Errorf("MQTT 启动异常错误 simq/main: %v", err)
 	}
 
 }
@@ -115,15 +115,15 @@ func BuffConfigInit() {
 	//defaultBufferSize := buff.BufferSize
 	//defaultReadBlockSize := buff.ReadBlockSize
 	//defaultWriteBlockSize := buff.WriteBlockSize
-	//service.BuffConfigInit(defaultBufferSize, defaultReadBlockSize, defaultWriteBlockSize)
+	//servicev5.BuffConfigInit(defaultBufferSize, defaultReadBlockSize, defaultWriteBlockSize)
 }
 
 // 转发websocket的数据到tcp处理中去
 func AddWebsocketHandler(urlPattern string, uri string) error {
-	logger2.Logger.Infof("AddWebsocketHandler urlPattern=%s, uri=%s", urlPattern, uri)
+	logger.Logger.Infof("AddWebsocketHandler urlPattern=%s, uri=%s", urlPattern, uri)
 	u, err := url.Parse(uri)
 	if err != nil {
-		logger2.Logger.Errorf("simq/main: %v", err)
+		logger.Logger.Errorf("simq/main: %v", err)
 		return err
 	}
 

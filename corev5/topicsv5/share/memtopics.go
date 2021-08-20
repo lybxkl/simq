@@ -3,8 +3,8 @@ package share
 
 import (
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/corev5/logger"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/logger"
 	"math/rand"
 	"reflect"
 	"sync"

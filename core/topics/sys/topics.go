@@ -2,10 +2,10 @@
 package sys
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 )
 
 const (
@@ -61,7 +61,7 @@ func Register(name string, provider SysTopicsProvider) {
 	}
 
 	providers[name] = provider
-	logger.Logger.Infof("Register Sys TopicsProvider：'%s' success，%T", name, provider)
+	logger2.Logger.Infof("Register Sys TopicsProvider：'%s' success，%T", name, provider)
 }
 
 func Unregister(name string) {

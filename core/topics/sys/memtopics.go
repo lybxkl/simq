@@ -2,9 +2,9 @@
 package sys
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"reflect"
 	"sync"
 )
@@ -38,7 +38,7 @@ const (
 
 func memSysTopicInit() {
 	Register("", NewMemProvider())
-	logger.Logger.Info("开启mem进行sys topic管理")
+	logger2.Logger.Info("开启mem进行sys topic管理")
 }
 
 var _ SysTopicsProvider = (*memTopics)(nil)

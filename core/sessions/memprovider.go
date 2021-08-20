@@ -1,8 +1,8 @@
 package sessions
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
 	"fmt"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"strconv"
 	"sync"
 )
@@ -11,7 +11,7 @@ var _ SessionsProvider = (*memProvider)(nil)
 
 func memProviderInit() {
 	Register("", NewMemProvider())
-	logger.Logger.Info("开启mem进行session管理")
+	logger2.Logger.Info("开启mem进行session管理")
 }
 
 type memProvider struct {
@@ -40,7 +40,7 @@ func (this *memProvider) Get(id string) (*Session, error) {
 	if !ok {
 		return nil, fmt.Errorf("store/Get: No session found for key %s", id)
 	}
-	logger.Logger.Info(strconv.Itoa(len(this.st)))
+	logger2.Logger.Info(strconv.Itoa(len(this.st)))
 	return sess, nil
 }
 

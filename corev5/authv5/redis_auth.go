@@ -1,7 +1,7 @@
 package authv5
 
 import (
-	"gitee.com/Ljolan/si-mqtt/corev5/logger"
+	"gitee.com/Ljolan/si-mqtt/logger"
 )
 
 type redisAuthenticator bool

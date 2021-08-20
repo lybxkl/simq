@@ -1,8 +1,8 @@
 package logger
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger/logs"
 	"bytes"
+	logs2 "gitee.com/Ljolan/si-mqtt/logger/logs"
 	"github.com/buguang01/util"
 )
 
@@ -13,10 +13,10 @@ type buffer struct {
 	next *buffer
 }
 
-var Logger *logs.AdamLog
+var Logger *logs2.AdamLog
 
 func LogInit(level string) {
 	util.SetLocation(util.BeiJing)
-	logs.LogInit(level)
-	Logger = logs.GetLogger()
+	logs2.LogInit(level)
+	Logger = logs2.GetLogger()
 }

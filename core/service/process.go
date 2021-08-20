@@ -1,11 +1,11 @@
 package service
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/logger"
-	"gitee.com/Ljolan/si-mqtt/core/message"
-	"gitee.com/Ljolan/si-mqtt/core/sessions"
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/sessions"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 
 	"io"
 	"reflect"
@@ -21,15 +21,15 @@ func (this *service) processor() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			logger2.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
 		}
 
 		this.wgStopped.Done()
 		this.stop()
-		logger.Logger.Debugf("(%s) Stopping processor", this.cid())
+		logger2.Logger.Debugf("(%s) Stopping processor", this.cid())
 	}()
 
-	logger.Logger.Debugf("(%s) Starting processor", this.cid())
+	logger2.Logger.Debugf("(%s) Starting processor", this.cid())
 
 	this.wgStarted.Done()
 
@@ -39,7 +39,7 @@ func (this *service) processor() {
 		mtype, total, err := this.peekMessageSize()
 		if err != nil {
 			if err != io.EOF {
-				logger.Logger.Errorf("(%s) Error peeking next message size", this.cid())
+				logger2.Logger.Errorf("(%s) Error peeking next message size", this.cid())
 			}
 			return
 		}
@@ -47,12 +47,12 @@ func (this *service) processor() {
 		msg, n, err := this.peekMessage(mtype, total)
 		if err != nil {
 			if err != io.EOF {
-				logger.Logger.Errorf("(%s) Error peeking next message: %v", this.cid(), err)
+				logger2.Logger.Errorf("(%s) Error peeking next message: %v", this.cid(), err)
 			}
 			return
 		}
 
-		logger.Logger.Debugf("(%s) Received: %s", this.cid(), msg)
+		logger2.Logger.Debugf("(%s) Received: %s", this.cid(), msg)
 
 		this.inStat.increment(int64(n))
 
@@ -61,7 +61,7 @@ func (this *service) processor() {
 		err = this.processIncoming(msg)
 		if err != nil {
 			if err != errDisconnect {
-				logger.Logger.Errorf("(%s) Error processing %s: %v", this.cid(), msg.Name(), err)
+				logger2.Logger.Errorf("(%s) Error processing %s: %v", this.cid(), msg.Name(), err)
 			} else {
 				return
 			}
@@ -72,7 +72,7 @@ func (this *service) processor() {
 		_, err = this.in.ReadCommit(total)
 		if err != nil {
 			if err != io.EOF {
-				logger.Logger.Errorf("(%s) Error committing %d read bytes: %v", this.cid(), total, err)
+				logger2.Logger.Errorf("(%s) Error committing %d read bytes: %v", this.cid(), total, err)
 			}
 			return
 		}
@@ -84,7 +84,7 @@ func (this *service) processor() {
 		}
 
 		if this.inStat.msgs%100000 == 0 {
-			logger.Logger.Warn(fmt.Sprintf("(%s) Going to process message %d", this.cid(), this.inStat.msgs))
+			logger2.Logger.Warn(fmt.Sprintf("(%s) Going to process message %d", this.cid(), this.inStat.msgs))
 		}
 	}
 }
@@ -174,7 +174,7 @@ func (this *service) processIncoming(msg message.Message) error {
 	}
 
 	if err != nil {
-		logger.Logger.Debugf("(%s) Error processing acked message: %v", this.cid(), err)
+		logger2.Logger.Debugf("(%s) Error processing acked message: %v", this.cid(), err)
 	}
 
 	return err
@@ -186,23 +186,23 @@ func (this *service) processAcked(ackq *sessions.Ackqueue) {
 		//让我们从保存的消息字节片获取消息。
 		msg, err := ackmsg.Mtype.New()
 		if err != nil {
-			logger.Logger.Errorf("process/processAcked: Unable to creating new %s message: %v", ackmsg.Mtype, err)
+			logger2.Logger.Errorf("process/processAcked: Unable to creating new %s message: %v", ackmsg.Mtype, err)
 			continue
 		}
 
 		if _, err := msg.Decode(ackmsg.Msgbuf); err != nil {
-			logger.Logger.Errorf("process/processAcked: Unable to decode %s message: %v", ackmsg.Mtype, err)
+			logger2.Logger.Errorf("process/processAcked: Unable to decode %s message: %v", ackmsg.Mtype, err)
 			continue
 		}
 
 		ack, err := ackmsg.State.New()
 		if err != nil {
-			logger.Logger.Errorf("process/processAcked: Unable to creating new %s message: %v", ackmsg.State, err)
+			logger2.Logger.Errorf("process/processAcked: Unable to creating new %s message: %v", ackmsg.State, err)
 			continue
 		}
 
 		if _, err := ack.Decode(ackmsg.Ackbuf); err != nil {
-			logger.Logger.Errorf("process/processAcked: Unable to decode %s message: %v", ackmsg.State, err)
+			logger2.Logger.Errorf("process/processAcked: Unable to decode %s message: %v", ackmsg.State, err)
 			continue
 		}
 
@@ -225,11 +225,11 @@ func (this *service) processAcked(ackq *sessions.Ackqueue) {
 			//如果ack为PUBREL，则表示远程客户端发送的QoS 2消息为
 			//发布了，让我们把它发布给其他订阅者吧。
 			if err = this.onPublish(msg.(*message.PublishMessage)); err != nil {
-				logger.Logger.Errorf("(%s) Error processing ack'ed %s message: %v", this.cid(), ackmsg.Mtype, err)
+				logger2.Logger.Errorf("(%s) Error processing ack'ed %s message: %v", this.cid(), ackmsg.Mtype, err)
 			}
 
 		case message.PUBACK, message.PUBCOMP, message.SUBACK, message.UNSUBACK, message.PINGRESP:
-			logger.Logger.Debugf("process/processAcked: %s", ack)
+			logger2.Logger.Debugf("process/processAcked: %s", ack)
 			// If ack is PUBACK, that means the QoS 1 message sent by this service got
 			// ack'ed. There's nothing to do other than calling onComplete() below.
 			//如果ack是PUBACK，则表示此服务发送的QoS 1消息已获取
@@ -257,7 +257,7 @@ func (this *service) processAcked(ackq *sessions.Ackqueue) {
 			err = nil
 
 		default:
-			logger.Logger.Errorf("(%s) Invalid ack message type %s.", this.cid(), ackmsg.State)
+			logger2.Logger.Errorf("(%s) Invalid ack message type %s.", this.cid(), ackmsg.State)
 			continue
 		}
 
@@ -265,10 +265,10 @@ func (this *service) processAcked(ackq *sessions.Ackqueue) {
 		if ackmsg.OnComplete != nil {
 			onComplete, ok := ackmsg.OnComplete.(OnCompleteFunc)
 			if !ok {
-				logger.Logger.Errorf("process/processAcked: Error type asserting onComplete function: %v", reflect.TypeOf(ackmsg.OnComplete))
+				logger2.Logger.Errorf("process/processAcked: Error type asserting onComplete function: %v", reflect.TypeOf(ackmsg.OnComplete))
 			} else if onComplete != nil {
 				if err := onComplete(msg, ack, nil); err != nil {
-					logger.Logger.Errorf("process/processAcked: Error running onComplete(): %v", err)
+					logger2.Logger.Errorf("process/processAcked: Error running onComplete(): %v", err)
 				}
 			}
 		}
@@ -339,7 +339,7 @@ func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 		//是的，我没有检查错误。如果有错误，我们不想
 		//订阅要停止，就放手吧。
 		this.topicsMgr.Retained(t, &this.rmsgs)
-		logger.Logger.Debugf("(%s) topic = %s, retained count = %d", this.cid(), t, len(this.rmsgs))
+		logger2.Logger.Debugf("(%s) topic = %s, retained count = %d", this.cid(), t, len(this.rmsgs))
 
 		/**
 		* 可以在这里向其它集群节点发送添加主题消息
@@ -347,7 +347,7 @@ func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 		**/
 
 	}
-	logger.Logger.Infof("客户端：%s，订阅主题：%s，qos：%d，retained count = %d", this.cid(), topics, qos, len(this.rmsgs))
+	logger2.Logger.Infof("客户端：%s，订阅主题：%s，qos：%d，retained count = %d", this.cid(), topics, qos, len(this.rmsgs))
 	if err := resp.AddReturnCodes(retcodes); err != nil {
 		return err
 	}
@@ -364,7 +364,7 @@ func (this *service) processSubscribe(msg *message.SubscribeMessage) error {
 			rm.SetQoS(qos[0])
 		}
 		if err := this.publish(rm, nil); err != nil {
-			logger.Logger.Errorf("service/processSubscribe: Error publishing retained message: %v", err)
+			logger2.Logger.Errorf("service/processSubscribe: Error publishing retained message: %v", err)
 			rm.SetQoS(old)
 			return err
 		}
@@ -392,7 +392,7 @@ func (this *service) processUnsubscribe(msg *message.UnsubscribeMessage) error {
 
 	_, err := this.writeMessage(resp)
 
-	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", this.cid(), topics)
+	logger2.Logger.Infof("客户端：%s 取消订阅主题：%s", this.cid(), topics)
 	return err
 }
 
@@ -405,14 +405,14 @@ func (this *service) processUnsubscribe(msg *message.UnsubscribeMessage) error {
 func (this *service) onPublish(msg1 *message.PublishMessage) error {
 	if msg1.Retain() {
 		if err := this.topicsMgr.Retain(msg1); err != nil { // 为这个主题保存最后一条保留消息
-			logger.Logger.Errorf("(%s) Error retaining message: %v", this.cid(), err)
+			logger2.Logger.Errorf("(%s) Error retaining message: %v", this.cid(), err)
 		}
 	}
 	// todo 集群模式，需要另外设计
 	// 发送当前主题的所有共享组
 	err := this.pubFnPlus(msg1)
 	if err != nil {
-		logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
+		logger2.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
 	}
 	// 发送非共享订阅主题
 	return this.pubFn(msg1, "", false)
@@ -424,7 +424,7 @@ func (this *service) pubFn(msg *message.PublishMessage, shareName string, onlySh
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to topic %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs), shareName)
+	logger2.Logger.Debugf("(%s) Publishing to topic %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs), shareName)
 	for i, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
@@ -448,7 +448,7 @@ func (this *service) pubFnPlus(msg *message.PublishMessage) error {
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs))
+	logger2.Logger.Debugf("(%s) Publishing to all shareName topic in %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs))
 	for i, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)

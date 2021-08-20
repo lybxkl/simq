@@ -3,7 +3,7 @@ package servicev5
 import (
 	"bufio"
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/corev5/logger"
+	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"math"
 	"sync"
