@@ -14,6 +14,21 @@ type netReader interface {
 	io.Reader
 	SetReadDeadline(t time.Time) error
 }
+type netWriter interface {
+	io.Writer
+	SetWriteDeadline(t time.Time) error
+}
+type timeoutWriter struct {
+	d    time.Duration
+	conn netWriter
+}
+
+func (r timeoutWriter) Write(b []byte) (int, error) {
+	if err := r.conn.SetWriteDeadline(time.Now().Add(r.d)); err != nil {
+		return 0, err
+	}
+	return r.conn.Write(b)
+}
 
 type timeoutReader struct {
 	d    time.Duration
@@ -62,9 +77,13 @@ func (this *service) receiver() {
 			_, err := this.in.ReadFrom(r)
 
 			if err != nil {
+				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
+					logger.Logger.Warnf("<<(%s)>> 读超时关闭：%v", this.cid(), er)
+					return
+				}
 				if err != io.EOF {
 					//连接异常或者断线啥的
-					//logger.Logger.Errorf("<<(%s)>> 连接异常关闭：%v", this.cid(), err.Error())
+					logger.Logger.Errorf("<<(%s)>> 连接异常关闭：%v", this.cid(), err.Error())
 				}
 				return
 			}
@@ -94,13 +113,21 @@ func (this *service) sender() {
 	logger.Logger.Debugf("(%s) Starting sender", this.cid())
 
 	this.wgStarted.Done()
-
 	switch conn := this.conn.(type) {
 	case net.Conn:
+		writeTimeout := time.Second * time.Duration(this.writeTimeout)
+		r := timeoutWriter{
+			d:    writeTimeout + (writeTimeout / 2),
+			conn: conn,
+		}
 		for {
-			_, err := this.out.WriteTo(conn)
+			_, err := this.out.WriteTo(r)
 
 			if err != nil {
+				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
+					logger.Logger.Warnf("<<(%s)>> 写超时关闭：%v", this.cid(), er)
+					return
+				}
 				if err != io.EOF {
 					logger.Logger.Errorf("(%s) error writing data: %v", this.cid(), err)
 				}

@@ -59,9 +59,10 @@ type Cluster struct {
 }
 type Connect struct {
 	Keepalive      int `toml:"keepalive"`
-	ConnectTimeOut int `toml:"connectTimeOut"`
-	AckTimeOut     int `toml:"ackTimeOut"`
-	TimeOutRetries int `toml:"timeOutRetries"`
+	WriteTimeout   int `toml:"writeTimeout"`
+	ConnectTimeout int `toml:"connectTimeout"`
+	AckTimeout     int `toml:"ackTimeout"`
+	TimeoutRetries int `toml:"timeOutRetries"`
 }
 type Provider struct {
 	SessionsProvider string `toml:"sessionsProvider"`
@@ -124,9 +125,9 @@ func Configure(args []string) error {
 	fs.StringVar(&cfg.Cluster.ClientKeyFile, "client-keyfile", cfg.Cluster.ClientKeyFile, "path of tls client key file.")
 
 	fs.IntVar(&cfg.DefaultConfig.Connect.Keepalive, "keepalive", cfg.DefaultConfig.Connect.Keepalive, "Keepalive (sec)")
-	fs.IntVar(&cfg.DefaultConfig.Connect.ConnectTimeOut, "connect-timeout", cfg.DefaultConfig.Connect.ConnectTimeOut, "Connect Timeout (sec)")
-	fs.IntVar(&cfg.DefaultConfig.Connect.AckTimeOut, "ack-timeout", cfg.DefaultConfig.Connect.AckTimeOut, "Ack Timeout (sec)")
-	fs.IntVar(&cfg.DefaultConfig.Connect.TimeOutRetries, "timeout-retries", cfg.DefaultConfig.Connect.TimeOutRetries, "Timeout Retries")
+	fs.IntVar(&cfg.DefaultConfig.Connect.ConnectTimeout, "connect-timeout", cfg.DefaultConfig.Connect.ConnectTimeout, "Connect Timeout (sec)")
+	fs.IntVar(&cfg.DefaultConfig.Connect.AckTimeout, "ack-timeout", cfg.DefaultConfig.Connect.AckTimeout, "Ack Timeout (sec)")
+	fs.IntVar(&cfg.DefaultConfig.Connect.TimeoutRetries, "timeout-retries", cfg.DefaultConfig.Connect.TimeoutRetries, "Timeout Retries")
 	fs.StringVar(&cfg.DefaultConfig.Provider.Authenticator, "auth", cfg.DefaultConfig.Provider.Authenticator, "Authenticator Type")
 	//下面两个的value要改都要改
 	fs.StringVar(&cfg.DefaultConfig.Provider.SessionsProvider, "sessions", cfg.DefaultConfig.Provider.SessionsProvider, "Session Provider Type")

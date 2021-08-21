@@ -68,7 +68,7 @@ func NewUnsubackMessage() *UnsubackMessage {
 }
 func (this UnsubackMessage) String() string {
 	return fmt.Sprintf("%s, Packet ID=%d, PropertyLen=%v, "+
-		"Reason String=%s, User Property=%s, Reason Code=%v\n",
+		"Reason String=%s, User Property=%s, Reason Code=%v",
 		this.header, this.packetId, this.propertyLen, this.reasonStr, this.userProperty, this.reasonCodes)
 }
 func (this *UnsubackMessage) Decode(src []byte) (int, error) {

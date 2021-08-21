@@ -34,13 +34,16 @@ type Server struct {
 	// The number of seconds to keep the connection live if there's no data.
 	// If not set then default to 5 mins.
 	//如果没有数据，保持连接的秒数。
-	//如果没有设置，则默认为5分钟。
-	KeepAlive int
+	//如果没有设置，则默认为5分钟。connect中的该值的1.5倍作为读超时
+	KeepAlive int // uint16
+
+	// 写超时，默认5分钟 1.5
+	WriteTimeout int
 
 	// The number of seconds to wait for the CONNECT messagev5 before disconnecting.
-	// If not set then default to 2 seconds.
+	// If not set then default to 5 seconds.
 	//在断开连接之前等待连接消息的秒数。
-	//如果没有设置，则默认为2秒。
+	//如果没有设置，则默认为5秒。
 	ConnectTimeout int
 
 	// The number of seconds to wait for any ACK messages before failing.
@@ -289,12 +292,11 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	//要建立联系，我们必须
 	// 1.阅读并解码信息从连接线上的ConnectMessage
 	// 2.如果没有解码错误，则使用用户名和密码进行身份验证。
-	//否则，就写一封电报。ConnackMessage与 合适的错误。
+	//否则，发送ConnackMessage与合适的原因码。
 	// 3.如果身份验证成功，则创建一个新会话或 检索现有会话
-	// 4.给电报写一封成功的信ConnackMessage消息
-	//从连线中读取连接消息，如果错误，则检查它是否正确
-	//一个连接错误。 如果是连接错误，请发回正确的连接错误
-	//客户端。无论错误类型如何退出。
+	// 4.给客户端发送成功的ConnackMessage消息
+	// 从连线中读取连接消息，如果错误，则检查它是否正确一个连接错误。
+	// 如果是连接错误，请发回正确的连接错误
 	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(this.ConnectTimeout)))
 
 	resp := messagev5.NewConnackMessage()
@@ -322,14 +324,15 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	}
 
 	if req.KeepAlive() == 0 {
-		//设置默认的keepalive数
-		req.SetKeepAlive(30)
+		//设置默认的keepalive数，五分钟
+		req.SetKeepAlive(uint16(this.KeepAlive))
 	}
 	svc = &service{
 		id:     atomic.AddUint64(&gsvcid, 1),
 		client: false,
 
 		keepAlive:      int(req.KeepAlive()),
+		writeTimeout:   this.WriteTimeout,
 		connectTimeout: this.ConnectTimeout,
 		ackTimeout:     this.AckTimeout,
 		timeoutRetries: this.TimeoutRetries,
@@ -370,11 +373,11 @@ func (this *Server) checkConfiguration() error {
 
 	this.configOnce.Do(func() {
 		if this.KeepAlive == 0 {
-			this.KeepAlive = 30
+			this.KeepAlive = 300
 		}
 
 		if this.ConnectTimeout == 0 {
-			this.ConnectTimeout = 30
+			this.ConnectTimeout = 5
 		}
 
 		if this.AckTimeout == 0 {

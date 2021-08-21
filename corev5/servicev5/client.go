@@ -97,6 +97,7 @@ func (this *Client) Connect(uri string, msg *messagev5.ConnectMessage) (err erro
 		conn:   conn,
 
 		keepAlive:      int(msg.KeepAlive()),
+		writeTimeout:   300,
 		connectTimeout: this.ConnectTimeout,
 		ackTimeout:     this.AckTimeout,
 		timeoutRetries: this.TimeoutRetries,

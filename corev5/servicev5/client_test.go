@@ -22,7 +22,7 @@ func TestExampleClient(t *testing.T) {
 	msg.SetVersion(5)
 	msg.SetCleanSession(true)
 	msg.SetClientId([]byte("surgemq"))
-	msg.SetKeepAlive(1000)
+	msg.SetKeepAlive(30)
 	msg.SetWillTopic([]byte("will"))
 	msg.SetWillMessage([]byte("send me home"))
 	msg.SetUsername([]byte("surgemq"))
@@ -31,10 +31,10 @@ func TestExampleClient(t *testing.T) {
 	// Connects to the remote server at 127.0.0.1 port 1883
 	err := c.Connect("tcp://127.0.0.1:1883", msg)
 	require.NoError(t, err)
-
+	time.Sleep(10 * time.Millisecond)
 	// Creates a new SUBSCRIBE messagev5 to subscribe to topic "abc"
 	submsg := messagev5.NewSubscribeMessage()
-	submsg.AddTopic([]byte("abc"), 0)
+	submsg.AddTopic([]byte("abc"), 2)
 
 	// Subscribes to the topic by sending the messagev5. The first nil in the function
 	// call is a OnCompleteFunc that should handle the SUBACK messagev5 from the server.
@@ -43,25 +43,24 @@ func TestExampleClient(t *testing.T) {
 	// subscription. Nil means we are ignoring any PUBLISH messages for this topic.
 	fmt.Println("====== >>> Subscribe")
 	err = c.Subscribe(submsg, func(msg, ack messagev5.Message, err error) error {
-		fmt.Println("====== >>> Subscribe msg handle")
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			fmt.Println(msg)
-			fmt.Println("=====>")
+			fmt.Println("\n====== >>> Subscribe msg handle")
 			fmt.Println(ack)
 		}
 		return nil
 	}, func(msg *messagev5.PublishMessage) error {
-		fmt.Println(msg.String())
+		fmt.Println("===<<<>>>", msg.String())
 		return nil
 	})
 	require.NoError(t, err)
+	time.Sleep(1 * time.Second)
 	// Creates a new PUBLISH messagev5 with the appropriate contents for publishing
 	pubmsg := messagev5.NewPublishMessage()
 	pubmsg.SetTopic([]byte("abc"))
-	pubmsg.SetPayload(make([]byte, 10))
-	pubmsg.SetQoS(0)
+	pubmsg.SetPayload([]byte("1234567890"))
+	pubmsg.SetQoS(2)
 
 	// Publishes to the server by sending the messagev5
 	fmt.Println("====== >>> Publish")
@@ -69,31 +68,28 @@ func TestExampleClient(t *testing.T) {
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			fmt.Println(msg)
-			fmt.Println("=====>")
+			fmt.Println("\n=====> Publish Complete")
 			fmt.Println(ack)
 		}
 		return nil
 	})
 	require.NoError(t, err)
-
+	time.Sleep(1 * time.Second)
 	fmt.Println("====== >>> Unsubscribe")
 	unsubmsg := messagev5.NewUnsubscribeMessage()
 	unsubmsg.AddTopic([]byte("abc"))
 	err = c.Unsubscribe(unsubmsg, func(msg, ack messagev5.Message, err error) error {
-		fmt.Println("====== >>> Unsubscribe handle")
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			fmt.Println(msg)
-			fmt.Println("=====>")
+			fmt.Println("\n====== >>> Unsubscribe handle")
 			fmt.Println(ack)
 		}
 		return nil
 	})
 	require.NoError(t, err)
 	// Disconnects from the server
-	time.Sleep(100 * time.Millisecond)
-	fmt.Println("====== >>> Disconnect")
+	time.Sleep(35 * time.Second)
+	fmt.Println("\n====== >>> Disconnect")
 	c.Disconnect()
 }

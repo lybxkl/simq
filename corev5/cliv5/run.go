@@ -33,9 +33,10 @@ func Run() {
 	proCif := cfg.DefaultConfig.Provider
 	svr := &servicev5.Server{
 		KeepAlive:        conCif.Keepalive,
-		ConnectTimeout:   conCif.ConnectTimeOut,
-		AckTimeout:       conCif.AckTimeOut,
-		TimeoutRetries:   conCif.TimeOutRetries,
+		WriteTimeout:     conCif.WriteTimeout,
+		ConnectTimeout:   conCif.ConnectTimeout,
+		AckTimeout:       conCif.AckTimeout,
+		TimeoutRetries:   conCif.TimeoutRetries,
 		SessionsProvider: proCif.SessionsProvider,
 		TopicsProvider:   proCif.TopicsProvider,
 		Authenticator:    proCif.Authenticator,

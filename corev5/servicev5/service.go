@@ -48,9 +48,9 @@ type service struct {
 	// The number of seconds to keep the connection live if there's no data.
 	// If not set then default to 5 mins.
 	//如果没有数据，保持连接有效的秒数。
-	//如果没有设置，则默认为5分钟。
-	keepAlive int
-
+	//如果没有设置，则默认为5分钟。1.5倍该值 作为读超时
+	keepAlive    int
+	writeTimeout int // 写超时，1.5
 	// The number of seconds to wait for the CONNACK messagev5 before disconnecting.
 	// If not set then default to 2 seconds.
 	//断开连接前等待CONNACK消息的秒数。
