@@ -41,7 +41,6 @@ func TestPubDecode(t *testing.T) {
 	fmt.Println(len(b[:n]))
 	pub2.dirty = true
 	pub2.dbuf = nil
-	pub2.tag = true
 	fmt.Println(reflect.DeepEqual(pub, pub2))
 }
 func TestPublishMessageHeaderFields(t *testing.T) {

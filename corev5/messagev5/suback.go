@@ -177,7 +177,6 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *SubackMessage) Encode(dst []byte) (int, error) {
-	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("suback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -187,13 +186,13 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 	}
 
 	for i, code := range this.reasonCodes {
-		if code != 0x00 && code != 0x01 && code != 0x02 && code != 0x80 {
+		if !ValidSubAckReasonCode(ReasonCode(code)) {
 			return 0, fmt.Errorf("suback/Encode: Invalid return code %d for topic %d", code, i)
 		}
 	}
 
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("suback/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))

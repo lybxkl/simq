@@ -42,7 +42,7 @@ func (this *PubcompMessage) decodeOther(src []byte, total, n int) (int, error) {
 	if !ValidPubCompReasonCode(this.reasonCode) {
 		return total, ProtocolError
 	}
-	if total < len(src) && len(src[total:]) >= 4 {
+	if total < len(src) && len(src[total:]) > 0 {
 		this.propertyLen, n, err = lbDecode(src[total:])
 		total += n
 		if err != nil {

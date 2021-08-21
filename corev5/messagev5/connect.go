@@ -25,7 +25,6 @@ func init() {
 // disconnect the Client [MQTT-3.1.0-2].  See section 4.8 for information about
 // handling errors.
 type ConnectMessage struct {
-	buildTag bool
 	header
 
 	// 7: username flag
@@ -141,9 +140,6 @@ func (this ConnectMessage) String() string {
 
 // 自动设置remlen , 属性长度， 遗嘱属性长度
 func (this *ConnectMessage) build() {
-	if this.buildTag {
-		return
-	}
 	remlen := 0
 	remlen += 1 // version
 	remlen += 1 // 连接标志
@@ -261,8 +257,7 @@ func (this *ConnectMessage) build() {
 		willPropertiesLen += len(this.correlationData)
 	}
 	this.willPropertiesLen = uint32(willPropertiesLen)
-	this.header.SetRemainingLength(int32(remlen + propertiesLen + len(lbEncode(this.propertiesLen)) + willPropertiesLen + len(lbEncode(this.willPropertiesLen))))
-	this.buildTag = true
+	_ = this.SetRemainingLength(int32(remlen + propertiesLen + len(lbEncode(this.propertiesLen)) + willPropertiesLen + len(lbEncode(this.willPropertiesLen))))
 }
 func (this *ConnectMessage) PropertiesLen() uint32 {
 	return this.propertiesLen
@@ -730,7 +725,6 @@ func (this *ConnectMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *ConnectMessage) Encode(dst []byte) (int, error) {
-	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("connect/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -748,8 +742,8 @@ func (this *ConnectMessage) Encode(dst []byte) (int, error) {
 		return 0, UnSupportedProtocolVersion
 	}
 
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("connect/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))

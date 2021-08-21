@@ -9,7 +9,6 @@ import (
 // PublishMessage A PUBLISH Control Packet is sent from a Client to a Server or from Server to a Client
 // to transport an Application Message.
 type PublishMessage struct {
-	tag bool
 	header
 
 	// === 可变报头 ===
@@ -374,7 +373,6 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 
 		return copy(dst, this.dbuf), nil
 	}
-	this.build()
 	if len(this.topic) == 0 {
 		return 0, fmt.Errorf("publish/Encode: Topic name is empty.")
 	}
@@ -384,12 +382,11 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 	}
 
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
 		return 0, err
 	}
-
-	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("publish/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
@@ -494,9 +491,6 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 func (this *PublishMessage) build() {
-	if this.tag {
-		return
-	}
 	total := 0
 
 	total += 2 // 主题
@@ -545,9 +539,7 @@ func (this *PublishMessage) build() {
 	this.propertiesLen = propertiesLen
 	total += len(lbEncode(propertiesLen))
 	total += len(this.payload)
-	this.SetRemainingLength(int32(total))
-	this.dirty = true
-	this.tag = true
+	_ = this.SetRemainingLength(int32(total))
 }
 func (this *PublishMessage) msglen() int {
 	this.build()

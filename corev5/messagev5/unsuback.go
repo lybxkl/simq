@@ -138,7 +138,6 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 	return total, nil
 }
 func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
-	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("unsuback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -146,8 +145,8 @@ func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
 		return copy(dst, this.dbuf), nil
 	}
 
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("unsuback/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))

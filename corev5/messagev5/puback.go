@@ -1,10 +1,11 @@
 package messagev5
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // PubackMessage A PUBACK Packet is the response to a PUBLISH Packet with QoS level 1.
 type PubackMessage struct {
-	tag bool
 	header
 	// === PUBACK可变报头 ===
 	reasonCode ReasonCode // 原因码
@@ -107,13 +108,10 @@ func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 	var err error
 	this.reasonCode = ReasonCode(src[total])
 	total++
-	code := this.reasonCode
-	if code != 0x00 && code != 0x10 && code != 0x80 &&
-		code != 0x83 && code != 0x87 && code != 0x90 && code != 0x91 &&
-		code != 0x97 && code != 0x99 {
+	if !ValidPubAckReasonCode(this.reasonCode) {
 		return total, ProtocolError
 	}
-	if total < len(src) && len(src[total:]) >= 4 {
+	if total < len(src) && len(src[total:]) > 0 {
 		this.propertyLen, n, err = lbDecode(src[total:])
 		total += n
 		if err != nil {
@@ -155,19 +153,18 @@ func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 	return total, nil
 }
 func (this *PubackMessage) Encode(dst []byte) (int, error) {
-	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("puback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+			return 0, fmt.Errorf("pubxxx/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
 		}
 		return copy(dst, this.dbuf), nil
 	}
 
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
-		return 0, fmt.Errorf("puback/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
+		return 0, fmt.Errorf("pubxxx/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
 	if err := this.SetRemainingLength(int32(ml)); err != nil {
@@ -192,13 +189,12 @@ func (this *PubackMessage) Encode(dst []byte) (int, error) {
 	}
 	dst[total] = this.reasonCode.Value()
 	total++
-	if !ValidPubAckReasonCode(this.reasonCode) {
-		return total, ProtocolError
-	}
-	if this.propertyLen >= 4 {
+	if this.propertyLen > 0 {
 		b := lbEncode(this.propertyLen)
 		copy(dst[total:], b)
 		total += len(b)
+	} else {
+		return total, nil
 	}
 	// TODO 下面两个在PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此原因字符串
 	if len(this.reasonStr) > 0 {
@@ -222,9 +218,6 @@ func (this *PubackMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 func (this *PubackMessage) build() {
-	if this.tag {
-		return
-	}
 	total := 0
 	if len(this.reasonStr) > 0 {
 		total++
@@ -237,12 +230,19 @@ func (this *PubackMessage) build() {
 		total += len(this.userProperty[i])
 	}
 	this.propertyLen = uint32(total)
-	this.SetRemainingLength(int32(2 + 1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
+	// 2 是报文标识符，2字节
+	// 1 是原因码
+	if this.propertyLen == 0 && this.reasonCode == Success {
+		_ = this.SetRemainingLength(int32(2))
+		return
+	}
+	if this.propertyLen == 0 && this.reasonCode != Success {
+		_ = this.SetRemainingLength(int32(2 + 1))
+		return
+	}
+	_ = this.SetRemainingLength(int32(2 + 1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
 }
 func (this *PubackMessage) msglen() int {
 	this.build()
-	if this.propertyLen == 0 && this.reasonCode == Success {
-		return 2
-	}
 	return int(this.remlen)
 }

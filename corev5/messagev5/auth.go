@@ -215,8 +215,8 @@ func (this *AuthMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("auth/Encode: Invalid message type. Expecting %d, got %d", AUTH, this.Type())
 	}
 
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
@@ -283,8 +283,9 @@ func (this *AuthMessage) Encode(dst []byte) (int, error) {
 }
 
 func (this *AuthMessage) build() {
-	total := 1
-	temp := total
+	// == 可变报头 ==
+	total := 1 // 认证原因码
+	// 属性
 	if len(this.authMethod) > 0 {
 		total++
 		total += 2
@@ -295,26 +296,27 @@ func (this *AuthMessage) build() {
 		total += 2
 		total += len(this.authData)
 	}
-	if len(this.reasonStr) > 0 {
+	if len(this.reasonStr) > 0 { // todo 超过接收端指定的最大报文长度，不能发送
 		total++
 		total += 2
 		total += len(this.reasonStr)
 	}
-	for i := 0; i < len(this.userProperty); i++ {
+	for i := 0; i < len(this.userProperty); i++ { // todo 超过接收端指定的最大报文长度，不能发送
 		total++
 		total += 2
 		total += len(this.userProperty[i])
 	}
-	this.propertiesLen = uint32(total - temp)
-	if this.propertiesLen > 0 {
-		total += len(lbEncode(this.propertiesLen))
+	this.propertiesLen = uint32(total - 1)
+
+	if this.propertiesLen == 0 && this.reasonCode == Success {
+		_ = this.SetRemainingLength(0)
+		return
 	}
+	total += len(lbEncode(this.propertiesLen))
+	_ = this.SetRemainingLength(int32(total))
 }
 
 func (this *AuthMessage) msglen() int {
 	this.build()
-	if this.propertiesLen == 0 && this.reasonCode == Success {
-		return 0
-	}
-	return 1 + int(this.propertiesLen)
+	return int(this.remlen)
 }

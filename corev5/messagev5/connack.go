@@ -13,7 +13,6 @@ import (
 // amount of time, the Client SHOULD close the Network Connection. A "reasonable" amount
 // of time depends on the type of application and the communications infrastructure.
 type ConnackMessage struct {
-	buildTag bool
 	header
 
 	sessionPresent bool
@@ -87,9 +86,6 @@ func (this ConnackMessage) String() string {
 	)
 }
 func (this *ConnackMessage) build() {
-	if this.buildTag {
-		return
-	}
 	propertiesLen := 0
 	// 属性
 	if this.sessionExpiryInterval > 0 { // 会话过期间隔
@@ -162,8 +158,8 @@ func (this *ConnackMessage) build() {
 		propertiesLen += len(this.authData)
 	}
 	this.propertiesLen = uint32(propertiesLen)
-	this.SetRemainingLength(int32(1 + 1 + propertiesLen + len(lbEncode(this.propertiesLen))))
-	this.buildTag = true
+	// 两个 1 分别是连接确认标志和连接原因码
+	_ = this.SetRemainingLength(int32(1 + 1 + propertiesLen + len(lbEncode(this.propertiesLen))))
 }
 func (this *ConnackMessage) PropertiesLen() uint32 {
 	return this.propertiesLen
@@ -601,7 +597,6 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *ConnackMessage) Encode(dst []byte) (int, error) {
-	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("connack/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -611,8 +606,8 @@ func (this *ConnackMessage) Encode(dst []byte) (int, error) {
 	}
 
 	// CONNACK remaining length fixed at 2 bytes
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("connack/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))

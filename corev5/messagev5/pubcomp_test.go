@@ -11,10 +11,10 @@ import (
 func TestPubCompDecodeEncode(t *testing.T) {
 	pubcomp := NewPubcompMessage()
 	pubcomp.SetPacketId(123)
-	pubcomp.SetReasonCode(Success)
-	pubcomp.SetReasonStr([]byte("aaa"))
-	pubcomp.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
-	pubcomp.build()
+	pubcomp.SetReasonCode(Success) // SUCCESS
+	//pubcomp.SetReasonStr([]byte("aaa"))
+	//pubcomp.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+
 	b := make([]byte, 100)
 	n, err := pubcomp.Encode(b)
 	if err != nil {
@@ -23,11 +23,30 @@ func TestPubCompDecodeEncode(t *testing.T) {
 	fmt.Println(pubcomp)
 	fmt.Println(b[:n])
 	pubcomp1 := NewPubcompMessage()
-	pubcomp1.Decode(b[:n])
+	_, err = pubcomp1.Decode(b[:n])
+	require.NoError(t, err)
 	pubcomp1.dirty = true
 	pubcomp1.dbuf = nil
 	fmt.Println(pubcomp1)
 	fmt.Println(reflect.DeepEqual(pubcomp1, pubcomp))
+}
+func TestPubCompDecodeErr(t *testing.T) {
+	pubcomp := NewPubcompMessage()
+	pubcomp.SetPacketId(123)
+	pubcomp.SetReasonCode(DisconnectionIncludesWill) // SUCCESS
+	//pubcomp.SetReasonStr([]byte("aaa"))
+	//pubcomp.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+
+	b := make([]byte, 100)
+	n, err := pubcomp.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(pubcomp)
+	fmt.Println(b[:n])
+	pubcomp1 := NewPubcompMessage()
+	_, err = pubcomp1.Decode(b[:n])
+	require.Error(t, err)
 }
 func TestDecodePubComp(t *testing.T) {
 	var b = []byte{112, 2, 0, 123}

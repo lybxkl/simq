@@ -33,7 +33,6 @@ func TestDecodeV5(t *testing.T) {
 	fmt.Println(conack2)
 	conack2.header.dbuf = nil
 	conack2.header.dirty = true
-	conack2.buildTag = true
 	fmt.Println(reflect.DeepEqual(conack, conack2)) // 最大报文长度，编码前可以为0
 }
 

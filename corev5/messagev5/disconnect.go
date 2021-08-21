@@ -112,7 +112,6 @@ func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *DisconnectMessage) Encode(dst []byte) (int, error) {
-	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("disconnect/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -120,8 +119,8 @@ func (this *DisconnectMessage) Encode(dst []byte) (int, error) {
 
 		return copy(dst, this.dbuf), nil
 	}
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
@@ -184,11 +183,12 @@ func (this *DisconnectMessage) build() {
 	if this.sessionExpiryInterval > 0 {
 		total += 5
 	}
-	if len(this.reasonStr) > 0 {
+	if len(this.reasonStr) > 0 { // todo 超了就不发
 		total++
+		total += 2
 		total += len(this.reasonStr)
 	}
-	for i := 0; i < len(this.userProperty); i++ {
+	for i := 0; i < len(this.userProperty); i++ { // todo 超了就不发
 		total++
 		total += 2
 		total += len(this.userProperty[i])
@@ -199,15 +199,29 @@ func (this *DisconnectMessage) build() {
 		total += len(this.serverReference)
 	}
 	this.propertyLen = uint32(total)
-	this.SetRemainingLength(int32(1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
-	this.dirty = true
+	if this.reasonCode == Success && this.propertyLen == 0 {
+		_ = this.SetRemainingLength(0)
+		return
+	}
+	// 加 1 是断开原因码
+	_ = this.SetRemainingLength(int32(1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
 }
 func (this *DisconnectMessage) msglen() int {
 	this.build()
-	if this.reasonCode == Success && this.propertyLen == 0 {
+	return int(this.remlen)
+}
+func (this *DisconnectMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(int32(ml)); err != nil {
 		return 0
 	}
-	return int(this.remlen)
+
+	return this.header.msglen() + ml
 }
 func (this *DisconnectMessage) ReasonCode() ReasonCode {
 	return this.reasonCode

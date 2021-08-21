@@ -255,7 +255,6 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
-	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -264,8 +263,8 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 		return copy(dst, this.dbuf), nil
 	}
 
-	hl := this.header.msglen()
 	ml := this.msglen()
+	hl := this.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))

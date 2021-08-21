@@ -12,8 +12,8 @@ func TestPubAckDecodeEncode(t *testing.T) {
 	puback := NewPubackMessage()
 	puback.SetPacketId(123)
 	puback.SetReasonCode(Success)
-	puback.SetReasonStr([]byte("aaa"))
-	puback.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	//puback.SetReasonStr([]byte("aaa"))
+	//puback.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
 	//puback.build()
 	b := make([]byte, 100)
 	n, err := puback.Encode(b)
@@ -28,6 +28,24 @@ func TestPubAckDecodeEncode(t *testing.T) {
 	puback1.dbuf = nil
 	fmt.Println(puback1)
 	fmt.Println(reflect.DeepEqual(puback1, puback))
+}
+func TestPubAckDecodeErr(t *testing.T) {
+	puback := NewPubackMessage()
+	puback.SetPacketId(123)
+	puback.SetReasonCode(DisconnectionIncludesWill)
+	//puback.SetReasonStr([]byte("aaa"))
+	//puback.AddUserPropertys([][]byte{[]byte("aaa:oo"), []byte("bbb:pp")})
+	//puback.build()
+	b := make([]byte, 100)
+	n, err := puback.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(puback)
+	fmt.Println(b[:n])
+	puback1 := NewPubackMessage()
+	n, err = puback1.Decode(b[:n])
+	require.Error(t, err)
 }
 func TestPubackMessageFields(t *testing.T) {
 	msg := NewPubackMessage()
