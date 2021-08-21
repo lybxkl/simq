@@ -73,7 +73,7 @@ func (this SubscribeMessage) String() string {
 		msgstr = fmt.Sprintf("%s, Topic[%d]=%q/%d", msgstr, i, string(t), this.qos[i])
 	}
 
-	return msgstr + "\n"
+	return msgstr
 }
 
 // Topics returns a list of topics sent by the Client.
@@ -255,6 +255,7 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
+	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -327,12 +328,10 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
-
-func (this *SubscribeMessage) msglen() int {
+func (this *SubscribeMessage) build() {
 	// packet ID
 	total := 2
 
-	total += len(lbEncode(this.propertiesLen))
 	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
 		total++
 		total += len(lbEncode(this.subscriptionIdentifier))
@@ -342,9 +341,14 @@ func (this *SubscribeMessage) msglen() int {
 		total += 2
 		total += len(this.userProperty[i])
 	}
-
+	this.propertiesLen = uint32(total - 2)
+	total += len(lbEncode(this.propertiesLen))
 	for _, t := range this.topics {
 		total += 2 + len(t) + 1
 	}
-	return total
+	_ = this.SetRemainingLength(int32(total))
+}
+func (this *SubscribeMessage) msglen() int {
+	this.build()
+	return int(this.remlen)
 }

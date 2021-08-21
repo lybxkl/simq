@@ -238,7 +238,6 @@ func (this *PubackMessage) build() {
 	}
 	this.propertyLen = uint32(total)
 	this.SetRemainingLength(int32(2 + 1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
-	this.dirty = true
 }
 func (this *PubackMessage) msglen() int {
 	this.build()

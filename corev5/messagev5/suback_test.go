@@ -17,8 +17,8 @@ func TestDecodeSubAck(t *testing.T) {
 	sub.AddUserPropertys([][]byte{[]byte("asd"), []byte("ccc:sa")})
 	require.Equal(t, [][]byte{[]byte("asd"), []byte("ccc:sa")}, sub.UserProperty(), "Error adding User Property.")
 
-	sub.SetSubscriptionIdentifier(123)
-	require.Equal(t, uint32(123), sub.SubscriptionIdentifier(), "Error adding Subscription Identifier.")
+	sub.SetReasonStr([]byte("aaa"))
+	require.Equal(t, []byte("aaa"), sub.ReasonStr(), "Error adding Subscription Identifier.")
 
 	sub.AddReasonCode(0x00)
 	sub.AddReasonCode(0x01)

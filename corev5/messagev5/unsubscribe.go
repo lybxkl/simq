@@ -192,6 +192,7 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 // should be considered invalid.
 // Any changes to the message after Encode() is called will invalidate the io.Reader.
 func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
+	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("unsubscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -250,16 +251,21 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
-
-func (this *UnsubscribeMessage) msglen() int {
-	// packet ID
-	total := 2
+func (this *UnsubscribeMessage) build() {
+	total := 0
 	for _, t := range this.userProperty {
-		total += 2 + len(t)
+		total += 1 + 2 + len(t)
 	}
+	this.propertyLen = uint32(total)
+
+	total += 2 // packet ID
 	for _, t := range this.topics {
 		total += 2 + len(t)
 	}
 	total += len(lbEncode(this.propertyLen))
-	return total
+	_ = this.SetRemainingLength(int32(total))
+}
+func (this *UnsubscribeMessage) msglen() int {
+	this.build()
+	return int(this.remlen)
 }

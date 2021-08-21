@@ -383,12 +383,12 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 		this.sess.RemoveTopic(string(t))
 		/**
 		* 可以在这里向其它节点发送移除主题消息
-		* 我选择带缓存的channel
 		**/
 	}
 
 	resp := messagev5.NewUnsubackMessage()
 	resp.SetPacketId(msg.PacketId())
+	resp.AddReasonCode(messagev5.Success.Value())
 
 	_, err := this.writeMessage(resp)
 

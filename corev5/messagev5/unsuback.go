@@ -84,13 +84,12 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 	this.packetId = src[total : total+2]
 	total += 2
 
-	if total < len(src) && len(src[total:]) >= 4 {
-		this.propertyLen, n, err = lbDecode(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
+	this.propertyLen, n, err = lbDecode(src[total:])
+	total += n
+	if err != nil {
+		return total, err
 	}
+
 	if total < len(src) && src[total] == ReasonString {
 		total++
 		this.reasonStr, n, err = readLPBytes(src[total:])
@@ -139,6 +138,7 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 	return total, nil
 }
 func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
+	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("unsuback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -199,7 +199,7 @@ func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
-func (this *UnsubackMessage) msglen() int {
+func (this *UnsubackMessage) build() {
 	// packet ID
 	total := 2
 
@@ -215,6 +215,24 @@ func (this *UnsubackMessage) msglen() int {
 	}
 	this.propertyLen = uint32(total - 2)
 	total += len(lbEncode(this.propertyLen))
+	total += len(this.reasonCodes)
+	_ = this.SetRemainingLength(int32(total))
+}
+func (this *UnsubackMessage) msglen() int {
+	this.build()
+	return int(this.remlen)
+}
 
-	return total + len(this.reasonCodes)
+func (this *UnsubackMessage) Len() int {
+	if !this.dirty {
+		return len(this.dbuf)
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(int32(ml)); err != nil {
+		return 0
+	}
+
+	return this.header.msglen() + ml
 }

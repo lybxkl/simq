@@ -10,11 +10,20 @@ import "fmt"
 type SubackMessage struct {
 	header
 	// 可变报头
-	propertiesLen          uint32 // 属性长度
-	subscriptionIdentifier uint32 // 订阅标识符 变长字节整数 取值范围从1到268,435,455
-	userProperty           [][]byte
+	propertiesLen uint32 // 属性长度
+	reasonStr     []byte // 原因字符串
+	userProperty  [][]byte
 	// 载荷
 	reasonCodes []byte
+}
+
+func (this *SubackMessage) ReasonStr() []byte {
+	return this.reasonStr
+}
+
+func (this *SubackMessage) SetReasonStr(reasonStr []byte) {
+	this.reasonStr = reasonStr
+	this.dirty = true
 }
 
 var _ Message = (*SubackMessage)(nil)
@@ -30,8 +39,8 @@ func NewSubackMessage() *SubackMessage {
 // String returns a string representation of the message.
 func (this SubackMessage) String() string {
 	return fmt.Sprintf("%s, Packet ID=%d, Return Codes=%v, ", this.header, this.PacketId(), this.reasonCodes) +
-		fmt.Sprintf("PropertiesLen=%v, Subscription Identifier=%v, User Properties=%v", this.PropertiesLen(), this.subscriptionIdentifier, this.UserProperty()) +
-		fmt.Sprintf("%v\n", this.reasonCodes)
+		fmt.Sprintf("PropertiesLen=%v, Reason Str=%v, User Properties=%v", this.PropertiesLen(), this.ReasonStr(), this.UserProperty()) +
+		fmt.Sprintf("%v", this.reasonCodes)
 
 }
 func (this *SubackMessage) PropertiesLen() uint32 {
@@ -40,15 +49,6 @@ func (this *SubackMessage) PropertiesLen() uint32 {
 
 func (this *SubackMessage) SetPropertiesLen(propertiesLen uint32) {
 	this.propertiesLen = propertiesLen
-	this.dirty = true
-}
-
-func (this *SubackMessage) SubscriptionIdentifier() uint32 {
-	return this.subscriptionIdentifier
-}
-
-func (this *SubackMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
-	this.subscriptionIdentifier = subscriptionIdentifier
 	this.dirty = true
 }
 
@@ -126,14 +126,14 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 	if int(this.propertiesLen) > len(src[total:]) {
 		return total, ProtocolError
 	}
-	if total < len(src) && src[total] == DefiningIdentifiers {
+	if total < len(src) && src[total] == ReasonString {
 		total++
-		this.subscriptionIdentifier, n, err = lbDecode(src[total:])
+		this.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
-		if this.subscriptionIdentifier == 0 || src[total] == DefiningIdentifiers {
+		if src[total] == ReasonString {
 			return total, ProtocolError
 		}
 	}
@@ -177,6 +177,7 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 }
 
 func (this *SubackMessage) Encode(dst []byte) (int, error) {
+	this.build()
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
 			return 0, fmt.Errorf("suback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
@@ -219,12 +220,14 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 	copy(dst[total:], tb)
 	total += len(tb)
 
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
-		dst[total] = DefiningIdentifiers
+	if len(this.reasonStr) > 0 { // todo && 太长，超过了客户端指定的最大报文长度，不发送
+		dst[total] = ReasonString
 		total++
-		tb = lbEncode(this.subscriptionIdentifier)
-		copy(dst[total:], tb)
-		total += len(tb)
+		n, err = writeLPBytes(dst[total:], this.reasonStr)
+		total += n
+		if err != nil {
+			return total, err
+		}
 	}
 	if len(this.userProperty) > 0 {
 		for i := 0; i < len(this.userProperty); i++ {
@@ -243,21 +246,27 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
-
-func (this *SubackMessage) msglen() int {
+func (this *SubackMessage) build() {
 	// packet ID
 	total := 2
 
-	total += len(lbEncode(this.propertiesLen))
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+	if len(this.reasonStr) > 0 { // todo 最大长度时
 		total++
-		total += len(lbEncode(this.subscriptionIdentifier))
+		total += 2
+		total += len(this.reasonStr)
 	}
 	for i := 0; i < len(this.userProperty); i++ {
 		total++
 		total += 2
 		total += len(this.userProperty[i])
 	}
+	this.propertiesLen = uint32(total - 2)
+	total += len(lbEncode(this.propertiesLen))
+	total += len(this.reasonCodes)
+	_ = this.SetRemainingLength(int32(total))
+}
+func (this *SubackMessage) msglen() int {
+	this.build()
 
-	return total + len(this.reasonCodes)
+	return int(this.remlen)
 }
