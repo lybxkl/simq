@@ -90,7 +90,7 @@ func NewAuthMessage() *AuthMessage {
 }
 
 func (this AuthMessage) String() string {
-	return fmt.Sprintf("%s, ReasonCode=%b, PropertiesLen=%d, AuthMethod=%s, AuthData=%q, ReasonStr=%s, UserProperty=%s\n",
+	return fmt.Sprintf("%s, ReasonCode=%b, PropertiesLen=%d, AuthMethod=%s, AuthData=%q, ReasonStr=%s, UserProperty=%s",
 		this.header,
 		this.ReasonCode(),
 		this.PropertiesLen(),

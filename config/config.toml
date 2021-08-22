@@ -53,7 +53,8 @@ serverVersion = "5.0.1"
         sessionsProvider=""
         topicsProvider=""
         authenticator="" # 不填则会采用默认，开启身份验证的验证钩子，可选【"default","mysql","redis"】
-
+    [defaultConfig.auth]
+        allows = [""]
 [store]
     [store.mysql]
         source = ""

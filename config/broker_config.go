@@ -72,6 +72,10 @@ type Provider struct {
 type DefaultConfig struct {
 	Connect  Connect  `toml:"connect"`
 	Provider Provider `toml:"provider"`
+	Auth     Auth     `toml:"auth"`
+}
+type Auth struct {
+	Allows []string `toml:"allows"`
 }
 type Mysql struct {
 	Source   string `toml:"source"`

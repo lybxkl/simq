@@ -2,6 +2,7 @@ package servicev5
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/logger"
@@ -23,6 +24,41 @@ func getConnectMessage(conn io.Closer) (*messagev5.ConnectMessage, error) {
 	return msg, err
 }
 
+// 获取增强认证数据，或者connack数据
+func getAuthMessage(conn io.Closer) (*messagev5.AuthMessage, *messagev5.ConnackMessage, error) {
+	buf, err := getMessageBuffer(conn)
+	if err != nil {
+		//glog.Logger.Debug("Receive error: %v", err)
+		return nil, nil, err
+	}
+	mtypeflags := buf[0]
+	tp := messagev5.MessageType(mtypeflags >> 4)
+	switch tp {
+	case messagev5.DISCONNECT:
+		dis := messagev5.NewDisconnectMessage()
+		_, err = dis.Decode(buf)
+		logger.Logger.Debugf("Received: %s", dis)
+		return nil, nil, errors.New("stop connect")
+	case messagev5.AUTH:
+		msg := messagev5.NewAuthMessage()
+		_, err = msg.Decode(buf)
+		logger.Logger.Debugf("Received: %s", msg)
+		return msg, nil, err
+	case messagev5.CONNACK:
+		msg := messagev5.NewConnackMessage()
+		_, err = msg.Decode(buf)
+		logger.Logger.Debugf("Received: %s", msg)
+		return nil, msg, err
+	default:
+		erMsg, er := tp.New()
+		if er != nil {
+			return nil, nil, er
+		}
+		_, err = erMsg.Decode(buf)
+		logger.Logger.Debugf("Received: %s", erMsg)
+		return nil, nil, errors.New(fmt.Sprintf("error type %v,  %v", tp.Name(), err))
+	}
+}
 func getConnackMessage(conn io.Closer) (*messagev5.ConnackMessage, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {

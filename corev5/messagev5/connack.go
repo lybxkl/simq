@@ -53,13 +53,13 @@ func NewConnackMessage() *ConnackMessage {
 
 // String returns a string representation of the CONNACK message
 func (this ConnackMessage) String() string {
-	return fmt.Sprintf("Header==>> \n\t\t%s\nVariable header==>> \n\t\tSession Present=%t\n\t\tReason code=%s\n\t\t"+
-		"Properties\n\t\t\t"+
-		"Length=%v\n\t\t\tSession Expiry Interval=%v\n\t\t\tReceive Maximum=%v\n\t\t\tMaximum QoS=%v\n\t\t\t"+
-		"Retain Available=%b\n\t\t\tMax Packet Size=%v\n\t\t\tAssignedIdentifier=%v\n\t\t\t"+
-		"Topic Alias Max=%v\n\t\t\tReason Str=%v\n\t\t\tUser Properties=%v\n\t\t\t"+
-		"Wildcard Subscription Available=%b\n\t\t\tSubscription Identifier Available=%b\n\t\t\tShared Subscription Available=%b\n\t\t\tServer Keep Alive=%v\n\t\t\t"+
-		"Response Information=%v\n\t\t\tServer Reference=%v\n\t\t\tAuth Method=%v\n\t\t\tAuth Data=%v\n\t\t",
+	return fmt.Sprintf("Header==>> \t%s\nVariable header==>> \tSession Present=%t\tReason code=%s\t"+
+		"Properties\t\t"+
+		"Length=%v\t\tSession Expiry Interval=%v\t\tReceive Maximum=%v\t\tMaximum QoS=%v\t\t"+
+		"Retain Available=%b\t\tMax Packet Size=%v\t\tAssignedIdentifier=%v\t\t"+
+		"Topic Alias Max=%v\t\tReason Str=%v\t\tUser Properties=%v\t\t"+
+		"Wildcard Subscription Available=%b\t\tSubscription Identifier Available=%b\t\tShared Subscription Available=%b\t\tServer Keep Alive=%v\t\t"+
+		"Response Information=%v\t\tServer Reference=%v\t\tAuth Method=%v\t\tAuth Data=%v\t",
 		this.header,
 
 		this.sessionPresent, this.reasonCode,

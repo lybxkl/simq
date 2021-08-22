@@ -1,12 +1,15 @@
 package servicev5
 
 import (
+	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"net"
 	"net/url"
+	"reflect"
 	"sync/atomic"
 	"time"
 )
@@ -27,6 +30,8 @@ type Client struct {
 	// The number of seconds to wait for the CONNACK messagev5 before disconnecting.
 	// If not set then default to 2 seconds.
 	ConnectTimeout int
+
+	AuthPlus authplus.AuthPlus
 
 	// The number of seconds to wait for any ACK messages before failing.
 	// If not set then default to 20 seconds.
@@ -79,12 +84,71 @@ func (this *Client) Connect(uri string, msg *messagev5.ConnectMessage) (err erro
 	if err = writeMessage(conn, msg); err != nil {
 		return err
 	}
-
+	var resp *messagev5.ConnackMessage
 	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(this.ConnectTimeout)))
 
-	resp, err := getConnackMessage(conn)
-	if err != nil {
-		return err
+	if len(msg.AuthMethod()) > 0 {
+		authMethod := msg.AuthMethod()
+		authData := msg.AuthData()
+
+		au, ack, err := getAuthMessage(conn)
+		if err != nil {
+			return err
+		}
+		if au != nil {
+		AC:
+			if this.AuthPlus == nil {
+				panic("authplus is nil")
+			}
+			authContinueData, _, err := this.AuthPlus.Verify(authData)
+			if err != nil {
+				dis := messagev5.NewDisconnectMessage()
+				dis.SetReasonCode(messagev5.UnAuthorized)
+				dis.SetReasonStr([]byte(err.Error()))
+				err = writeMessage(conn, dis)
+				return err
+			}
+			auC := messagev5.NewAuthMessage()
+			auC.SetReasonCode(messagev5.ContinueAuthentication)
+			auC.SetAuthMethod(authMethod)
+			auC.SetAuthData(authContinueData)
+			err = writeMessage(conn, auC)
+			if err != nil {
+				return err
+			}
+			auMsg, ack, err := getAuthMessage(conn)
+			if err != nil {
+				return err
+			}
+			if ack != nil {
+				resp = ack
+			} else if auMsg != nil {
+				if !reflect.DeepEqual(auMsg.AuthMethod(), authMethod) {
+					ds := messagev5.NewDisconnectMessage()
+					ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
+					ds.SetReasonStr([]byte("auth method is different from last time"))
+					err = writeMessage(conn, ds)
+					if err != nil {
+						return err
+					}
+					return errors.New("authplus: the authentication method is different from last time.")
+				}
+				authMethod = auMsg.AuthMethod()
+				authData = auMsg.AuthData()
+				goto AC // 需要继续认证
+			} else {
+				panic("---")
+			}
+		} else if ack != nil {
+			resp = ack
+		} else {
+			panic("---")
+		}
+	} else {
+		resp, err = getConnackMessage(conn)
+		if err != nil {
+			return err
+		}
 	}
 
 	if resp.ReasonCode() != messagev5.Success {

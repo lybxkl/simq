@@ -2,6 +2,7 @@ package servicev5
 
 import (
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	logger2 "gitee.com/Ljolan/si-mqtt/logger"
@@ -15,7 +16,9 @@ func TestExampleClient(t *testing.T) {
 	topicsv5.TopicInit("")
 	// Instantiates a new Client
 	c := &Client{}
-
+	authplus.Register("", authplus.NewDefaultAuth())
+	vp, _ := authplus.NewManager("")
+	c.AuthPlus = vp
 	// Creates a new MQTT CONNECT messagev5 and sets the proper parameters
 	msg := messagev5.NewConnectMessage()
 	msg.SetWillQos(1)
@@ -27,7 +30,8 @@ func TestExampleClient(t *testing.T) {
 	msg.SetWillMessage([]byte("send me home"))
 	msg.SetUsername([]byte("surgemq"))
 	msg.SetPassword([]byte("verysecret"))
-
+	msg.SetAuthMethod([]byte("default"))
+	msg.SetAuthData([]byte("aaa"))
 	// Connects to the remote server at 127.0.0.1 port 1883
 	err := c.Connect("tcp://127.0.0.1:1883", msg)
 	require.NoError(t, err)

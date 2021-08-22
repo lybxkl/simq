@@ -81,20 +81,20 @@ func NewConnectMessage() *ConnectMessage {
 
 // String returns a string representation of the CONNECT message
 func (this ConnectMessage) String() string {
-	return fmt.Sprintf("Header==>> \n\t\t%s\nVariable header==>> \n\t\tProtocol Name=%s\n\t\tProtocol Version=%v\n\t\t"+
-		"Connect Flags=%08b\n\t\t\t"+
-		"User Name Flag=%v\n\t\t\tPassword Flag=%v\n\t\t\tWill Retain=%v\n\t\t\tWill QoS=%d\n\t\t\tWill Flag=%v\n\t\t\tClean Start=%v\n\t\t\tReserved=%v\n\t\t"+
-		"KeepAlive=%v\n\t\t"+
-		"Properties\n\t\t\t"+
-		"Length=%v\n\t\t\tSession Expiry Interval=%v\n\t\t\tReceive Maximum=%v\n\t\t\tMaximum Packet Size=%v\n\t\t\t"+
-		"Topic Alias Maximum=%v\n\t\t\tRequest Response Information=%v\n\t\t\tRequest Problem Information=%v\n\t\t\t"+
-		"User Property=%s\n\t\t\tAuthentication Method=%s\n\t\t\tAuthentication Data=%s\n"+
-		"载荷==>>\n\t\t"+
-		"Client ID=%q\n\t\t"+
-		"Will Properties\n\t\t\t"+
-		"Will Properties Len=%v\n\t\t\tWill Delay Interval=%v\n\t\t\tPayload Format Indicator=%v\n\t\t\tMessage Expiry Interval=%v\n\t\t\t"+
-		"Content Type=%s\n\t\t\tResponse Topic=%s\n\t\t\tCorrelation Data=%v\n\t\t\tUser Property=%s\n\t\t"+
-		"Will Topic=%s\n\t\tWill Payload=%s\n\t\tUsername=%s\n\t\tPassword=%s",
+	return fmt.Sprintf("Header==>> %s, Variable header==>> \tProtocol Name=%s\tProtocol Version=%v, "+
+		"Connect Flags=%08b\t"+
+		"User Name Flag=%v\tPassword Flag=%v\tWill Retain=%v\tWill QoS=%d\tWill Flag=%v\tClean Start=%v\tReserved=%v, "+
+		"KeepAlive=%v, "+
+		"Properties\t"+
+		"Length=%v\tSession Expiry Interval=%v\tReceive Maximum=%v\tMaximum Packet Size=%v\t"+
+		"Topic Alias Maximum=%v\tRequest Response Information=%v\tRequest Problem Information=%v\t"+
+		"User Property=%s\tAuthentication Method=%s\tAuthentication Data=%s, "+
+		"载荷==>>"+
+		"Client ID=%q, "+
+		"Will Properties\t"+
+		"Will Properties Len=%v\tWill Delay Interval=%v\tPayload Format Indicator=%v\tMessage Expiry Interval=%v\t"+
+		"Content Type=%s\tResponse Topic=%s\tCorrelation Data=%v\tUser Property=%s, "+
+		"Will Topic=%s\tWill Payload=%s\tUsername=%s\n\t\tPassword=%s",
 		this.header,
 
 		this.protoName,

@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"net"
 	"net/url"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -78,11 +80,17 @@ type Server struct {
 	//如果没有设置，则默认为"mem"。
 	TopicsProvider string
 
+	// 增强认证管理器
+	AuthPlusProvider []string
+
 	// authMgr is the authentication manager that we are going to use for authenticating
 	// incoming connections
 	// authMgr是我们将用于身份验证的认证管理器
 	// 传入的连接
 	authMgr *authv5.Manager
+
+	// 增强认证允许的方法
+	authPlusAllows map[string]*authplus.Manager
 
 	// sessMgr is the sessionsv5 manager for keeping track of the sessionsv5
 	// sessMgr是用于跟踪会话的会话管理器
@@ -313,14 +321,68 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	}
 	// 版本
 	logger.Logger.Debugf("client mqtt version :%v", req.Version())
-	// Authenticate the user, if error, return error and exit
-	//登陆认证
-	if err = this.authMgr.Authenticate(string(req.Username()), string(req.Password())); err != nil {
-		//登陆失败日志，断开连接
-		resp.SetReasonCode(messagev5.UserNameOrPasswordIsIncorrect)
-		resp.SetSessionPresent(false)
-		err = writeMessage(conn, resp)
-		return nil, err
+
+	authMethod := req.AuthMethod()
+	authData := req.AuthData()
+	// 增强认证
+	if len(authMethod) > 0 {
+	AC:
+		auVerify, ok := this.authPlusAllows[string(authMethod)]
+		if !ok {
+			dis := messagev5.NewDisconnectMessage()
+			dis.SetReasonCode(messagev5.InvalidAuthenticationMethod)
+			err = writeMessage(conn, dis)
+			return nil, err
+		}
+		authContinueData, continueAuth, err := auVerify.Verify(authData)
+		if err != nil {
+			dis := messagev5.NewDisconnectMessage()
+			dis.SetReasonCode(messagev5.UnAuthorized)
+			dis.SetReasonStr([]byte(err.Error()))
+			err = writeMessage(conn, dis)
+			return nil, err
+		}
+		if continueAuth {
+			au := messagev5.NewAuthMessage()
+			au.SetReasonCode(messagev5.ContinueAuthentication)
+			au.SetAuthMethod(authMethod)
+			au.SetAuthData(authContinueData)
+			err = writeMessage(conn, au)
+			if err != nil {
+				return nil, err
+			}
+			auMsg, _, err := getAuthMessage(conn)
+			if err != nil {
+				return nil, err
+			}
+			if !reflect.DeepEqual(auMsg.AuthMethod(), authMethod) {
+				ds := messagev5.NewDisconnectMessage()
+				ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
+				ds.SetReasonStr([]byte("auth method is different from last time"))
+				err = writeMessage(conn, ds)
+				if err != nil {
+					return nil, err
+				}
+				return nil, errors.New("authplus: the authentication method is different from last time.")
+			}
+			authMethod = auMsg.AuthMethod()
+			authData = auMsg.AuthData()
+			goto AC // 需要继续认证
+		} else {
+			// 成功
+			resp.SetReasonCode(messagev5.Success)
+			resp.SetAuthMethod(authMethod)
+			logger.Logger.Infof("增强认证成功：%s", req.ClientId())
+		}
+	} else {
+		if err = this.authMgr.Authenticate(string(req.Username()), string(req.Password())); err != nil {
+			//登陆失败日志，断开连接
+			resp.SetReasonCode(messagev5.UserNameOrPasswordIsIncorrect)
+			resp.SetSessionPresent(false)
+			err = writeMessage(conn, resp)
+			return nil, err
+		}
+		logger.Logger.Infof("普通认证成功：%s", req.ClientId())
 	}
 
 	if req.KeepAlive() == 0 {
@@ -396,6 +458,19 @@ func (this *Server) checkConfiguration() error {
 		if err != nil {
 			panic(err)
 		}
+
+		auPlus := make(map[string]*authplus.Manager)
+		for _, s := range this.AuthPlusProvider {
+			ma, err := authplus.NewManager(s)
+			if err != nil {
+				panic(err)
+			}
+			if s == "" {
+				s = authplus.Default
+			}
+			auPlus[s] = ma
+		}
+		this.authPlusAllows = auPlus
 
 		if this.SessionsProvider == "" {
 			logger.Logger.Info("缺少Session管理器，采用默认方式")

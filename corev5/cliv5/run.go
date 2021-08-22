@@ -3,6 +3,7 @@ package cliv5
 import (
 	config2 "gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
 	"gitee.com/Ljolan/si-mqtt/corev5/servicev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
@@ -24,6 +25,7 @@ func init() {
 	utils2.MustPanic(config2.Configure(nil))
 	cfg := config2.GetConfig()
 	authv5.AuthInit(cfg.DefaultConfig.Provider.Authenticator)
+	authplus.InitAuthPlus(cfg.DefaultConfig.Auth.Allows)
 	sessionsv5.SessionInit(cfg.DefaultConfig.Provider.SessionsProvider)
 	topicsv5.TopicInit(cfg.DefaultConfig.Provider.TopicsProvider)
 }
@@ -31,6 +33,7 @@ func Run() {
 	cfg := config2.GetConfig()
 	conCif := cfg.DefaultConfig.Connect
 	proCif := cfg.DefaultConfig.Provider
+	authPlusCif := cfg.DefaultConfig.Auth
 	svr := &servicev5.Server{
 		KeepAlive:        conCif.Keepalive,
 		WriteTimeout:     conCif.WriteTimeout,
@@ -40,6 +43,7 @@ func Run() {
 		SessionsProvider: proCif.SessionsProvider,
 		TopicsProvider:   proCif.TopicsProvider,
 		Authenticator:    proCif.Authenticator,
+		AuthPlusProvider: authPlusCif.Allows,
 		Version:          cfg.ServerVersion,
 	}
 
