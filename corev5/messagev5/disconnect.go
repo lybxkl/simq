@@ -19,6 +19,11 @@ type DisconnectMessage struct {
 	userProperty          [][]byte // 用户属性如果加上之后的报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此用户属性
 }
 
+func (d *DisconnectMessage) String() string {
+	return fmt.Sprintf("header: %v, reasonCode=%s, propertyLen=%v, sessionExpiryInterval=%v, reasonStr=%v, serverReference=%s, userProperty=%s",
+		d.header, d.reasonCode, d.propertyLen, d.sessionExpiryInterval, d.reasonStr, d.serverReference, d.userProperty)
+}
+
 var _ Message = (*DisconnectMessage)(nil)
 
 // NewDisconnectMessage creates a new DISCONNECT message.

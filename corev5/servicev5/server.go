@@ -3,6 +3,7 @@ package servicev5
 import (
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
@@ -33,6 +34,9 @@ var SVC *service
 //使用MQTT 3.1和3.1.1规范。
 type Server struct {
 	Version string // 服务版本
+
+	ConFig *config.SIConfig // 偷懒了
+
 	// The number of seconds to keep the connection live if there's no data.
 	// If not set then default to 5 mins.
 	//如果没有数据，保持连接的秒数。
@@ -319,14 +323,25 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		}
 		return nil, err
 	}
+	svconf := this.ConFig.DefaultConfig.Server
+	if svconf.RedirectOpen { // 重定向
+		dis := messagev5.NewDisconnectMessage()
+		if svconf.RedirectIsForEver {
+			dis.SetReasonCode(messagev5.ServerHasMoved)
+		} else {
+			dis.SetReasonCode(messagev5.UseOtherServers)
+		}
+		dis.SetServerReference([]byte(svconf.Redirects[0]))
+		err = writeMessage(conn, dis)
+		return nil, nil
+	}
 	// 版本
 	logger.Logger.Debugf("client mqtt version :%v", req.Version())
 
-	authMethod := req.AuthMethod()
-	authData := req.AuthData()
 	// 增强认证
+	authMethod := req.AuthMethod() // 第一次的增强认证方法
 	if len(authMethod) > 0 {
-	AC:
+		authData := req.AuthData()
 		auVerify, ok := this.authPlusAllows[string(authMethod)]
 		if !ok {
 			dis := messagev5.NewDisconnectMessage()
@@ -334,6 +349,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 			err = writeMessage(conn, dis)
 			return nil, err
 		}
+	AC:
 		authContinueData, continueAuth, err := auVerify.Verify(authData)
 		if err != nil {
 			dis := messagev5.NewDisconnectMessage()
@@ -351,23 +367,30 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 			if err != nil {
 				return nil, err
 			}
-			auMsg, _, err := getAuthMessage(conn)
+			msg, err := getAuthMessageOrOther(conn) // 后续的auth
 			if err != nil {
 				return nil, err
 			}
-			if !reflect.DeepEqual(auMsg.AuthMethod(), authMethod) {
-				ds := messagev5.NewDisconnectMessage()
-				ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
-				ds.SetReasonStr([]byte("auth method is different from last time"))
-				err = writeMessage(conn, ds)
-				if err != nil {
-					return nil, err
+			switch msg.Type() {
+			case messagev5.DISCONNECT: // 增强认证过程中断开连接
+				return nil, nil
+			case messagev5.AUTH:
+				auMsg := msg.(*messagev5.AuthMessage)
+				if !reflect.DeepEqual(auMsg.AuthMethod(), authMethod) {
+					ds := messagev5.NewDisconnectMessage()
+					ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
+					ds.SetReasonStr([]byte("auth method is different from last time"))
+					err = writeMessage(conn, ds)
+					if err != nil {
+						return nil, err
+					}
+					return nil, errors.New("authplus: the authentication method is different from last time.")
 				}
-				return nil, errors.New("authplus: the authentication method is different from last time.")
+				authData = auMsg.AuthData()
+				goto AC // 需要继续认证
+			default:
+				return nil, errors.New(fmt.Sprintf("unSupport deal msg %s", msg))
 			}
-			authMethod = auMsg.AuthMethod()
-			authData = auMsg.AuthData()
-			goto AC // 需要继续认证
 		} else {
 			// 成功
 			resp.SetReasonCode(messagev5.Success)

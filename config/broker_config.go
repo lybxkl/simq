@@ -73,9 +73,15 @@ type DefaultConfig struct {
 	Connect  Connect  `toml:"connect"`
 	Provider Provider `toml:"provider"`
 	Auth     Auth     `toml:"auth"`
+	Server   Server   `toml:"server"`
 }
 type Auth struct {
 	Allows []string `toml:"allows"`
+}
+type Server struct {
+	Redirects         []string `tome:"redirects"`
+	RedirectOpen      bool     `tome:"redirectOpen"`
+	RedirectIsForEver bool     `tome:"redirectIsForEver"`
 }
 type Mysql struct {
 	Source   string `toml:"source"`

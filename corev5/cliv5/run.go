@@ -35,6 +35,7 @@ func Run() {
 	proCif := cfg.DefaultConfig.Provider
 	authPlusCif := cfg.DefaultConfig.Auth
 	svr := &servicev5.Server{
+		ConFig:           &cfg,
 		KeepAlive:        conCif.Keepalive,
 		WriteTimeout:     conCif.WriteTimeout,
 		ConnectTimeout:   conCif.ConnectTimeout,

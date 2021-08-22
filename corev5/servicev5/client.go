@@ -57,6 +57,7 @@ func (this *Client) Connect(uri string, msg *messagev5.ConnectMessage) (err erro
 		return fmt.Errorf("msg is nil")
 	}
 
+redirect:
 	u, err := url.Parse(uri)
 	if err != nil {
 		return err
@@ -89,18 +90,40 @@ func (this *Client) Connect(uri string, msg *messagev5.ConnectMessage) (err erro
 
 	if len(msg.AuthMethod()) > 0 {
 		authMethod := msg.AuthMethod()
-		authData := msg.AuthData()
 
-		au, ack, err := getAuthMessage(conn)
+	AC:
+		msgTemp, err := getAuthMessageOrOther(conn)
 		if err != nil {
 			return err
 		}
-		if au != nil {
-		AC:
+		switch msgTemp.Type() {
+		case messagev5.DISCONNECT:
+			disc := msgTemp.(*messagev5.DisconnectMessage)
+			if disc.ReasonCode() == messagev5.ServerHasMoved || disc.ReasonCode() == messagev5.UseOtherServers {
+				uri = string(disc.ServerReference())
+				// 重定向
+				goto redirect
+			} else {
+				return errors.New(disc.String())
+			}
+		case messagev5.CONNACK:
+			resp = msgTemp.(*messagev5.ConnackMessage)
+		case messagev5.AUTH:
+			au := msgTemp.(*messagev5.AuthMessage)
 			if this.AuthPlus == nil {
 				panic("authplus is nil")
 			}
-			authContinueData, _, err := this.AuthPlus.Verify(authData)
+			if !reflect.DeepEqual(au.AuthMethod(), authMethod) {
+				ds := messagev5.NewDisconnectMessage()
+				ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
+				ds.SetReasonStr([]byte("auth method is different from last time"))
+				err = writeMessage(conn, ds)
+				if err != nil {
+					return err
+				}
+				return errors.New("authplus: the authentication method is different from last time.")
+			}
+			authContinueData, _, err := this.AuthPlus.Verify(au.AuthData())
 			if err != nil {
 				dis := messagev5.NewDisconnectMessage()
 				dis.SetReasonCode(messagev5.UnAuthorized)
@@ -116,32 +139,8 @@ func (this *Client) Connect(uri string, msg *messagev5.ConnectMessage) (err erro
 			if err != nil {
 				return err
 			}
-			auMsg, ack, err := getAuthMessage(conn)
-			if err != nil {
-				return err
-			}
-			if ack != nil {
-				resp = ack
-			} else if auMsg != nil {
-				if !reflect.DeepEqual(auMsg.AuthMethod(), authMethod) {
-					ds := messagev5.NewDisconnectMessage()
-					ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
-					ds.SetReasonStr([]byte("auth method is different from last time"))
-					err = writeMessage(conn, ds)
-					if err != nil {
-						return err
-					}
-					return errors.New("authplus: the authentication method is different from last time.")
-				}
-				authMethod = auMsg.AuthMethod()
-				authData = auMsg.AuthData()
-				goto AC // 需要继续认证
-			} else {
-				panic("---")
-			}
-		} else if ack != nil {
-			resp = ack
-		} else {
+			goto AC // 需要继续认证
+		default:
 			panic("---")
 		}
 	} else {

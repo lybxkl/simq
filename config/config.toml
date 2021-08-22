@@ -55,6 +55,10 @@ serverVersion = "5.0.1"
         authenticator="" # 不填则会采用默认，开启身份验证的验证钩子，可选【"default","mysql","redis"】
     [defaultConfig.auth]
         allows = [""]
+    [defaultConfig.server]
+        redirects = ["127.0.0.1:2883","myserver.xyz.org","myserver.xyz.org:8883","[fe80::9610:3eff:fe1c]:1883"]
+        redirectIsForEver = true # 临时还是永久
+        redirectOpen = false # 开关
 [store]
     [store.mysql]
         source = ""
