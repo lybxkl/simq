@@ -102,12 +102,12 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.PubackMessage:
 		// For PUBACK messagev5, it means QoS 1, we should send to ack queue
-		this.sess.Pub1ack.Ack(msg)
-		this.processAcked(this.sess.Pub1ack)
+		this.sess.Pub1ack().Ack(msg)
+		this.processAcked(this.sess.Pub1ack())
 
 	case *messagev5.PubrecMessage:
 		// For PUBREC messagev5, it means QoS 2, we should send to ack queue, and send back PUBREL
-		if err = this.sess.Pub2out.Ack(msg); err != nil {
+		if err = this.sess.Pub2out().Ack(msg); err != nil {
 			break
 		}
 
@@ -117,11 +117,11 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.PubrelMessage:
 		// For PUBREL messagev5, it means QoS 2, we should send to ack queue, and send back PUBCOMP
-		if err = this.sess.Pub2in.Ack(msg); err != nil {
+		if err = this.sess.Pub2in().Ack(msg); err != nil {
 			break
 		}
 
-		this.processAcked(this.sess.Pub2in)
+		this.processAcked(this.sess.Pub2in())
 
 		resp := messagev5.NewPubcompMessage()
 		resp.SetPacketId(msg.PacketId())
@@ -129,11 +129,11 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.PubcompMessage:
 		// For PUBCOMP messagev5, it means QoS 2, we should send to ack queue
-		if err = this.sess.Pub2out.Ack(msg); err != nil {
+		if err = this.sess.Pub2out().Ack(msg); err != nil {
 			break
 		}
 
-		this.processAcked(this.sess.Pub2out)
+		this.processAcked(this.sess.Pub2out())
 
 	case *messagev5.SubscribeMessage:
 		// For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
@@ -142,8 +142,8 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.SubackMessage:
 		// For SUBACK messagev5, we should send to ack queue
-		this.sess.Suback.Ack(msg)
-		this.processAcked(this.sess.Suback)
+		this.sess.Suback().Ack(msg)
+		this.processAcked(this.sess.Suback())
 
 	case *messagev5.UnsubscribeMessage:
 		// For UNSUBSCRIBE messagev5, we should remove subscriber, then send back UNSUBACK
@@ -151,8 +151,8 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.UnsubackMessage:
 		// For UNSUBACK messagev5, we should send to ack queue
-		this.sess.Unsuback.Ack(msg)
-		this.processAcked(this.sess.Unsuback)
+		this.sess.Unsuback().Ack(msg)
+		this.processAcked(this.sess.Unsuback())
 
 	case *messagev5.PingreqMessage:
 		// For PINGREQ messagev5, we should send back PINGRESP
@@ -160,13 +160,13 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 		_, err = this.writeMessage(resp)
 
 	case *messagev5.PingrespMessage:
-		this.sess.Pingack.Ack(msg)
-		this.processAcked(this.sess.Pingack)
+		this.sess.Pingack().Ack(msg)
+		this.processAcked(this.sess.Pingack())
 
 	case *messagev5.DisconnectMessage:
 		// For DISCONNECT messagev5, we should quit
 		// 主动断开连接，不需要发送will消息，这里直接设置为false，外面处理就不会发送will了
-		this.sess.Cmsg.SetWillFlag(false)
+		this.sess.Cmsg().SetWillFlag(false)
 		return errDisconnect
 
 	default:
@@ -180,7 +180,7 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 	return err
 }
 
-func (this *service) processAcked(ackq *sessionsv5.Ackqueue) {
+func (this *service) processAcked(ackq sessionsv5.Ackqueue) {
 	for _, ackmsg := range ackq.Acked() {
 		// Let's get the messages from the saved messagev5 byte slices.
 		//让我们从保存的消息字节片获取消息。
@@ -287,7 +287,7 @@ func (this *service) processPublish(msg *messagev5.PublishMessage) error {
 
 	switch msg.QoS() {
 	case messagev5.QosExactlyOnce:
-		this.sess.Pub2in.Wait(msg, nil)
+		this.sess.Pub2in().Wait(msg, nil)
 
 		resp := messagev5.NewPubrecMessage()
 		resp.SetPacketId(msg.PacketId())
