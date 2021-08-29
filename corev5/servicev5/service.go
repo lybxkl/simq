@@ -2,6 +2,7 @@ package servicev5
 
 import (
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
@@ -32,6 +33,7 @@ var (
 )
 
 type service struct {
+	clusterBelong bool
 	// The ID of this service, it's not related to the Client ID, just a number that's
 	// incremented for every new service.
 	//这个服务的ID，它与客户ID无关，只是一个数字而已
@@ -131,6 +133,9 @@ type service struct {
 	subs  []interface{}
 	qoss  []byte
 	rmsgs []*messagev5.PublishMessage
+
+	clusterClient     *sync.Map // name --> *client.Client
+	shareTopicMapNode cluster.ShareTopicMapNode
 }
 
 func (this *service) start() error {

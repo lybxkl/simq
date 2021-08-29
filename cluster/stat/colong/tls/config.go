@@ -2,7 +2,7 @@ package tls
 
 import (
 	"crypto/tls"
-	"gitee.com/Ljolan/si-mqtt/colang/stat/colong"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"time"
 )
 
@@ -13,8 +13,8 @@ import (
 var (
 	pkgHandler = &colong.PackageHandler{}
 	// EventListener register event callback
-	EventListener       = &colong.MessageHandler{}
-	EventServerListener = &colong.MessageHandler2{}
+	EventListener       = colong.NewEventListener()
+	EventServerListener = colong.NewServerEventListener()
 )
 
 func InitialSession(session getty.Session) (err error) {

@@ -11,6 +11,7 @@ require (
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/onsi/gomega v1.14.0 // indirect
 	github.com/stretchr/testify v1.7.0
+	github.com/valyala/fastrand v1.0.0
 	go.uber.org/zap v1.18.1
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect

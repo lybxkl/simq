@@ -2,6 +2,7 @@ package colong
 
 import (
 	"github.com/apache/dubbo-getty"
+	"sync"
 )
 
 const (
@@ -10,3 +11,11 @@ const (
 )
 
 var log = getty.GetLogger()
+
+var (
+	pingresp []byte
+	ack      []byte
+	cs       sync.Map
+	Cname    = "name"
+	Caddr    = "addr"
+)

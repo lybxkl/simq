@@ -1,4 +1,4 @@
-package colang
+package cluster
 
 import (
 	"errors"
@@ -6,9 +6,8 @@ import (
 )
 
 type Node struct {
-	NNA string // 节点名称
-	NPO int64  // 节点端口
-	NIP string // 节点ip
+	NNA  string // 节点名称
+	Addr string // 节点addr
 }
 
 var (
@@ -18,7 +17,7 @@ var (
 // NodeDiscover 集群节点发现
 type NodeDiscover interface {
 	GetNodes() ([]Node, error)
-	GetNodeMap() (map[string]Node, error)
+	GetNodeMap() map[string]Node
 	GetNode(name string) (Node, error)
 	RegisterMe(node Node) error
 	RemoveNode(name string) error
@@ -44,14 +43,14 @@ func (n *nodeDiscover) GetNodes() ([]Node, error) {
 	n.RUnlock()
 	return ret, nil
 }
-func (n *nodeDiscover) GetNodeMap() (map[string]Node, error) {
+func (n *nodeDiscover) GetNodeMap() map[string]Node {
 	n.RLock()
 	ret := make(map[string]Node)
 	for k, node := range n.nodes {
 		ret[k] = node
 	}
 	n.RUnlock()
-	return ret, nil
+	return ret
 }
 
 func (n *nodeDiscover) GetNode(name string) (Node, error) {

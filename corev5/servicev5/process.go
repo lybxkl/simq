@@ -3,6 +3,7 @@ package servicev5
 import (
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
@@ -410,13 +411,97 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 	}
 	// todo 集群模式，需要另外设计
 	// 发送当前主题的所有共享组
-	err := this.pubFnPlus(msg1)
-	if err != nil {
-		logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
+	//err := this.pubFnPlus(msg1)
+	//if err != nil {
+	//	logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
+	//}
+	go func() {
+		// 发送共享主题消息
+		sn, err := this.shareTopicMapNode.GetShareNames(msg1.Topic())
+		if err != nil {
+			logger.Logger.Errorf("%v 获取主题%s共享组错误:%v", this.id, msg1.Topic(), err)
+			return
+		}
+		for shareName, node := range sn {
+			if node == GetServerName() {
+				err = this.pubFn(msg1, shareName, true)
+				if err != nil {
+					// FIXME 错误处理
+				}
+			} else {
+				colong.SendMsgToCluster(msg1, shareName, node, nil, nil, nil)
+			}
+		}
+	}()
+	go this.sendCluster(msg1)
+	// 发送非共享订阅主题
+	return this.pubFn(msg1, "", false)
+}
+
+// 发送到集群其它节点去
+func (this *service) sendCluster(message messagev5.Message) {
+	colong.SendMsgToCluster(message, "", "", func(message messagev5.Message) {
+
+	}, func(name string, message messagev5.Message) {
+
+	}, func(name string, message messagev5.Message) {
+
+	})
+}
+
+// 发送共享主题到集群其它节点去，以共享组的方式发送
+func (this *service) sendShareToCluster(message messagev5.Message, shareName string) {
+	colong.SendMsgToCluster(message, shareName, "", func(message messagev5.Message) {
+
+	}, func(name string, message messagev5.Message) {
+
+	}, func(name string, message messagev5.Message) {
+
+	})
+}
+
+// 集群节点发来的普通消息
+func (this *service) ClusterInToPub(msg1 *messagev5.PublishMessage) error {
+	if !this.clusterBelong {
+		return nil
+	}
+	if msg1.Retain() {
+		if err := this.topicsMgr.Retain(msg1); err != nil { // 为这个主题保存最后一条保留消息
+			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
+		}
 	}
 	// 发送非共享订阅主题
 	return this.pubFn(msg1, "", false)
 }
+
+// 集群节点发来的共享主题消息，需要发送到特定的共享组 和 普通节点
+func (this *service) ClusterInToPubShare(msg1 *messagev5.PublishMessage, shareName string) error {
+	if !this.clusterBelong {
+		return nil
+	}
+	if msg1.Retain() {
+		if err := this.topicsMgr.Retain(msg1); err != nil { // 为这个主题保存最后一条保留消息
+			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
+		}
+	}
+	// 发送非共享订阅主题
+	return this.pubFn(msg1, shareName, false)
+}
+
+// 集群节点发来的系统主题消息
+func (this *service) ClusterInToPubSys(msg1 *messagev5.PublishMessage) error {
+	if !this.clusterBelong {
+		return nil
+	}
+	if msg1.Retain() {
+		if err := this.topicsMgr.Retain(msg1); err != nil { // 为这个主题保存最后一条保留消息
+			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
+		}
+	}
+	// 发送
+	return this.pubFnSys(msg1)
+}
+
 func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, onlyShare bool) error {
 	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, false, shareName, onlyShare)
 	if err != nil {
@@ -441,6 +526,8 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 	}
 	return nil
 }
+
+// 发送当前主题所有共享组
 func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
 	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, false, "", true)
 	if err != nil {
@@ -448,7 +535,33 @@ func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs))
+	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s to subscribers：%v", this.cid(), msg.Topic(), this.subs)
+	for i, s := range this.subs {
+		if s != nil {
+			fn, ok := s.(*OnPublishFunc)
+			if !ok {
+				return fmt.Errorf("Invalid onPublish Function")
+			} else {
+				_ = msg.SetQoS(this.qoss[i]) // 设置为该发的qos级别
+				err = (*fn)(msg)
+				if err == io.EOF {
+					// TODO 断线了，是否对于qos=1和2的保存至离线消息
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// 发送系统消息
+func (this *service) pubFnSys(msg *messagev5.PublishMessage) error {
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, true, "", false)
+	if err != nil {
+		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", this.cid(), err)
+		return err
+	}
+	msg.SetRetain(false)
+	logger.Logger.Debugf("(%s) Publishing sys topic %s to subscribers：%v", this.cid(), msg.Topic(), this.subs)
 	for i, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)

@@ -2,7 +2,6 @@ package colong
 
 import (
 	"errors"
-	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 )
 
 import (
@@ -35,33 +34,12 @@ func lbDecode(b []byte) (uint32, int, error) {
 	return value, i, nil
 }
 func (h *PackageHandler) Read(ss getty.Session, data []byte) (interface{}, int, error) {
-	dataLen := len(data)
-	if dataLen == 0 {
-		return nil, 0, nil
-	}
-	mtype := messagev5.MessageType(data[0] >> 4)
-
-	msglen, n, err := lbDecode(data[1:])
+	msg, n, err := DecodeCMsg(data)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	//获取消息的剩余长度
-	remlen := len(data[n:])
-	if remlen < int(msglen) {
-		return nil, remlen + n, nil
-	}
-
-	//消息的总长度
-	total := n + 1 + int(msglen)
-
-	msg, err := mtype.New()
-	if err != nil {
-		return nil, total, err
-	}
-	n, err = msg.Decode(data)
-	if err != nil {
-		return nil, n, err
+	if msg == nil {
+		return nil, n, nil
 	}
 	return msg, n, nil
 }

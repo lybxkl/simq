@@ -3,6 +3,8 @@ package servicev5
 import (
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/server"
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
@@ -27,6 +29,11 @@ var (
 	ErrBufferInsufficientData error = errors.New("service: buffer has insufficient data.") //缓冲区数据不足。
 )
 var SVC *service
+var serverName string
+
+func GetServerName() string {
+	return serverName
+}
 
 // Server is a library implementation of the MQTT server that, as best it can, complies
 // with the MQTT 3.1 and 3.1.1 specs.
@@ -131,8 +138,17 @@ type Server struct {
 	//指示此服务器是否已检查配置
 	configOnce sync.Once
 
+	ClusterDiscover   cluster.NodeDiscover
+	ClusterServer     *server.Server
+	ClusterClient     *sync.Map // name --> *client.Client
+	ShareTopicMapNode cluster.ShareTopicMapNode
+
 	subs []interface{}
 	qoss []byte
+}
+
+func (s *Server) TopicProvider() *topicsv5.Manager {
+	return s.topicsMgr
 }
 
 // ListenAndServe listents to connections on the URI requested, and handles any
@@ -153,6 +169,8 @@ func (this *Server) ListenAndServe(uri string) error {
 	if !atomic.CompareAndSwapInt32(&this.running, 0, 1) {
 		return fmt.Errorf("server/ListenAndServe: Server is already running")
 	}
+	serverName = this.ConFig.Cluster.ClusterName
+
 	this.quit = make(chan struct{})
 
 	u, err := url.Parse(uri)
@@ -281,6 +299,13 @@ func (this *Server) Close() error {
 	// 后面不会执行到，不知道为啥
 	// TODO 将当前节点上的客户端数据保存持久化到mysql或者redis都行，待这些客户端重连集群时，可以搜索到旧session，也要考虑是否和客户端连接时的cleanSession有绑定
 	return nil
+}
+func (this *Server) NewService() *service {
+	return &service{
+		sessMgr:       this.sessMgr,
+		topicsMgr:     this.topicsMgr,
+		clusterBelong: true,
+	}
 }
 
 // HandleConnection is for the broker to handle an incoming connection from a client
@@ -422,9 +447,11 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		ackTimeout:     this.AckTimeout,
 		timeoutRetries: this.TimeoutRetries,
 
-		conn:      conn,
-		sessMgr:   this.sessMgr,
-		topicsMgr: this.topicsMgr,
+		conn:              conn,
+		sessMgr:           this.sessMgr,
+		topicsMgr:         this.topicsMgr,
+		clusterClient:     this.ClusterClient,
+		shareTopicMapNode: this.ShareTopicMapNode,
 	}
 	err = this.getSession(svc, req, resp)
 	if err != nil {

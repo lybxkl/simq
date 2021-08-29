@@ -6,7 +6,6 @@ github.com/StackExchange/wmi
 # github.com/apache/dubbo-getty v1.4.5
 ## explicit
 github.com/apache/dubbo-getty
-github.com/apache/dubbo-getty/demo/hello
 # github.com/buguang01/util v1.1.14
 ## explicit
 github.com/buguang01/util
@@ -63,6 +62,9 @@ github.com/shirou/gopsutil/process
 ## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
+# github.com/valyala/fastrand v1.0.0
+## explicit
+github.com/valyala/fastrand
 # go.uber.org/atomic v1.7.0
 go.uber.org/atomic
 # go.uber.org/multierr v1.6.0
