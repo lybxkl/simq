@@ -12,6 +12,12 @@ const (
 
 var log = getty.GetLogger()
 
+// 更新getty内部日志，虽然都是zap
+func UpdateLogger(lg getty.Logger) {
+	getty.SetLogger(lg)
+	log = getty.GetLogger()
+}
+
 var (
 	pingresp []byte
 	ack      []byte

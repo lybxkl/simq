@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/client"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/server"
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
@@ -14,6 +16,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -182,6 +185,9 @@ func (this *Server) ListenAndServe(uri string) error {
 	if err != nil {
 		panic(err)
 	}
+
+	this.RunClusterComp()
+
 	printBanner(this.Version)
 	var tempDelay time.Duration // how long to sleep on accept failure 接受失败要睡多久，默认5ms，最大1s
 
@@ -229,6 +235,33 @@ func (this *Server) ListenAndServe(uri string) error {
 				SVC = svc // 这一步是不是多余的
 			}
 		}()
+	}
+}
+func (this *Server) RunClusterComp() {
+	cfg := this.ConFig
+	if cfg.Cluster.Enabled { // 集群服务启动
+		colong.UpdateLogger(logger.Logger)
+		staticDisc := make(map[string]cluster.Node)
+		for _, v := range cfg.Cluster.StaticNodeList {
+			if v.Name == cfg.Cluster.ClusterName { // 跳过自己，这样就不用在配置文件中单独设置不同的数据了
+				continue
+			}
+			staticDisc[v.Name] = cluster.Node{
+				NNA:  v.Name,
+				Addr: v.Addr,
+			}
+		}
+		this.ClusterDiscover = cluster.NewStaticNodeDiscover(staticDisc)
+		this.ShareTopicMapNode = cluster.NewShareMap()
+		svc := this.NewService() // 单独service用来处理集群来的消息
+		this.ClusterServer = server.RunClusterServer(cfg.Cluster.ClusterName,
+			cfg.Cluster.ClusterHost+":"+strconv.Itoa(cfg.Cluster.ClusterPort),
+			svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode)
+		this.ClusterClient = &sync.Map{}
+		for name, node := range this.ClusterDiscover.GetNodeMap() {
+			go this.ClusterClient.Store(name, client.RunClient(cfg.Cluster.ClusterName, name, node.Addr,
+				1, true, 1000))
+		}
 	}
 }
 
@@ -438,8 +471,9 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		req.SetKeepAlive(uint16(this.KeepAlive))
 	}
 	svc = &service{
-		id:     atomic.AddUint64(&gsvcid, 1),
-		client: false,
+		id:          atomic.AddUint64(&gsvcid, 1),
+		client:      false,
+		clusterOpen: this.ConFig.Cluster.Enabled,
 
 		keepAlive:      int(req.KeepAlive()),
 		writeTimeout:   this.WriteTimeout,

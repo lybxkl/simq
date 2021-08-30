@@ -33,7 +33,10 @@ var (
 )
 
 type service struct {
-	clusterBelong bool
+	clusterBelong bool // 集群特殊使用的标记
+
+	clusterOpen bool // 是否开启了集群
+
 	// The ID of this service, it's not related to the Client ID, just a number that's
 	// incremented for every new service.
 	//这个服务的ID，它与客户ID无关，只是一个数字而已

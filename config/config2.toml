@@ -5,17 +5,17 @@ serverVersion = "5.0.1"
 
 [broker]
     # broker 监听的addr
-    tcpAddr = "tcp://:1884"
+    tcpAddr = "tcp://:1883"
     # 是否开启tls
     tcpTlsOpen = false
 
 
     # 开启websocket监听的addr
-    wsAddr = ":8765"
+    wsAddr = ":8764"
     # websocket的path
     wsPath = "/mqtt"
 
-    wssAddr=":8762"
+    wssAddr=":8761"
     wssCertPath=""
     wssKeyPath=""
 
@@ -26,11 +26,11 @@ serverVersion = "5.0.1"
     # 是否开启集群模式
     enabled = true
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
-    clusterName = "node2"
+    clusterName = "node1"
     # 集群模式监听的IP，用来和集群中其他节点通信
     clusterHost = "127.0.0.1"
     # 集群模式监听的端口
-    clusterPort = 2885
+    clusterPort = 2884
     # 集群模式是否使用tls
     clusterTls = false
     # 服务器端证书

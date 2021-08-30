@@ -415,6 +415,17 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 	//if err != nil {
 	//	logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
 	//}
+	this.sendShareToCluster(msg1)
+	this.sendCluster(msg1)
+	// 发送非共享订阅主题
+	return this.pubFn(msg1, "", false)
+}
+
+// 发送共享主题到集群其它节点去，以共享组的方式发送
+func (this *service) sendShareToCluster(msg1 *messagev5.PublishMessage) {
+	if !this.clusterOpen {
+		return
+	}
 	go func() {
 		// 发送共享主题消息
 		sn, err := this.shareTopicMapNode.GetShareNames(msg1.Topic())
@@ -433,31 +444,22 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 			}
 		}
 	}()
-	go this.sendCluster(msg1)
-	// 发送非共享订阅主题
-	return this.pubFn(msg1, "", false)
 }
 
 // 发送到集群其它节点去
 func (this *service) sendCluster(message messagev5.Message) {
-	colong.SendMsgToCluster(message, "", "", func(message messagev5.Message) {
+	if !this.clusterOpen {
+		return
+	}
+	go func() {
+		colong.SendMsgToCluster(message, "", "", func(message messagev5.Message) {
 
-	}, func(name string, message messagev5.Message) {
+		}, func(name string, message messagev5.Message) {
 
-	}, func(name string, message messagev5.Message) {
+		}, func(name string, message messagev5.Message) {
 
-	})
-}
-
-// 发送共享主题到集群其它节点去，以共享组的方式发送
-func (this *service) sendShareToCluster(message messagev5.Message, shareName string) {
-	colong.SendMsgToCluster(message, shareName, "", func(message messagev5.Message) {
-
-	}, func(name string, message messagev5.Message) {
-
-	}, func(name string, message messagev5.Message) {
-
-	})
+		})
+	}()
 }
 
 // 集群节点发来的普通消息

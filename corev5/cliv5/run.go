@@ -1,9 +1,6 @@
 package cliv5
 
 import (
-	"gitee.com/Ljolan/si-mqtt/cluster"
-	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/client"
-	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/server"
 	config2 "gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
@@ -22,7 +19,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 func init() {
@@ -51,27 +47,6 @@ func Run() {
 		Authenticator:    proCif.Authenticator,
 		AuthPlusProvider: authPlusCif.Allows,
 		Version:          cfg.ServerVersion,
-	}
-
-	if cfg.Cluster.Enabled {
-		staticDisc := make(map[string]cluster.Node)
-		for _, v := range cfg.Cluster.StaticNodeList {
-			staticDisc[v.Name] = cluster.Node{
-				NNA:  v.Name,
-				Addr: v.Addr,
-			}
-		}
-		svr.ClusterDiscover = cluster.NewStaticNodeDiscover(staticDisc)
-		svr.ShareTopicMapNode = cluster.NewShareMap()
-		svc := svr.NewService()
-		svr.ClusterServer = server.RunClusterServer(cfg.Cluster.ClusterName,
-			cfg.Cluster.ClusterHost+":"+strconv.Itoa(cfg.Cluster.ClusterPort),
-			svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, svr.ShareTopicMapNode)
-		svr.ClusterClient = &sync.Map{}
-		for name, node := range svr.ClusterDiscover.GetNodeMap() {
-			go svr.ClusterClient.Store(name, client.RunClient(cfg.Cluster.ClusterName, name, node.Addr,
-				1, true, 1000))
-		}
 	}
 
 	var err error
