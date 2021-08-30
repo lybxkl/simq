@@ -2,7 +2,6 @@ package colong
 
 import (
 	"errors"
-	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"net"
 	"strconv"
@@ -105,7 +104,6 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	case *messagev5.PublishMessage:
 		// 本地发送
 		go func() {
-			fmt.Println(pkg)
 			if pkg1.Share() {
 				err := h.clusterInToPubShare(pkg, pkg1.Tag()[0])
 				if err != nil {
@@ -121,7 +119,6 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	case *messagev5.SubscribeMessage:
 		// 更新【本地订阅树】  与 【主题与节点的映射】
 		go func() {
-			fmt.Println(pkg)
 			tpk := pkg.Topics()
 			node := cname.(string)
 			for i := 0; i < len(tpk); i++ {
@@ -139,7 +136,6 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 		}()
 	case *messagev5.UnsubscribeMessage:
 		go func() {
-			fmt.Println(pkg)
 			tpk := pkg.Topics()
 			node := cname.(string)
 			for i := 0; i < len(tpk); i++ {
@@ -148,10 +144,10 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 				if shareName != "" {
 					err := h.shareTopicMapNode.RemoveTopicMapNode(tpk[i], shareName, node)
 					if err != nil {
-						log.Errorf("%s,共享订阅节点新增失败 : %v", node, shareName, err)
+						log.Errorf("%s,共享订阅节点减少失败 : %v", node, shareName, err)
 					}
 				} else {
-					log.Warnf("收到非法订阅：%s", string(tpk[i]))
+					log.Warnf("收到非法取消订阅：%s", string(tpk[i]))
 				}
 			}
 		}()
@@ -181,7 +177,7 @@ func shareTopic(b []byte) string {
 func (h *serverMessageHandler) OnCron(session getty.Session) {
 	active := session.GetActive()
 	if CronPeriod < time.Since(active).Nanoseconds() {
-		log.Infof("OnCorn session{%s} timeout{%s}", session.Stat(), time.Since(active).String())
+		//log.Infof("OnCorn session{%s} timeout{%s}", session.Stat(), time.Since(active).String())
 		session.Close()
 	}
 }

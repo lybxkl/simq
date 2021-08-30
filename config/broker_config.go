@@ -13,7 +13,7 @@ import (
 var cfg SIConfig
 
 func init() {
-	if _, err := toml.DecodeFile(utils2.GetConfigPath(utils2.GetCurrentDirectory(), "config.toml"), &cfg); err != nil {
+	if _, err := toml.DecodeFile(utils2.GetConfigPath(utils2.GetCurrentDirectory(), "config2.toml"), &cfg); err != nil {
 		panic(err)
 	}
 	fmt.Println(cfg.String())

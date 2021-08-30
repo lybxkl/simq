@@ -344,7 +344,6 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 
 		/**
 		* 可以在这里向其它集群节点发送添加主题消息
-		* 我选择带缓存的channel
 		**/
 
 	}
@@ -357,6 +356,24 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 		return err
 	}
 
+	for i := 0; i < len(topics); i++ {
+		/**
+		* 可以在这里向其它节点发送移除主题消息
+		**/
+		if len(topics[i]) < 10 { // $share/{shareName}/{topic} 至少长度为9，即其中shareName不能为空，topic也不能为空
+			continue
+		}
+		tag := true
+		for j := 0; j < len(serverName); j++ {
+			if topics[i][j] != serverName[j] {
+				tag = false
+				break
+			}
+		}
+		if tag {
+			this.sendCluster(msg) // 发送订阅到其它节点，不需要qos处理的
+		}
+	}
 	for _, rm := range this.rmsgs {
 		// TODO
 		old := rm.QoS()
@@ -382,9 +399,6 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 	for _, t := range topics {
 		this.topicsMgr.Unsubscribe(t, &this.onpub)
 		this.sess.RemoveTopic(string(t))
-		/**
-		* 可以在这里向其它节点发送移除主题消息
-		**/
 	}
 
 	resp := messagev5.NewUnsubackMessage()
@@ -392,9 +406,30 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 	resp.AddReasonCode(messagev5.Success.Value())
 
 	_, err := this.writeMessage(resp)
+	if err != nil {
+		return err
+	}
 
+	for i := 0; i < len(topics); i++ {
+		/**
+		* 可以在这里向其它节点发送移除主题消息
+		**/
+		if len(topics[i]) < 10 { // $share/{shareName}/{topic} 至少长度为9，即其中shareName不能为空，topic也不能为空
+			continue
+		}
+		tag := true
+		for j := 0; j < len(serverName); j++ {
+			if topics[i][j] != serverName[j] {
+				tag = false
+				break
+			}
+		}
+		if tag {
+			this.sendCluster(msg) // 发送取消订阅到其它节点， TODO 客户端掉线，是否需要，还是要看session
+		}
+	}
 	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", this.cid(), topics)
-	return err
+	return nil
 }
 
 // onPublish() is called when the server receives a PUBLISH messagev5 AND have completed
@@ -511,7 +546,7 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to topic %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs), shareName)
+	logger.Logger.Debugf("(%s) Publishing to topic %s and %s subscribers：%v", this.cid(), msg.Topic(), shareName, len(this.subs))
 	for i, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)

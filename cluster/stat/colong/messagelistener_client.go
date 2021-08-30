@@ -62,7 +62,7 @@ func (h *messageHandler) OnMessage(session getty.Session, m interface{}) {
 	}
 	switch pkg := pkg.(type) {
 	case *messagev5.PingrespMessage:
-		log.Infof("%s", pkg)
+		// log.Infof("%s", pkg)
 	case *messagev5.ConnackMessage:
 		if pkg.ReasonCode() == messagev5.Success {
 			// 此时才可以发送消息
