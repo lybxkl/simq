@@ -191,14 +191,21 @@ func (this *service) processAcked(ackq sessionsv5.Ackqueue) {
 			continue
 		}
 
-		if _, err := msg.Decode(ackmsg.Msgbuf); err != nil {
-			logger.Logger.Errorf("process/processAcked: Unable to decode %s messagev5: %v", ackmsg.Mtype, err)
-			continue
+		if msg.Type() != messagev5.PINGREQ {
+			if _, err := msg.Decode(ackmsg.Msgbuf); err != nil {
+				logger.Logger.Errorf("process/processAcked: Unable to decode %s messagev5: %v", ackmsg.Mtype, err)
+				continue
+			}
 		}
 
 		ack, err := ackmsg.State.New()
 		if err != nil {
 			logger.Logger.Errorf("process/processAcked: Unable to creating new %s messagev5: %v", ackmsg.State, err)
+			continue
+		}
+
+		if ack.Type() == messagev5.PINGRESP {
+			logger.Logger.Debug("process/processAcked: PINGRESP")
 			continue
 		}
 
@@ -229,7 +236,7 @@ func (this *service) processAcked(ackq sessionsv5.Ackqueue) {
 				logger.Logger.Errorf("(%s) Error processing ack'ed %s messagev5: %v", this.cid(), ackmsg.Mtype, err)
 			}
 
-		case messagev5.PUBACK, messagev5.PUBCOMP, messagev5.SUBACK, messagev5.UNSUBACK, messagev5.PINGRESP:
+		case messagev5.PUBACK, messagev5.PUBCOMP, messagev5.SUBACK, messagev5.UNSUBACK:
 			logger.Logger.Debugf("process/processAcked: %s", ack)
 			// If ack is PUBACK, that means the QoS 1 messagev5 sent by this service got
 			// ack'ed. There's nothing to do other than calling onComplete() below.
@@ -253,8 +260,7 @@ func (this *service) processAcked(ackq sessionsv5.Ackqueue) {
 
 			// If ack is PINGRESP, that means the PINGREQ messagev5 sent by this service
 			// got ack'ed. There's nothing to do other than calling onComplete() below.
-			//如果ack是PINGRESP，则表示此服务发送的PINGREQ消息
-			//得到“消”。除了调用下面的onComplete()之外，没有什么可以做的。
+			// PINGRESP 直接跳过了，因为发送ping时，我们选择了不保存ping数据，所以这里无法验证
 			err = nil
 
 		default:
