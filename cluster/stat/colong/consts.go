@@ -12,6 +12,10 @@ const (
 
 var log = getty.GetLogger()
 
+func SetLoggerLevelInfo() {
+	getty.SetLoggerLevel(getty.LoggerLevelInfo)
+}
+
 // 更新getty内部日志，虽然都是zap
 func UpdateLogger(lg getty.Logger) {
 	getty.SetLogger(lg)

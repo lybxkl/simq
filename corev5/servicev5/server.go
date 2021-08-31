@@ -240,7 +240,10 @@ func (this *Server) ListenAndServe(uri string) error {
 func (this *Server) RunClusterComp() {
 	cfg := this.ConFig
 	if cfg.Cluster.Enabled { // 集群服务启动
-		colong.UpdateLogger(logger.Logger)
+
+		// colong.UpdateLogger(logger.Logger) // 可以替换为通用日志
+		colong.SetLoggerLevelInfo() // 设置集群服务的日志等级
+
 		staticDisc := make(map[string]cluster.Node)
 		for _, v := range cfg.Cluster.StaticNodeList {
 			if v.Name == cfg.Cluster.ClusterName { // 跳过自己，这样就不用在配置文件中单独设置不同的数据了

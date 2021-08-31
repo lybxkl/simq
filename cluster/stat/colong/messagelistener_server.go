@@ -103,54 +103,62 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 		}
 	case *messagev5.PublishMessage:
 		// 本地发送
-		go func() {
+		go func(pkg1 WrapCMsg, pkg *messagev5.PublishMessage) {
 			if pkg1.Share() {
 				err := h.clusterInToPubShare(pkg, pkg1.Tag()[0])
 				if err != nil {
 					log.Errorf("clusterInToPubShare: err %v", err)
+				} else {
+					log.Infof("收到节点：%s 发来的 共享消息：%s", cname.(string), pkg)
 				}
 			} else {
 				err := h.clusterInToPub(pkg)
 				if err != nil {
 					log.Errorf("clusterInToPub: err %v", err)
+				} else {
+					log.Infof("收到节点：%s 发来的 普通消息：%s", cname.(string), pkg)
 				}
 			}
-		}()
+		}(pkg1, pkg)
 	case *messagev5.SubscribeMessage:
 		// 更新【本地订阅树】  与 【主题与节点的映射】
-		go func() {
+		go func(pkg *messagev5.SubscribeMessage) {
 			tpk := pkg.Topics()
 			node := cname.(string)
 			for i := 0; i < len(tpk); i++ {
 				// 解析share name
-				shareName := shareTopic(tpk[i])
+				shareName, top := shareTopic(tpk[i])
 				if shareName != "" {
-					err := h.shareTopicMapNode.AddTopicMapNode(tpk[i], shareName, node)
+					err := h.shareTopicMapNode.AddTopicMapNode(top, shareName, node)
 					if err != nil {
 						log.Errorf("%s,共享订阅节点新增失败 : %v", node, shareName, err)
+					} else {
+						log.Infof("收到节点：%s 发来的 共享订阅：%s", node, string(tpk[i]))
 					}
 				} else {
 					log.Warnf("收到非法订阅：%s", string(tpk[i]))
 				}
 			}
-		}()
+		}(pkg)
 	case *messagev5.UnsubscribeMessage:
-		go func() {
+		go func(pkg *messagev5.UnsubscribeMessage) {
 			tpk := pkg.Topics()
 			node := cname.(string)
 			for i := 0; i < len(tpk); i++ {
 				// 解析share name
-				shareName := shareTopic(tpk[i])
+				shareName, top := shareTopic(tpk[i])
 				if shareName != "" {
-					err := h.shareTopicMapNode.RemoveTopicMapNode(tpk[i], shareName, node)
+					err := h.shareTopicMapNode.RemoveTopicMapNode(top, shareName, node)
 					if err != nil {
 						log.Errorf("%s,共享订阅节点减少失败 : %v", node, shareName, err)
+					} else {
+						log.Infof("收到节点：%s 发来的 取消共享订阅：%s", node, string(tpk[i]))
 					}
 				} else {
 					log.Warnf("收到非法取消订阅：%s", string(tpk[i]))
 				}
 			}
-		}()
+		}(pkg)
 	default:
 		log.Infof("OnMessage: %s", pkg)
 	}
@@ -158,21 +166,22 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 
 var stp = []byte("$share/")
 
-func shareTopic(b []byte) string {
+// 共享组和topic
+func shareTopic(b []byte) (string, []byte) {
 	if len(b) < len(stp) {
-		return ""
+		return "", b
 	}
 	for i := 0; i < len(stp); i++ {
 		if b[i] != stp[i] {
-			return ""
+			return "", b
 		}
 	}
 	for i := len(stp); i < len(b); i++ {
 		if b[i] == '/' {
-			return string(b[:i])
+			return string(b[:i]), b[1:]
 		}
 	}
-	return ""
+	return "", b
 }
 func (h *serverMessageHandler) OnCron(session getty.Session) {
 	active := session.GetActive()

@@ -319,6 +319,8 @@ func (this *service) processPublish(msg *messagev5.PublishMessage) error {
 	return fmt.Errorf("(%s) invalid messagev5 QoS %d.", this.cid(), msg.QoS())
 }
 
+var shareName = []byte("$share/")
+
 // For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
 func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 	resp := messagev5.NewSubackMessage()
@@ -370,14 +372,29 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 			continue
 		}
 		tag := true
-		for j := 0; j < len(serverName); j++ {
-			if topics[i][j] != serverName[j] {
+		for j := 0; j < len(shareName); j++ {
+			if topics[i][j] != shareName[j] {
 				tag = false
 				break
 			}
 		}
+
 		if tag {
 			this.sendCluster(msg) // 发送订阅到其它节点，不需要qos处理的
+
+			// 共享名称组
+			k := 0
+			for j := len(shareName); j < len(topics[i]); j++ {
+				if topics[i][j] == '/' {
+					k = j
+					break
+				}
+			}
+			if k == len(shareName) || k == len(topics[i]) {
+				continue
+			}
+			// 添加本地集群共享订阅订阅
+			this.shareTopicMapNode.AddTopicMapNode(topics[i][k+1:], string(topics[i][len(shareName):k]), GetServerName())
 		}
 	}
 	for _, rm := range this.rmsgs {
@@ -424,14 +441,27 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 			continue
 		}
 		tag := true
-		for j := 0; j < len(serverName); j++ {
-			if topics[i][j] != serverName[j] {
+		for j := 0; j < len(shareName); j++ {
+			if topics[i][j] != shareName[j] {
 				tag = false
 				break
 			}
 		}
 		if tag {
 			this.sendCluster(msg) // 发送取消订阅到其它节点， TODO 客户端掉线，是否需要，还是要看session
+			// 共享名称组
+			k := 0
+			for j := len(shareName); j < len(topics[i]); j++ {
+				if topics[i][j] == '/' {
+					k = j
+					break
+				}
+			}
+			if k == len(shareName) || k == len(topics[i]) {
+				continue
+			}
+			// 删除本地集群共享订阅
+			this.shareTopicMapNode.RemoveTopicMapNode(topics[i][k+1:], string(topics[i][len(shareName):k]), GetServerName())
 		}
 	}
 	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", this.cid(), topics)
