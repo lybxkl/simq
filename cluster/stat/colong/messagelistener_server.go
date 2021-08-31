@@ -60,15 +60,6 @@ func (h *serverMessageHandler) OnClose(session getty.Session) {
 	cs.Delete(session.GetAttribute(Cname))
 }
 
-func init() {
-	ps := messagev5.NewPingrespMessage()
-	pingresp, _ = wrapperPub(ps)
-
-	ackM := messagev5.NewConnackMessage()
-	ackM.SetReasonCode(messagev5.Success)
-	ack, _ = wrapperPub(ackM)
-}
-
 func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	pkg1, ok := m.(WrapCMsg)
 	if !ok {
@@ -89,6 +80,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 		case *messagev5.ConnectMessage: // 直接使用connec报文中的用户属性传递节点连接数据，简单方便
 			h.connectAuth(session, pkg)
 		default:
+			session.Close()
 			return
 		}
 	}
@@ -97,13 +89,15 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	case *messagev5.ConnectMessage: // 直接使用connec报文中的用户属性传递节点连接数据，简单方便
 		h.connectAuth(session, pkg)
 	case *messagev5.PingreqMessage:
-		_, err := session.WriteBytes(pingresp)
-		if err != nil {
-			log.Infof("OnMessage PingreqMessage: session{%s} write bytes err: {%v}", session.Stat(), err)
-		}
+		submit(func() {
+			_, err := session.WriteBytes(pingresp)
+			if err != nil {
+				log.Infof("OnMessage PingreqMessage: session{%s} write bytes err: {%v}", session.Stat(), err)
+			}
+		})
 	case *messagev5.PublishMessage:
 		// 本地发送
-		go func(pkg1 WrapCMsg, pkg *messagev5.PublishMessage) {
+		submit(func() {
 			if pkg1.Share() {
 				err := h.clusterInToPubShare(pkg, pkg1.Tag()[0])
 				if err != nil {
@@ -119,10 +113,10 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 					log.Infof("收到节点：%s 发来的 普通消息：%s", cname.(string), pkg)
 				}
 			}
-		}(pkg1, pkg)
+		})
 	case *messagev5.SubscribeMessage:
 		// 更新【本地订阅树】  与 【主题与节点的映射】
-		go func(pkg *messagev5.SubscribeMessage) {
+		submit(func() {
 			tpk := pkg.Topics()
 			node := cname.(string)
 			for i := 0; i < len(tpk); i++ {
@@ -139,9 +133,9 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 					log.Warnf("收到非法订阅：%s", string(tpk[i]))
 				}
 			}
-		}(pkg)
+		})
 	case *messagev5.UnsubscribeMessage:
-		go func(pkg *messagev5.UnsubscribeMessage) {
+		submit(func() {
 			tpk := pkg.Topics()
 			node := cname.(string)
 			for i := 0; i < len(tpk); i++ {
@@ -158,25 +152,23 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 					log.Warnf("收到非法取消订阅：%s", string(tpk[i]))
 				}
 			}
-		}(pkg)
+		})
 	default:
 		log.Infof("OnMessage: %s", pkg)
 	}
 }
 
-var stp = []byte("$share/")
-
 // 共享组和topic
 func shareTopic(b []byte) (string, []byte) {
-	if len(b) < len(stp) {
+	if len(b) < len(sharePrefix) {
 		return "", b
 	}
-	for i := 0; i < len(stp); i++ {
-		if b[i] != stp[i] {
+	for i := 0; i < len(sharePrefix); i++ {
+		if b[i] != sharePrefix[i] {
 			return "", b
 		}
 	}
-	for i := len(stp); i < len(b); i++ {
+	for i := len(sharePrefix); i < len(b); i++ {
 		if b[i] == '/' {
 			return string(b[:i]), b[1:]
 		}
@@ -191,6 +183,7 @@ func (h *serverMessageHandler) OnCron(session getty.Session) {
 	}
 }
 
+// 简单校验地址
 func parseAddr(addr string) error {
 	url := strings.Split(addr, ":")
 	if len(url) != 2 {

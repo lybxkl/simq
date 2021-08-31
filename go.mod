@@ -10,6 +10,7 @@ require (
 	github.com/garyburd/redigo v1.6.2
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/onsi/gomega v1.14.0 // indirect
+	github.com/panjf2000/ants/v2 v2.4.6
 	github.com/stretchr/testify v1.7.0
 	github.com/valyala/fastrand v1.0.0
 	go.uber.org/zap v1.18.1

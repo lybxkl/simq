@@ -24,7 +24,7 @@ serverVersion = "5.0.1"
 
 [cluster]
     # 是否开启集群模式
-    enabled = true
+    enabled = false
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
     clusterName = "node1"
     # 集群模式监听的IP，用来和集群中其他节点通信

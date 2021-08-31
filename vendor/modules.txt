@@ -48,6 +48,10 @@ github.com/jinzhu/inflection
 github.com/jinzhu/now
 # github.com/onsi/gomega v1.14.0
 ## explicit
+# github.com/panjf2000/ants/v2 v2.4.6
+## explicit
+github.com/panjf2000/ants/v2
+github.com/panjf2000/ants/v2/internal
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0

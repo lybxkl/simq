@@ -319,7 +319,7 @@ func (this *service) processPublish(msg *messagev5.PublishMessage) error {
 	return fmt.Errorf("(%s) invalid messagev5 QoS %d.", this.cid(), msg.QoS())
 }
 
-var shareName = []byte("$share/")
+var sharePrefix = []byte("$share/")
 
 // For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
 func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
@@ -364,39 +364,7 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 		return err
 	}
 
-	for i := 0; i < len(topics); i++ {
-		/**
-		* 可以在这里向其它节点发送移除主题消息
-		**/
-		if len(topics[i]) < 10 { // $share/{shareName}/{topic} 至少长度为9，即其中shareName不能为空，topic也不能为空
-			continue
-		}
-		tag := true
-		for j := 0; j < len(shareName); j++ {
-			if topics[i][j] != shareName[j] {
-				tag = false
-				break
-			}
-		}
-
-		if tag {
-			this.sendCluster(msg) // 发送订阅到其它节点，不需要qos处理的
-
-			// 共享名称组
-			k := 0
-			for j := len(shareName); j < len(topics[i]); j++ {
-				if topics[i][j] == '/' {
-					k = j
-					break
-				}
-			}
-			if k == len(shareName) || k == len(topics[i]) {
-				continue
-			}
-			// 添加本地集群共享订阅订阅
-			this.shareTopicMapNode.AddTopicMapNode(topics[i][k+1:], string(topics[i][len(shareName):k]), GetServerName())
-		}
-	}
+	this.processToCluster(topics, msg)
 	for _, rm := range this.rmsgs {
 		// TODO
 		old := rm.QoS()
@@ -433,39 +401,52 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 		return err
 	}
 
+	this.processToCluster(topics, msg)
+	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", this.cid(), topics)
+	return nil
+}
+
+// processToCluster 分主题发送到其它节点发送
+func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
+	if !this.clusterOpen {
+		return
+	}
+	tag := len(topics)
 	for i := 0; i < len(topics); i++ {
-		/**
-		* 可以在这里向其它节点发送移除主题消息
-		**/
 		if len(topics[i]) < 10 { // $share/{shareName}/{topic} 至少长度为9，即其中shareName不能为空，topic也不能为空
+			tag--
 			continue
 		}
-		tag := true
-		for j := 0; j < len(shareName); j++ {
-			if topics[i][j] != shareName[j] {
-				tag = false
+		for j := 0; j < len(sharePrefix); j++ {
+			if topics[i][j] != sharePrefix[j] {
+				tag--
 				break
 			}
 		}
-		if tag {
-			this.sendCluster(msg) // 发送取消订阅到其它节点， TODO 客户端掉线，是否需要，还是要看session
-			// 共享名称组
-			k := 0
-			for j := len(shareName); j < len(topics[i]); j++ {
-				if topics[i][j] == '/' {
-					k = j
-					break
-				}
+		// 共享名称组
+		k := 0
+		for j := len(sharePrefix); j < len(topics[i]); j++ {
+			if topics[i][j] == '/' {
+				k = j
+				break
 			}
-			if k == len(shareName) || k == len(topics[i]) {
-				continue
-			}
+		}
+		if k == len(sharePrefix) || k == len(topics[i])-1 {
+			tag--
+			continue
+		}
+		switch msg.Type() {
+		case messagev5.SUBSCRIBE:
+			// 添加本地集群共享订阅订阅
+			this.shareTopicMapNode.AddTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
+		case messagev5.UNSUBSCRIBE:
 			// 删除本地集群共享订阅
-			this.shareTopicMapNode.RemoveTopicMapNode(topics[i][k+1:], string(topics[i][len(shareName):k]), GetServerName())
+			this.shareTopicMapNode.RemoveTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
 		}
 	}
-	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", this.cid(), topics)
-	return nil
+	if tag > 0 { // 确实是有共享主题，才发送到集群其它节点
+		this.sendCluster(msg) // 发送到其它节点，不需要qos处理的，TODO 但是需要考虑session相关问题
+	}
 }
 
 // onPublish() is called when the server receives a PUBLISH messagev5 AND have completed
@@ -480,14 +461,10 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
 		}
 	}
-	// todo 集群模式，需要另外设计
-	// 发送当前主题的所有共享组
-	//err := this.pubFnPlus(msg1)
-	//if err != nil {
-	//	logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
-	//}
+
 	this.sendShareToCluster(msg1)
 	this.sendCluster(msg1)
+
 	// 发送非共享订阅主题
 	return this.pubFn(msg1, "", false)
 }
@@ -495,6 +472,12 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 // 发送共享主题到集群其它节点去，以共享组的方式发送
 func (this *service) sendShareToCluster(msg1 *messagev5.PublishMessage) {
 	if !this.clusterOpen {
+		// 没开集群，就只要发送到当前节点下就行
+		// 发送当前主题的所有共享组
+		err := this.pubFnPlus(msg1)
+		if err != nil {
+			logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
+		}
 		return
 	}
 	go func() {
