@@ -6,6 +6,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"github.com/apache/dubbo-getty"
 	"github.com/panjf2000/ants/v2"
+	"io"
 	"sync"
 )
 
@@ -49,7 +50,7 @@ func init() {
 func submit(f func()) {
 	dealAntsErr(taskGPool.Submit(f))
 }
-func InitClusterTaskPool(poolSize int) (close func()) {
+func InitClusterTaskPool(poolSize int) (close io.Closer) {
 	if poolSize < 100 {
 		poolSize = 100
 	}
@@ -57,10 +58,15 @@ func InitClusterTaskPool(poolSize int) (close func()) {
 		fmt.Println("协程池处理错误：", i)
 	}), ants.WithMaxBlockingTasks(poolSize*2))
 	taskGPoolSize = poolSize
-	return closeTaskPool
+	return &closer{}
 }
-func closeTaskPool() {
+
+type closer struct {
+}
+
+func (closer closer) Close() error {
 	taskGPool.Release()
+	return nil
 }
 func dealAntsErr(err error) {
 	if err == nil {

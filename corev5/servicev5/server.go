@@ -243,8 +243,8 @@ func (this *Server) RunClusterComp() {
 	cfg := this.ConFig
 	if cfg.Cluster.Enabled { // 集群服务启动
 
-		colong.InitClusterTaskPool(int(cfg.Cluster.TaskClusterPoolSize))
-		InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize))
+		this.AddCloser(colong.InitClusterTaskPool(int(cfg.Cluster.TaskClusterPoolSize)))
+		this.AddCloser(InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize)))
 
 		// colong.UpdateLogger(logger.Logger) // 可以替换为通用日志
 		colong.SetLoggerLevelInfo() // 设置集群服务的日志等级

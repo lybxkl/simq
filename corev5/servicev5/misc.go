@@ -16,7 +16,7 @@ var (
 	taskGPoolSize = 1000
 )
 
-func InitServiceTaskPool(poolSize int) (close func()) {
+func InitServiceTaskPool(poolSize int) (close io.Closer) {
 	if poolSize < 100 {
 		poolSize = 100
 	}
@@ -24,10 +24,15 @@ func InitServiceTaskPool(poolSize int) (close func()) {
 		logger.Logger.Errorf("协程池处理错误：%v", i)
 	}), ants.WithMaxBlockingTasks(poolSize*2))
 	taskGPoolSize = poolSize
-	return closeServiceTaskPool
+	return &closer{}
 }
-func closeServiceTaskPool() {
+
+type closer struct {
+}
+
+func (closer closer) Close() error {
 	taskGPool.Release()
+	return nil
 }
 func submit(f func()) {
 	dealAntsErr(taskGPool.Submit(f))
