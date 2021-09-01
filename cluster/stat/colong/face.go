@@ -17,7 +17,7 @@ func RemoveSession(name string) {
 
 // wrapperShare 发送共享主题消息
 func wrapperShare(msg messagev5.Message, shareName string) ([]byte, error) {
-	cmsg := NewWrapCMsgImpl(PubCMsg)
+	cmsg := NewWrapCMsgImpl(PubShareCMsg)
 	cmsg.SetShare(shareName, msg)
 	return EncodeCMsg(cmsg)
 }

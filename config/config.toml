@@ -25,6 +25,9 @@ serverVersion = "5.0.1"
 [cluster]
     # 是否开启集群模式
     enabled = true
+    taskClusterPoolSize=1000 # 节点处理其它节点发来的消息的协程池大小
+    taskServicePoolSize=1000 # 服务向其它节点发送的协程池大小
+
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
     clusterName = "node2"
     # 集群模式监听的IP，用来和集群中其他节点通信

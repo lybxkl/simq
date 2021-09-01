@@ -439,9 +439,11 @@ func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
 		case messagev5.SUBSCRIBE:
 			// 添加本地集群共享订阅
 			this.shareTopicMapNode.AddTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
+			logger.Logger.Debugf("添加本地集群共享订阅：%s,%s,%s", topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
 		case messagev5.UNSUBSCRIBE:
 			// 删除本地集群共享订阅
 			this.shareTopicMapNode.RemoveTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
+			logger.Logger.Debugf("删除本地集群共享订阅：%s,%s,%s", topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
 		}
 	}
 	if tag > 0 { // 确实是有共享主题，才发送到集群其它节点
@@ -461,11 +463,14 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
 		}
 	}
+	b := make([]byte, msg1.Len())
+	_, _ = msg1.Encode(b)                   // 这里没有选择直接拿msg内的buf
+	tmpMsg := messagev5.NewPublishMessage() // 必须重新弄一个，防止被下面改动qos引起bug
+	_, _ = tmpMsg.Decode(b)
+	this.sendShareToCluster(tmpMsg)
+	this.sendCluster(tmpMsg)
 
-	this.sendShareToCluster(msg1)
-	this.sendCluster(msg1)
-
-	// 发送非共享订阅主题
+	// 发送非共享订阅主题, 这里面会改动qos
 	return this.pubFn(msg1, "", false)
 }
 
@@ -480,7 +485,7 @@ func (this *service) sendShareToCluster(msg1 *messagev5.PublishMessage) {
 		}
 		return
 	}
-	go func() {
+	submit(func() {
 		// 发送共享主题消息
 		sn, err := this.shareTopicMapNode.GetShareNames(msg1.Topic())
 		if err != nil {
@@ -497,7 +502,7 @@ func (this *service) sendShareToCluster(msg1 *messagev5.PublishMessage) {
 				colong.SendMsgToCluster(msg1, shareName, node, nil, nil, nil)
 			}
 		}
-	}()
+	})
 }
 
 // 发送到集群其它节点去
@@ -505,7 +510,7 @@ func (this *service) sendCluster(message messagev5.Message) {
 	if !this.clusterOpen {
 		return
 	}
-	go func() {
+	submit(func() {
 		colong.SendMsgToCluster(message, "", "", func(message messagev5.Message) {
 
 		}, func(name string, message messagev5.Message) {
@@ -513,7 +518,7 @@ func (this *service) sendCluster(message messagev5.Message) {
 		}, func(name string, message messagev5.Message) {
 
 		})
-	}()
+	})
 }
 
 // 集群节点发来的普通消息
@@ -559,20 +564,25 @@ func (this *service) ClusterInToPubSys(msg1 *messagev5.PublishMessage) error {
 }
 
 func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, onlyShare bool) error {
-	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, false, shareName, onlyShare)
+	var (
+		subs []interface{}
+		qoss []byte
+	)
+
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, shareName, onlyShare)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", this.cid(), err)
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to topic %s and %s subscribers：%v", this.cid(), msg.Topic(), shareName, len(this.subs))
-	for i, s := range this.subs {
+	logger.Logger.Debugf("(%s) Publishing to topic %s and %s subscribers：%v", this.cid(), msg.Topic(), shareName, len(subs))
+	for i, s := range subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(this.qoss[i]) // 设置为该发的qos级别
+				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
 				err = (*fn)(msg)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
@@ -585,20 +595,24 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 
 // 发送当前主题所有共享组
 func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
-	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, false, "", true)
+	var (
+		subs []interface{}
+		qoss []byte
+	)
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, "", true)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", this.cid(), err)
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s to subscribers：%v", this.cid(), msg.Topic(), this.subs)
-	for i, s := range this.subs {
+	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s to subscribers：%v", this.cid(), msg.Topic(), subs)
+	for i, s := range subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(this.qoss[i]) // 设置为该发的qos级别
+				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
 				err = (*fn)(msg)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
@@ -611,20 +625,24 @@ func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
 
 // 发送系统消息
 func (this *service) pubFnSys(msg *messagev5.PublishMessage) error {
-	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, true, "", false)
+	var (
+		subs []interface{}
+		qoss []byte
+	)
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, true, "", false)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", this.cid(), err)
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing sys topic %s to subscribers：%v", this.cid(), msg.Topic(), this.subs)
-	for i, s := range this.subs {
+	logger.Logger.Debugf("(%s) Publishing sys topic %s to subscribers：%v", this.cid(), msg.Topic(), subs)
+	for i, s := range subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(this.qoss[i]) // 设置为该发的qos级别
+				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
 				err = (*fn)(msg)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息

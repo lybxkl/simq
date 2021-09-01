@@ -133,8 +133,6 @@ type service struct {
 	intmp  []byte
 	outtmp []byte
 
-	subs  []interface{}
-	qoss  []byte
 	rmsgs []*messagev5.PublishMessage
 
 	clusterClient     *sync.Map // name --> *client.Client

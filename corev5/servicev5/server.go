@@ -148,6 +148,8 @@ type Server struct {
 
 	subs []interface{}
 	qoss []byte
+
+	close []io.Closer
 }
 
 func (s *Server) TopicProvider() *topicsv5.Manager {
@@ -241,6 +243,9 @@ func (this *Server) RunClusterComp() {
 	cfg := this.ConFig
 	if cfg.Cluster.Enabled { // 集群服务启动
 
+		colong.InitClusterTaskPool(int(cfg.Cluster.TaskClusterPoolSize))
+		InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize))
+
 		// colong.UpdateLogger(logger.Logger) // 可以替换为通用日志
 		colong.SetLoggerLevelInfo() // 设置集群服务的日志等级
 
@@ -306,6 +311,10 @@ func printBanner(serverVersion string) {
 		"服务器准备就绪: server is ready... version: " + serverVersion)
 }
 
+func (this *Server) AddCloser(close io.Closer) {
+	this.close = append(this.close, close)
+}
+
 // Close terminates the server by shutting down all the client connections and closing
 // the listener. It will, as best it can, clean up after itself.
 func (this *Server) Close() error {
@@ -334,6 +343,9 @@ func (this *Server) Close() error {
 	}
 	// 后面不会执行到，不知道为啥
 	// TODO 将当前节点上的客户端数据保存持久化到mysql或者redis都行，待这些客户端重连集群时，可以搜索到旧session，也要考虑是否和客户端连接时的cleanSession有绑定
+	for i := 0; i < len(this.close); i++ {
+		this.close[i].Close()
+	}
 	return nil
 }
 func (this *Server) NewService() *service {

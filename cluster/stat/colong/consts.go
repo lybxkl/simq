@@ -34,7 +34,7 @@ var (
 	Caddr         = "addr"
 	sharePrefix   = []byte("$share/")
 	taskGPool     *ants.Pool
-	taskGPoolSize = 10000
+	taskGPoolSize = 1000
 )
 
 func init() {
@@ -45,13 +45,22 @@ func init() {
 	ackM.SetReasonCode(messagev5.Success)
 	ack, _ = wrapperPub(ackM)
 
-	// Set 10000 the size of goroutine pool
-	taskGPool, _ = ants.NewPool(taskGPoolSize, ants.WithPanicHandler(func(i interface{}) {
-		fmt.Println("协程池处理错误：", i)
-	}), ants.WithMaxBlockingTasks(10000))
 }
 func submit(f func()) {
 	dealAntsErr(taskGPool.Submit(f))
+}
+func InitClusterTaskPool(poolSize int) (close func()) {
+	if poolSize < 100 {
+		poolSize = 100
+	}
+	taskGPool, _ = ants.NewPool(poolSize, ants.WithPanicHandler(func(i interface{}) {
+		fmt.Println("协程池处理错误：", i)
+	}), ants.WithMaxBlockingTasks(poolSize*2))
+	taskGPoolSize = poolSize
+	return closeTaskPool
+}
+func closeTaskPool() {
+	taskGPool.Release()
 }
 func dealAntsErr(err error) {
 	if err == nil {

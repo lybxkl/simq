@@ -130,7 +130,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 					if err != nil {
 						log.Errorf("%s,共享订阅节点新增失败 : %v", node, shareName, err)
 					} else {
-						log.Infof("收到节点：%s 发来的 共享订阅：%s", node, string(tpk[i]))
+						log.Infof("收到节点：%s 发来的 共享订阅：topic-%s, shareName-%s", node, top, shareName)
 					}
 				} else {
 					log.Warnf("收到非法订阅：%s", string(tpk[i]))
@@ -149,7 +149,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 					if err != nil {
 						log.Errorf("%s,共享订阅节点减少失败 : %v", node, shareName, err)
 					} else {
-						log.Infof("收到节点：%s 发来的 取消共享订阅：%s", node, string(tpk[i]))
+						log.Infof("收到节点：%s 发来的 取消共享订阅：topic-%s, shareName-%s", node, top, shareName)
 					}
 				} else {
 					log.Warnf("收到非法取消订阅：%s", string(tpk[i]))
@@ -173,7 +173,7 @@ func shareTopic(b []byte) (string, []byte) {
 	}
 	for i := len(sharePrefix); i < len(b); i++ {
 		if b[i] == '/' {
-			return string(b[:i]), b[1:]
+			return string(b[len(sharePrefix):i]), b[i+1:]
 		}
 	}
 	return "", b

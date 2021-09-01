@@ -205,7 +205,7 @@ func DecodeCMsg(b []byte) (WrapCMsg, int, error) {
 }
 
 func (w *wrapCMsgImpl) Share() bool {
-	return w.cmsgtype&8 == 1
+	return w.cmsgtype&8 == 8
 }
 func (w *wrapCMsgImpl) Type() CMsgType {
 	return CMsgType(w.cmsgtype >> 4)
