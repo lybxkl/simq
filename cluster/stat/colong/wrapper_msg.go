@@ -23,7 +23,8 @@ const (
 	UnSubCMsg
 	PingCMsg
 	PingRespCMsg
-	StatusCMsg // 状态消息，可以通知其发慢点
+	StatusCMsg   // 状态消息，可以通知其发慢点
+	CloseSession // 通知集群删除某个session，断开某个client连接
 
 	Tag byte = 0x01 // CMsgType中的tag字段为1时，第二个字节必须是此标志，第0位为1表示后面还有tag，为0表示后面没有tag了，为msg了
 )
@@ -33,6 +34,8 @@ type WrapCMsg interface {
 	Tag() []string
 	Share() bool
 	Msg() messagev5.Message
+	Status() map[string]string // 状态数据，自定义
+	CloseSessions() []string   // 需要断开连接并删除的session，client ids
 
 	SetShare(shareName string, msg messagev5.Message)
 	AddTag(tag string)
@@ -41,7 +44,8 @@ type WrapCMsg interface {
 }
 type wrapCMsgImpl struct {
 	cmsgtype byte
-	tag      []string          // 一个字节开头表示，和mqtt协议内协同的UTF-8字符串数据
+	tag      []string // 一个字节开头表示，和mqtt协议内协同的UTF-8字符串数据
+	status   map[string]string
 	msg      messagev5.Message // mqtt报文
 }
 
@@ -49,6 +53,27 @@ func NewWrapCMsgImpl(msgType CMsgType) WrapCMsg {
 	return &wrapCMsgImpl{
 		cmsgtype: byte(msgType) << 4,
 	}
+}
+
+// Status 状态数据在tag中采用 k v k v k v 排列
+func (w *wrapCMsgImpl) Status() map[string]string {
+	if w.Type() == StatusCMsg {
+		if w.status == nil {
+			w.status = make(map[string]string)
+			for i := 0; i < len(w.tag)-1; i += 2 {
+				w.status[w.tag[i]] = w.tag[i+1]
+			}
+		}
+		return w.status
+	}
+	return nil
+}
+
+func (w *wrapCMsgImpl) CloseSessions() []string {
+	if w.Type() == CloseSession {
+		return w.tag
+	}
+	return nil
 }
 
 // IsShare 如果是共享消息，tag只能有共享组名称，且一个

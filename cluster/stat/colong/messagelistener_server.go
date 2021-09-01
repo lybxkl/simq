@@ -69,6 +69,9 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	case StatusCMsg:
 		// TODO 状态处理
 		return
+	case CloseSession:
+		// TODO 断开客户端连接，清理远端session
+		return
 	}
 	msg := pkg1.Msg()
 	if msg == nil {
