@@ -1,6 +1,7 @@
 package messagev5
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,13 +28,20 @@ func TestPingreqMessageEncode(t *testing.T) {
 	}
 
 	msg := NewPingreqMessage()
-
-	dst := make([]byte, 10)
+	fmt.Println(msg.Len())
+	dst := make([]byte, msg.Len())
 	n, err := msg.Encode(dst)
 
 	require.NoError(t, err, "Error decoding message.")
 	require.Equal(t, len(msgBytes), n, "Error decoding message.")
-	require.Equal(t, msgBytes, dst[:n], "Error decoding message.")
+	require.Equal(t, msgBytes, dst, "Error decoding message.")
+
+	msg2 := NewPingreqMessage()
+	n, err = msg2.Decode(dst)
+
+	require.NoError(t, err, "Error decoding message.")
+	require.Equal(t, len(msgBytes), n, "Error decoding message.")
+	require.Equal(t, PINGREQ, msg.Type(), "Error decoding message.")
 }
 
 func TestPingrespMessageDecode(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 var cfg SIConfig
 
 func init() {
-	if _, err := toml.DecodeFile(utils2.GetConfigPath(utils2.GetCurrentDirectory(), "config.toml"), &cfg); err != nil {
+	if _, err := toml.DecodeFile(utils2.GetConfigPath(utils2.GetCurrentDirectory(), "config2.toml"), &cfg); err != nil {
 		panic(err)
 	}
 	fmt.Println(cfg.String())
@@ -47,15 +47,22 @@ type Broker struct {
 	Ca          string `toml:"ca"`
 }
 type Cluster struct {
-	Enabled        bool   `toml:"enabled"`
-	ClusterName    string `toml:"clusterName"`
-	ClusterHost    string `toml:"clusterHost"`
-	ClusterPort    int    `toml:"clusterPort"`
-	ClusterTLS     bool   `toml:"clusterTls"`
-	ServerCertFile string `toml:"serverCertFile"`
-	ServerKeyFile  string `toml:"serverKeyFile"`
-	ClientCertFile string `toml:"clientCertFile"`
-	ClientKeyFile  string `toml:"clientKeyFile"`
+	Enabled             bool       `toml:"enabled"`
+	TaskClusterPoolSize int32      `toml:"taskClusterPoolSize"`
+	TaskServicePoolSize int32      `toml:"taskServicePoolSize"`
+	ClusterName         string     `toml:"clusterName"`
+	ClusterHost         string     `toml:"clusterHost"`
+	ClusterPort         int        `toml:"clusterPort"`
+	ClusterTLS          bool       `toml:"clusterTls"`
+	ServerCertFile      string     `toml:"serverCertFile"`
+	ServerKeyFile       string     `toml:"serverKeyFile"`
+	ClientCertFile      string     `toml:"clientCertFile"`
+	ClientKeyFile       string     `toml:"clientKeyFile"`
+	StaticNodeList      []NodeInfo `toml:"staticNodeList"`
+}
+type NodeInfo struct {
+	Name string `toml:"name"`
+	Addr string `toml:"addr"`
 }
 type Connect struct {
 	Keepalive      int `toml:"keepalive"`

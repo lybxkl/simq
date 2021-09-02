@@ -13,42 +13,38 @@ const (
 )
 
 // 客户端会话
-type Session struct {
+type session struct {
 	// Ack queue for outgoing PUBLISH QoS 1 messages
 	//用于传出发布QoS 1消息的Ack队列
-	Pub1ack *Ackqueue
+	pub1ack Ackqueue
 
 	// Ack queue for incoming PUBLISH QoS 2 messages
 	//传入发布QoS 2消息的Ack队列
-	Pub2in *Ackqueue
+	pub2in Ackqueue
 
 	// Ack queue for outgoing PUBLISH QoS 2 messages
 	//用于传出发布QoS 2消息的Ack队列
-	Pub2out *Ackqueue
+	pub2out Ackqueue
 
 	// Ack queue for outgoing SUBSCRIBE messages
 	//用于发送订阅消息的Ack队列
-	Suback *Ackqueue
+	suback Ackqueue
 
 	// Ack queue for outgoing UNSUBSCRIBE messages
 	//发送取消订阅消息的Ack队列
-	Unsuback *Ackqueue
+	unsuback Ackqueue
 
 	// Ack queue for outgoing PINGREQ messages
 	//用于发送PINGREQ消息的Ack队列
-	Pingack *Ackqueue
+	pingack Ackqueue
 
 	// cmsg is the CONNECT messagev5
 	//cmsg是连接消息
-	Cmsg *messagev5.ConnectMessage
+	cmsg *messagev5.ConnectMessage
 
 	// Will messagev5 to publish if connect is closed unexpectedly
 	//如果连接意外关闭，遗嘱消息将发布
-	Will *messagev5.PublishMessage
-
-	// Retained publish messagev5
-	//保留发布消息
-	Retained *messagev5.PublishMessage
+	will *messagev5.PublishMessage
 
 	// cbuf is the CONNECT messagev5 buffer, this is for storing all the will stuff
 	//cbuf是连接消息缓冲区，用于存储所有的will内容
@@ -72,91 +68,82 @@ type Session struct {
 	id string
 }
 
-func (this *Session) Init(msg *messagev5.ConnectMessage) error {
+func NewMemSession() Session {
+	return &session{}
+}
+
+//Init 遗嘱和connect消息会存在每个session中，不用每次查询数据库的
+func (this *session) Init(msg *messagev5.ConnectMessage, topics ...SessionInitTopic) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	if this.initted {
-		return fmt.Errorf("Session already initialized")
+		return fmt.Errorf("session already initialized")
 	}
 
 	this.cbuf = make([]byte, msg.Len())
-	this.Cmsg = messagev5.NewConnectMessage()
+	this.cmsg = messagev5.NewConnectMessage()
 
 	if _, err := msg.Encode(this.cbuf); err != nil {
 		return err
 	}
 
-	if _, err := this.Cmsg.Decode(this.cbuf); err != nil {
+	if _, err := this.cmsg.Decode(this.cbuf); err != nil {
 		return err
 	}
 
-	if this.Cmsg.WillFlag() {
-		this.Will = messagev5.NewPublishMessage()
-		this.Will.SetQoS(this.Cmsg.WillQos())
-		this.Will.SetTopic(this.Cmsg.WillTopic())
-		this.Will.SetPayload(this.Cmsg.WillMessage())
-		this.Will.SetRetain(this.Cmsg.WillRetain())
+	if this.cmsg.WillFlag() {
+		this.will = messagev5.NewPublishMessage()
+		this.will.SetQoS(this.cmsg.WillQos())
+		this.will.SetTopic(this.cmsg.WillTopic())
+		this.will.SetPayload(this.cmsg.WillMessage())
+		this.will.SetRetain(this.cmsg.WillRetain())
 	}
 
 	this.topics = make(map[string]byte, 1)
 
 	this.id = string(msg.ClientId())
 
-	this.Pub1ack = newAckqueue(defaultQueueSize)
-	this.Pub2in = newAckqueue(defaultQueueSize)
-	this.Pub2out = newAckqueue(defaultQueueSize)
-	this.Suback = newAckqueue(defaultQueueSize << 2)
-	this.Unsuback = newAckqueue(defaultQueueSize << 2)
-	this.Pingack = newAckqueue(defaultQueueSize << 2)
+	this.pub1ack = newAckqueue(defaultQueueSize)
+	this.pub2in = newAckqueue(defaultQueueSize)
+	this.pub2out = newAckqueue(defaultQueueSize)
+	this.suback = newAckqueue(defaultQueueSize << 2)
+	this.unsuback = newAckqueue(defaultQueueSize << 2)
+	this.pingack = newAckqueue(defaultQueueSize << 2)
+
+	for i := 0; i < len(topics); i++ {
+		this.topics[topics[i].Topic] = topics[i].Qos
+	}
 
 	this.initted = true
 
 	return nil
 }
 
-func (this *Session) Update(msg *messagev5.ConnectMessage) error {
+func (this *session) Update(msg *messagev5.ConnectMessage) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	this.cbuf = make([]byte, msg.Len())
-	this.Cmsg = messagev5.NewConnectMessage()
+	this.cmsg = messagev5.NewConnectMessage()
 
 	if _, err := msg.Encode(this.cbuf); err != nil {
 		return err
 	}
 
-	if _, err := this.Cmsg.Decode(this.cbuf); err != nil {
+	if _, err := this.cmsg.Decode(this.cbuf); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (this *Session) RetainMessage(msg *messagev5.PublishMessage) error {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-
-	this.rbuf = make([]byte, msg.Len())
-	this.Retained = messagev5.NewPublishMessage()
-
-	if _, err := msg.Encode(this.rbuf); err != nil {
-		return err
-	}
-
-	if _, err := this.Retained.Decode(this.rbuf); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (this *Session) AddTopic(topic string, qos byte) error {
+func (this *session) AddTopic(topic string, qos byte) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	if !this.initted {
-		return fmt.Errorf("Session not yet initialized")
+		return fmt.Errorf("session not yet initialized")
 	}
 
 	this.topics[topic] = qos
@@ -164,12 +151,12 @@ func (this *Session) AddTopic(topic string, qos byte) error {
 	return nil
 }
 
-func (this *Session) RemoveTopic(topic string) error {
+func (this *session) RemoveTopic(topic string) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	if !this.initted {
-		return fmt.Errorf("Session not yet initialized")
+		return fmt.Errorf("session not yet initialized")
 	}
 
 	delete(this.topics, topic)
@@ -177,12 +164,12 @@ func (this *Session) RemoveTopic(topic string) error {
 	return nil
 }
 
-func (this *Session) Topics() ([]string, []byte, error) {
+func (this *session) Topics() ([]string, []byte, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	if !this.initted {
-		return nil, nil, fmt.Errorf("Session not yet initialized")
+		return nil, nil, fmt.Errorf("session not yet initialized")
 	}
 
 	var (
@@ -198,9 +185,67 @@ func (this *Session) Topics() ([]string, []byte, error) {
 	return topics, qoss, nil
 }
 
-func (this *Session) ID() string {
-	return string(this.Cmsg.ClientId())
+func (this *session) ID() string {
+	return string(this.Cmsg().ClientId())
 }
-func (this *Session) IDs() []byte {
-	return this.Cmsg.ClientId()
+func (this *session) IDs() []byte {
+	return this.Cmsg().ClientId()
+}
+
+func (this *session) Cmsg() *messagev5.ConnectMessage {
+	return this.cmsg
+}
+
+func (this *session) Will() *messagev5.PublishMessage {
+	return this.will
+}
+
+func (this *session) Pub1ack() Ackqueue {
+	return this.pub1ack
+}
+
+func (this *session) Pub2in() Ackqueue {
+	return this.pub2in
+}
+
+func (this *session) Pub2out() Ackqueue {
+	return this.pub2out
+}
+
+func (this *session) Suback() Ackqueue {
+	return this.suback
+}
+
+func (this *session) Unsuback() Ackqueue {
+	return this.unsuback
+}
+
+func (this *session) Pingack() Ackqueue {
+	return this.pingack
+}
+
+type SessionInitTopic struct {
+	Topic string
+	Qos   byte
+}
+type Session interface {
+	Init(msg *messagev5.ConnectMessage, topics ...SessionInitTopic) error
+	Update(msg *messagev5.ConnectMessage) error
+
+	AddTopic(topic string, qos byte) error
+	RemoveTopic(topic string) error
+	Topics() ([]string, []byte, error)
+
+	ID() string
+	IDs() []byte
+
+	Cmsg() *messagev5.ConnectMessage
+	Will() *messagev5.PublishMessage
+
+	Pub1ack() Ackqueue
+	Pub2in() Ackqueue
+	Pub2out() Ackqueue
+	Suback() Ackqueue
+	Unsuback() Ackqueue
+	Pingack() Ackqueue
 }

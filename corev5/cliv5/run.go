@@ -34,6 +34,7 @@ func Run() {
 	conCif := cfg.DefaultConfig.Connect
 	proCif := cfg.DefaultConfig.Provider
 	authPlusCif := cfg.DefaultConfig.Auth
+
 	svr := &servicev5.Server{
 		ConFig:           &cfg,
 		KeepAlive:        conCif.Keepalive,
@@ -97,7 +98,6 @@ func Run() {
 			go ListenAndServeWebsocketSecure(wssAddr, cfg.Broker.WssCertPath, cfg.Broker.WssKeyPath)
 		}
 	}
-
 	/* create plain MQTT listener */
 	err = svr.ListenAndServe(mqttaddr)
 	if err != nil {

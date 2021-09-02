@@ -2,6 +2,7 @@ package servicev5
 
 import (
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
@@ -32,6 +33,10 @@ var (
 )
 
 type service struct {
+	clusterBelong bool // 集群特殊使用的标记
+
+	clusterOpen bool // 是否开启了集群
+
 	// The ID of this service, it's not related to the Client ID, just a number that's
 	// incremented for every new service.
 	//这个服务的ID，它与客户ID无关，只是一个数字而已
@@ -85,7 +90,7 @@ type service struct {
 	// such as ClientId, KeepAlive, Username, etc
 	// sess是这个MQTT会话的会话对象。它跟踪会话变量
 	//比如ClientId, KeepAlive，用户名等
-	sess *sessionsv5.Session
+	sess sessionsv5.Session
 
 	// Wait for the various goroutines to finish starting and stopping
 	//等待各种goroutines完成启动和停止
@@ -128,9 +133,10 @@ type service struct {
 	intmp  []byte
 	outtmp []byte
 
-	subs  []interface{}
-	qoss  []byte
 	rmsgs []*messagev5.PublishMessage
+
+	clusterClient     *sync.Map // name --> *client.Client
+	shareTopicMapNode cluster.ShareTopicMapNode
 }
 
 func (this *service) start() error {
@@ -257,9 +263,9 @@ func (this *service) stop() {
 	}
 	//如果设置了遗嘱消息，则发送遗嘱消息
 	// Publish will messagev5 if WillFlag is set. Server side only.
-	if !this.client && this.sess.Cmsg.WillFlag() {
+	if !this.client && this.sess.Cmsg().WillFlag() {
 		logger.Logger.Infof("(%s) service/stop: connection unexpectedly closed. Sending Will：.", this.cid())
-		this.onPublish(this.sess.Will)
+		this.onPublish(this.sess.Will())
 	}
 	//移除这个客户端的主题管理
 	// Remove the client topicsv5 manager
@@ -268,7 +274,7 @@ func (this *service) stop() {
 	}
 	//如果该客户端支持清除session，则清除
 	// Remove the session from session store if it's suppose to be clean session
-	if this.sess.Cmsg.CleanSession() && this.sessMgr != nil {
+	if this.sess.Cmsg().CleanSession() && this.sessMgr != nil {
 		this.sessMgr.Del(this.sess.ID())
 	}
 
@@ -293,10 +299,10 @@ func (this *service) publish(msg *messagev5.PublishMessage, onComplete OnComplet
 		return nil
 
 	case messagev5.QosAtLeastOnce:
-		return this.sess.Pub1ack.Wait(msg, onComplete)
+		return this.sess.Pub1ack().Wait(msg, onComplete)
 
 	case messagev5.QosExactlyOnce:
-		return this.sess.Pub2out.Wait(msg, onComplete)
+		return this.sess.Pub2out().Wait(msg, onComplete)
 	}
 
 	return nil
@@ -379,7 +385,7 @@ func (this *service) subscribe(msg *messagev5.SubscribeMessage, onComplete OnCom
 		return err2
 	}
 
-	return this.sess.Suback.Wait(msg, onc)
+	return this.sess.Suback().Wait(msg, onc)
 }
 
 func (this *service) unsubscribe(msg *messagev5.UnsubscribeMessage, onComplete OnCompleteFunc) error {
@@ -441,7 +447,7 @@ func (this *service) unsubscribe(msg *messagev5.UnsubscribeMessage, onComplete O
 		return err2
 	}
 
-	return this.sess.Unsuback.Wait(msg, onc)
+	return this.sess.Unsuback().Wait(msg, onc)
 }
 
 func (this *service) ping(onComplete OnCompleteFunc) error {
@@ -452,7 +458,7 @@ func (this *service) ping(onComplete OnCompleteFunc) error {
 		return fmt.Errorf("(%s) Error sending %s messagev5: %v", this.cid(), msg.Name(), err)
 	}
 
-	return this.sess.Pingack.Wait(msg, onComplete)
+	return this.sess.Pingack().Wait(msg, onComplete)
 }
 
 func (this *service) isDone() bool {

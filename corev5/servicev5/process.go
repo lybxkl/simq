@@ -3,6 +3,7 @@ package servicev5
 import (
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
@@ -102,12 +103,12 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.PubackMessage:
 		// For PUBACK messagev5, it means QoS 1, we should send to ack queue
-		this.sess.Pub1ack.Ack(msg)
-		this.processAcked(this.sess.Pub1ack)
+		this.sess.Pub1ack().Ack(msg)
+		this.processAcked(this.sess.Pub1ack())
 
 	case *messagev5.PubrecMessage:
 		// For PUBREC messagev5, it means QoS 2, we should send to ack queue, and send back PUBREL
-		if err = this.sess.Pub2out.Ack(msg); err != nil {
+		if err = this.sess.Pub2out().Ack(msg); err != nil {
 			break
 		}
 
@@ -117,11 +118,11 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.PubrelMessage:
 		// For PUBREL messagev5, it means QoS 2, we should send to ack queue, and send back PUBCOMP
-		if err = this.sess.Pub2in.Ack(msg); err != nil {
+		if err = this.sess.Pub2in().Ack(msg); err != nil {
 			break
 		}
 
-		this.processAcked(this.sess.Pub2in)
+		this.processAcked(this.sess.Pub2in())
 
 		resp := messagev5.NewPubcompMessage()
 		resp.SetPacketId(msg.PacketId())
@@ -129,11 +130,11 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.PubcompMessage:
 		// For PUBCOMP messagev5, it means QoS 2, we should send to ack queue
-		if err = this.sess.Pub2out.Ack(msg); err != nil {
+		if err = this.sess.Pub2out().Ack(msg); err != nil {
 			break
 		}
 
-		this.processAcked(this.sess.Pub2out)
+		this.processAcked(this.sess.Pub2out())
 
 	case *messagev5.SubscribeMessage:
 		// For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
@@ -142,8 +143,8 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.SubackMessage:
 		// For SUBACK messagev5, we should send to ack queue
-		this.sess.Suback.Ack(msg)
-		this.processAcked(this.sess.Suback)
+		this.sess.Suback().Ack(msg)
+		this.processAcked(this.sess.Suback())
 
 	case *messagev5.UnsubscribeMessage:
 		// For UNSUBSCRIBE messagev5, we should remove subscriber, then send back UNSUBACK
@@ -151,8 +152,8 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.UnsubackMessage:
 		// For UNSUBACK messagev5, we should send to ack queue
-		this.sess.Unsuback.Ack(msg)
-		this.processAcked(this.sess.Unsuback)
+		this.sess.Unsuback().Ack(msg)
+		this.processAcked(this.sess.Unsuback())
 
 	case *messagev5.PingreqMessage:
 		// For PINGREQ messagev5, we should send back PINGRESP
@@ -160,13 +161,13 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 		_, err = this.writeMessage(resp)
 
 	case *messagev5.PingrespMessage:
-		this.sess.Pingack.Ack(msg)
-		this.processAcked(this.sess.Pingack)
+		this.sess.Pingack().Ack(msg)
+		this.processAcked(this.sess.Pingack())
 
 	case *messagev5.DisconnectMessage:
 		// For DISCONNECT messagev5, we should quit
 		// 主动断开连接，不需要发送will消息，这里直接设置为false，外面处理就不会发送will了
-		this.sess.Cmsg.SetWillFlag(false)
+		this.sess.Cmsg().SetWillFlag(false)
 		return errDisconnect
 
 	default:
@@ -180,7 +181,7 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 	return err
 }
 
-func (this *service) processAcked(ackq *sessionsv5.Ackqueue) {
+func (this *service) processAcked(ackq sessionsv5.Ackqueue) {
 	for _, ackmsg := range ackq.Acked() {
 		// Let's get the messages from the saved messagev5 byte slices.
 		//让我们从保存的消息字节片获取消息。
@@ -190,14 +191,21 @@ func (this *service) processAcked(ackq *sessionsv5.Ackqueue) {
 			continue
 		}
 
-		if _, err := msg.Decode(ackmsg.Msgbuf); err != nil {
-			logger.Logger.Errorf("process/processAcked: Unable to decode %s messagev5: %v", ackmsg.Mtype, err)
-			continue
+		if msg.Type() != messagev5.PINGREQ {
+			if _, err := msg.Decode(ackmsg.Msgbuf); err != nil {
+				logger.Logger.Errorf("process/processAcked: Unable to decode %s messagev5: %v", ackmsg.Mtype, err)
+				continue
+			}
 		}
 
 		ack, err := ackmsg.State.New()
 		if err != nil {
 			logger.Logger.Errorf("process/processAcked: Unable to creating new %s messagev5: %v", ackmsg.State, err)
+			continue
+		}
+
+		if ack.Type() == messagev5.PINGRESP {
+			logger.Logger.Debug("process/processAcked: PINGRESP")
 			continue
 		}
 
@@ -228,7 +236,7 @@ func (this *service) processAcked(ackq *sessionsv5.Ackqueue) {
 				logger.Logger.Errorf("(%s) Error processing ack'ed %s messagev5: %v", this.cid(), ackmsg.Mtype, err)
 			}
 
-		case messagev5.PUBACK, messagev5.PUBCOMP, messagev5.SUBACK, messagev5.UNSUBACK, messagev5.PINGRESP:
+		case messagev5.PUBACK, messagev5.PUBCOMP, messagev5.SUBACK, messagev5.UNSUBACK:
 			logger.Logger.Debugf("process/processAcked: %s", ack)
 			// If ack is PUBACK, that means the QoS 1 messagev5 sent by this service got
 			// ack'ed. There's nothing to do other than calling onComplete() below.
@@ -252,8 +260,7 @@ func (this *service) processAcked(ackq *sessionsv5.Ackqueue) {
 
 			// If ack is PINGRESP, that means the PINGREQ messagev5 sent by this service
 			// got ack'ed. There's nothing to do other than calling onComplete() below.
-			//如果ack是PINGRESP，则表示此服务发送的PINGREQ消息
-			//得到“消”。除了调用下面的onComplete()之外，没有什么可以做的。
+			// PINGRESP 直接跳过了，因为发送ping时，我们选择了不保存ping数据，所以这里无法验证
 			err = nil
 
 		default:
@@ -287,7 +294,7 @@ func (this *service) processPublish(msg *messagev5.PublishMessage) error {
 
 	switch msg.QoS() {
 	case messagev5.QosExactlyOnce:
-		this.sess.Pub2in.Wait(msg, nil)
+		this.sess.Pub2in().Wait(msg, nil)
 
 		resp := messagev5.NewPubrecMessage()
 		resp.SetPacketId(msg.PacketId())
@@ -311,6 +318,8 @@ func (this *service) processPublish(msg *messagev5.PublishMessage) error {
 
 	return fmt.Errorf("(%s) invalid messagev5 QoS %d.", this.cid(), msg.QoS())
 }
+
+var sharePrefix = []byte("$share/")
 
 // For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
 func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
@@ -343,7 +352,6 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 
 		/**
 		* 可以在这里向其它集群节点发送添加主题消息
-		* 我选择带缓存的channel
 		**/
 
 	}
@@ -356,6 +364,7 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 		return err
 	}
 
+	this.processToCluster(topics, msg)
 	for _, rm := range this.rmsgs {
 		// TODO
 		old := rm.QoS()
@@ -381,9 +390,6 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 	for _, t := range topics {
 		this.topicsMgr.Unsubscribe(t, &this.onpub)
 		this.sess.RemoveTopic(string(t))
-		/**
-		* 可以在这里向其它节点发送移除主题消息
-		**/
 	}
 
 	resp := messagev5.NewUnsubackMessage()
@@ -391,9 +397,58 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 	resp.AddReasonCode(messagev5.Success.Value())
 
 	_, err := this.writeMessage(resp)
+	if err != nil {
+		return err
+	}
 
+	this.processToCluster(topics, msg)
 	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", this.cid(), topics)
-	return err
+	return nil
+}
+
+// processToCluster 分主题发送到其它节点发送
+func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
+	if !this.clusterOpen {
+		return
+	}
+	tag := len(topics)
+	for i := 0; i < len(topics); i++ {
+		if len(topics[i]) < 10 { // $share/{shareName}/{topic} 至少长度为9，即其中shareName不能为空，topic也不能为空
+			tag--
+			continue
+		}
+		for j := 0; j < len(sharePrefix); j++ {
+			if topics[i][j] != sharePrefix[j] {
+				tag--
+				break
+			}
+		}
+		// 共享名称组
+		k := 0
+		for j := len(sharePrefix); j < len(topics[i]); j++ {
+			if topics[i][j] == '/' {
+				k = j
+				break
+			}
+		}
+		if k == len(sharePrefix) || k == len(topics[i])-1 {
+			tag--
+			continue
+		}
+		switch msg.Type() {
+		case messagev5.SUBSCRIBE:
+			// 添加本地集群共享订阅
+			this.shareTopicMapNode.AddTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
+			logger.Logger.Debugf("添加本地集群共享订阅：%s,%s,%s", topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
+		case messagev5.UNSUBSCRIBE:
+			// 删除本地集群共享订阅
+			this.shareTopicMapNode.RemoveTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
+			logger.Logger.Debugf("删除本地集群共享订阅：%s,%s,%s", topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
+		}
+	}
+	if tag > 0 { // 确实是有共享主题，才发送到集群其它节点
+		this.sendCluster(msg) // 发送到其它节点，不需要qos处理的，TODO 但是需要考虑session相关问题
+	}
 }
 
 // onPublish() is called when the server receives a PUBLISH messagev5 AND have completed
@@ -408,30 +463,126 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
 		}
 	}
-	// todo 集群模式，需要另外设计
-	// 发送当前主题的所有共享组
-	err := this.pubFnPlus(msg1)
-	if err != nil {
-		logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
+	b := make([]byte, msg1.Len())
+	_, _ = msg1.Encode(b)                   // 这里没有选择直接拿msg内的buf
+	tmpMsg := messagev5.NewPublishMessage() // 必须重新弄一个，防止被下面改动qos引起bug
+	_, _ = tmpMsg.Decode(b)
+	this.sendShareToCluster(tmpMsg)
+	this.sendCluster(tmpMsg)
+
+	// 发送非共享订阅主题, 这里面会改动qos
+	return this.pubFn(msg1, "", false)
+}
+
+// 发送共享主题到集群其它节点去，以共享组的方式发送
+func (this *service) sendShareToCluster(msg1 *messagev5.PublishMessage) {
+	if !this.clusterOpen {
+		// 没开集群，就只要发送到当前节点下就行
+		// 发送当前主题的所有共享组
+		err := this.pubFnPlus(msg1)
+		if err != nil {
+			logger.Logger.Errorf("%v 发送共享：%v 主题错误：%+v", this.id, msg1.Topic(), *msg1)
+		}
+		return
+	}
+	submit(func() {
+		// 发送共享主题消息
+		sn, err := this.shareTopicMapNode.GetShareNames(msg1.Topic())
+		if err != nil {
+			logger.Logger.Errorf("%v 获取主题%s共享组错误:%v", this.id, msg1.Topic(), err)
+			return
+		}
+		for shareName, node := range sn {
+			if node == GetServerName() {
+				err = this.pubFn(msg1, shareName, true)
+				if err != nil {
+					// FIXME 错误处理
+				}
+			} else {
+				colong.SendMsgToCluster(msg1, shareName, node, nil, nil, nil)
+			}
+		}
+	})
+}
+
+// 发送到集群其它节点去
+func (this *service) sendCluster(message messagev5.Message) {
+	if !this.clusterOpen {
+		return
+	}
+	submit(func() {
+		colong.SendMsgToCluster(message, "", "", func(message messagev5.Message) {
+
+		}, func(name string, message messagev5.Message) {
+
+		}, func(name string, message messagev5.Message) {
+
+		})
+	})
+}
+
+// 集群节点发来的普通消息
+func (this *service) ClusterInToPub(msg1 *messagev5.PublishMessage) error {
+	if !this.clusterBelong {
+		return nil
+	}
+	if msg1.Retain() {
+		if err := this.topicsMgr.Retain(msg1); err != nil { // 为这个主题保存最后一条保留消息
+			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
+		}
 	}
 	// 发送非共享订阅主题
 	return this.pubFn(msg1, "", false)
 }
+
+// 集群节点发来的共享主题消息，需要发送到特定的共享组 和 普通节点
+func (this *service) ClusterInToPubShare(msg1 *messagev5.PublishMessage, shareName string) error {
+	if !this.clusterBelong {
+		return nil
+	}
+	if msg1.Retain() {
+		if err := this.topicsMgr.Retain(msg1); err != nil { // 为这个主题保存最后一条保留消息
+			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
+		}
+	}
+	// 发送非共享订阅主题
+	return this.pubFn(msg1, shareName, false)
+}
+
+// 集群节点发来的系统主题消息
+func (this *service) ClusterInToPubSys(msg1 *messagev5.PublishMessage) error {
+	if !this.clusterBelong {
+		return nil
+	}
+	if msg1.Retain() {
+		if err := this.topicsMgr.Retain(msg1); err != nil { // 为这个主题保存最后一条保留消息
+			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
+		}
+	}
+	// 发送
+	return this.pubFnSys(msg1)
+}
+
 func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, onlyShare bool) error {
-	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, false, shareName, onlyShare)
+	var (
+		subs []interface{}
+		qoss []byte
+	)
+
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, shareName, onlyShare)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", this.cid(), err)
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to topic %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs), shareName)
-	for i, s := range this.subs {
+	logger.Logger.Debugf("(%s) Publishing to topic %s and %s subscribers：%v", this.cid(), msg.Topic(), shareName, len(subs))
+	for i, s := range subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(this.qoss[i]) // 设置为该发的qos级别
+				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
 				err = (*fn)(msg)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
@@ -441,21 +592,57 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 	}
 	return nil
 }
+
+// 发送当前主题所有共享组
 func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
-	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &this.subs, &this.qoss, false, "", true)
+	var (
+		subs []interface{}
+		qoss []byte
+	)
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, "", true)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", this.cid(), err)
 		return err
 	}
 	msg.SetRetain(false)
-	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs))
-	for i, s := range this.subs {
+	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s to subscribers：%v", this.cid(), msg.Topic(), subs)
+	for i, s := range subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(this.qoss[i]) // 设置为该发的qos级别
+				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
+				err = (*fn)(msg)
+				if err == io.EOF {
+					// TODO 断线了，是否对于qos=1和2的保存至离线消息
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// 发送系统消息
+func (this *service) pubFnSys(msg *messagev5.PublishMessage) error {
+	var (
+		subs []interface{}
+		qoss []byte
+	)
+	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, true, "", false)
+	if err != nil {
+		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", this.cid(), err)
+		return err
+	}
+	msg.SetRetain(false)
+	logger.Logger.Debugf("(%s) Publishing sys topic %s to subscribers：%v", this.cid(), msg.Topic(), subs)
+	for i, s := range subs {
+		if s != nil {
+			fn, ok := s.(*OnPublishFunc)
+			if !ok {
+				return fmt.Errorf("Invalid onPublish Function")
+			} else {
+				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
 				err = (*fn)(msg)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息

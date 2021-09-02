@@ -424,7 +424,7 @@ func (this *service) pubFn(msg *message.PublishMessage, shareName string, onlySh
 		return err
 	}
 	msg.SetRetain(false)
-	logger2.Logger.Debugf("(%s) Publishing to topic %s and %d subscribers：%v", this.cid(), msg.Topic(), len(this.subs), shareName)
+	logger2.Logger.Debugf("(%s) Publishing to topic %s and %s subscribers size ：%v", this.cid(), msg.Topic(), shareName, len(this.subs))
 	for i, s := range this.subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)

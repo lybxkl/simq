@@ -6,9 +6,51 @@ import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/logger"
+	"github.com/panjf2000/ants/v2"
 	"io"
 	"net"
 )
+
+var (
+	taskGPool     *ants.Pool
+	taskGPoolSize = 1000
+)
+
+func InitServiceTaskPool(poolSize int) (close io.Closer) {
+	if poolSize < 100 {
+		poolSize = 100
+	}
+	taskGPool, _ = ants.NewPool(poolSize, ants.WithPanicHandler(func(i interface{}) {
+		logger.Logger.Errorf("协程池处理错误：%v", i)
+	}), ants.WithMaxBlockingTasks(poolSize*2))
+	taskGPoolSize = poolSize
+	return &closer{}
+}
+
+type closer struct {
+}
+
+func (closer closer) Close() error {
+	taskGPool.Release()
+	return nil
+}
+func submit(f func()) {
+	dealAntsErr(taskGPool.Submit(f))
+}
+func dealAntsErr(err error) {
+	if err == nil {
+		return
+	}
+	if errors.Is(err, ants.ErrPoolClosed) {
+		logger.Logger.Errorf("协程池错误：%v", err.Error())
+		taskGPool.Reboot()
+	}
+	if errors.Is(err, ants.ErrPoolOverload) {
+		logger.Logger.Errorf("协程池超载：%v", err.Error())
+		taskGPool.Tune(int(float64(taskGPoolSize) * 1.25))
+	}
+	logger.Logger.Errorf("线程池处理异常：%v", err)
+}
 
 func getConnectMessage(conn io.Closer) (*messagev5.ConnectMessage, error) {
 	buf, err := getMessageBuffer(conn)

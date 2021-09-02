@@ -15,24 +15,24 @@ func memProviderInit() {
 }
 
 type memProvider struct {
-	st map[string]*Session
+	st map[string]Session
 	mu sync.RWMutex
 }
 
 func NewMemProvider() *memProvider {
 	return &memProvider{
-		st: make(map[string]*Session),
+		st: make(map[string]Session),
 	}
 }
 
-func (this *memProvider) New(id string) (*Session, error) {
+func (this *memProvider) New(id string) (Session, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
-	this.st[id] = &Session{id: id}
+	this.st[id] = &session{id: id}
 	return this.st[id], nil
 }
 
-func (this *memProvider) Get(id string) (*Session, error) {
+func (this *memProvider) Get(id string) (Session, error) {
 	this.mu.RLock()
 	defer this.mu.RUnlock()
 
@@ -59,6 +59,6 @@ func (this *memProvider) Count() int {
 }
 
 func (this *memProvider) Close() error {
-	this.st = make(map[string]*Session)
+	this.st = make(map[string]Session)
 	return nil
 }

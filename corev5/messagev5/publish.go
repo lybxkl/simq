@@ -184,7 +184,7 @@ func (this *PublishMessage) SetQoS(v byte) error {
 	}
 
 	this.mtypeflags[0] = (this.mtypeflags[0] & 249) | (v << 1) // 249 = 11111001
-
+	this.dirty = true
 	return nil
 }
 

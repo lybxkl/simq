@@ -3,6 +3,10 @@ package servicev5
 import (
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/client"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/server"
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
@@ -12,6 +16,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,6 +32,11 @@ var (
 	ErrBufferInsufficientData error = errors.New("service: buffer has insufficient data.") //缓冲区数据不足。
 )
 var SVC *service
+var serverName string
+
+func GetServerName() string {
+	return serverName
+}
 
 // Server is a library implementation of the MQTT server that, as best it can, complies
 // with the MQTT 3.1 and 3.1.1 specs.
@@ -131,8 +141,19 @@ type Server struct {
 	//指示此服务器是否已检查配置
 	configOnce sync.Once
 
+	ClusterDiscover   cluster.NodeDiscover
+	ClusterServer     *server.Server
+	ClusterClient     *sync.Map // name --> *client.Client
+	ShareTopicMapNode cluster.ShareTopicMapNode
+
 	subs []interface{}
 	qoss []byte
+
+	close []io.Closer
+}
+
+func (s *Server) TopicProvider() *topicsv5.Manager {
+	return s.topicsMgr
 }
 
 // ListenAndServe listents to connections on the URI requested, and handles any
@@ -153,6 +174,8 @@ func (this *Server) ListenAndServe(uri string) error {
 	if !atomic.CompareAndSwapInt32(&this.running, 0, 1) {
 		return fmt.Errorf("server/ListenAndServe: Server is already running")
 	}
+	serverName = this.ConFig.Cluster.ClusterName
+
 	this.quit = make(chan struct{})
 
 	u, err := url.Parse(uri)
@@ -164,6 +187,9 @@ func (this *Server) ListenAndServe(uri string) error {
 	if err != nil {
 		panic(err)
 	}
+
+	this.RunClusterComp()
+
 	printBanner(this.Version)
 	var tempDelay time.Duration // how long to sleep on accept failure 接受失败要睡多久，默认5ms，最大1s
 
@@ -213,6 +239,39 @@ func (this *Server) ListenAndServe(uri string) error {
 		}()
 	}
 }
+func (this *Server) RunClusterComp() {
+	cfg := this.ConFig
+	if cfg.Cluster.Enabled { // 集群服务启动
+
+		this.AddCloser(colong.InitClusterTaskPool(int(cfg.Cluster.TaskClusterPoolSize)))
+		this.AddCloser(InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize)))
+
+		// colong.UpdateLogger(logger.Logger) // 可以替换为通用日志
+		colong.SetLoggerLevelInfo() // 设置集群服务的日志等级
+
+		staticDisc := make(map[string]cluster.Node)
+		for _, v := range cfg.Cluster.StaticNodeList {
+			if v.Name == cfg.Cluster.ClusterName { // 跳过自己，这样就不用在配置文件中单独设置不同的数据了
+				continue
+			}
+			staticDisc[v.Name] = cluster.Node{
+				NNA:  v.Name,
+				Addr: v.Addr,
+			}
+		}
+		this.ClusterDiscover = cluster.NewStaticNodeDiscover(staticDisc)
+		this.ShareTopicMapNode = cluster.NewShareMap()
+		svc := this.NewService() // 单独service用来处理集群来的消息
+		this.ClusterServer = server.RunClusterServer(cfg.Cluster.ClusterName,
+			cfg.Cluster.ClusterHost+":"+strconv.Itoa(cfg.Cluster.ClusterPort),
+			svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode)
+		this.ClusterClient = &sync.Map{}
+		for name, node := range this.ClusterDiscover.GetNodeMap() {
+			go this.ClusterClient.Store(name, client.RunClient(cfg.Cluster.ClusterName, name, node.Addr,
+				1, true, 1000))
+		}
+	}
+}
 
 // 打印启动banner
 func printBanner(serverVersion string) {
@@ -252,6 +311,10 @@ func printBanner(serverVersion string) {
 		"服务器准备就绪: server is ready... version: " + serverVersion)
 }
 
+func (this *Server) AddCloser(close io.Closer) {
+	this.close = append(this.close, close)
+}
+
 // Close terminates the server by shutting down all the client connections and closing
 // the listener. It will, as best it can, clean up after itself.
 func (this *Server) Close() error {
@@ -280,7 +343,17 @@ func (this *Server) Close() error {
 	}
 	// 后面不会执行到，不知道为啥
 	// TODO 将当前节点上的客户端数据保存持久化到mysql或者redis都行，待这些客户端重连集群时，可以搜索到旧session，也要考虑是否和客户端连接时的cleanSession有绑定
+	for i := 0; i < len(this.close); i++ {
+		this.close[i].Close()
+	}
 	return nil
+}
+func (this *Server) NewService() *service {
+	return &service{
+		sessMgr:       this.sessMgr,
+		topicsMgr:     this.topicsMgr,
+		clusterBelong: true,
+	}
 }
 
 // HandleConnection is for the broker to handle an incoming connection from a client
@@ -413,8 +486,9 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		req.SetKeepAlive(uint16(this.KeepAlive))
 	}
 	svc = &service{
-		id:     atomic.AddUint64(&gsvcid, 1),
-		client: false,
+		id:          atomic.AddUint64(&gsvcid, 1),
+		client:      false,
+		clusterOpen: this.ConFig.Cluster.Enabled,
 
 		keepAlive:      int(req.KeepAlive()),
 		writeTimeout:   this.WriteTimeout,
@@ -422,9 +496,11 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		ackTimeout:     this.AckTimeout,
 		timeoutRetries: this.TimeoutRetries,
 
-		conn:      conn,
-		sessMgr:   this.sessMgr,
-		topicsMgr: this.topicsMgr,
+		conn:              conn,
+		sessMgr:           this.sessMgr,
+		topicsMgr:         this.topicsMgr,
+		clusterClient:     this.ClusterClient,
+		shareTopicMapNode: this.ShareTopicMapNode,
 	}
 	err = this.getSession(svc, req, resp)
 	if err != nil {

@@ -262,7 +262,7 @@ func (this *Client) Disconnect() {
 
 func (this *Client) getSession(svc *service, req *messagev5.ConnectMessage, resp *messagev5.ConnackMessage) error {
 	//id := string(req.ClientId())
-	svc.sess = &sessionsv5.Session{}
+	svc.sess = sessionsv5.NewMemSession()
 	return svc.sess.Init(req)
 }
 

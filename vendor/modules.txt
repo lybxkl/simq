@@ -1,0 +1,105 @@
+# github.com/BurntSushi/toml v0.3.1
+## explicit
+github.com/BurntSushi/toml
+# github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
+github.com/StackExchange/wmi
+# github.com/apache/dubbo-getty v1.4.5
+## explicit
+github.com/apache/dubbo-getty
+# github.com/buguang01/util v1.1.14
+## explicit
+github.com/buguang01/util
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
+# github.com/dubbogo/gost v1.11.12
+## explicit
+github.com/dubbogo/gost/bytes
+github.com/dubbogo/gost/context
+github.com/dubbogo/gost/net
+github.com/dubbogo/gost/path/filepath
+github.com/dubbogo/gost/runtime
+github.com/dubbogo/gost/sync
+github.com/dubbogo/gost/time
+# github.com/garyburd/redigo v1.6.2
+## explicit
+github.com/garyburd/redigo/internal
+github.com/garyburd/redigo/redis
+# github.com/go-ole/go-ole v1.2.4
+github.com/go-ole/go-ole
+github.com/go-ole/go-ole/oleutil
+# github.com/go-redis/redis v6.15.9+incompatible
+## explicit
+github.com/go-redis/redis
+github.com/go-redis/redis/internal
+github.com/go-redis/redis/internal/consistenthash
+github.com/go-redis/redis/internal/hashtag
+github.com/go-redis/redis/internal/pool
+github.com/go-redis/redis/internal/proto
+github.com/go-redis/redis/internal/util
+# github.com/go-sql-driver/mysql v1.6.0
+github.com/go-sql-driver/mysql
+# github.com/golang/snappy v0.0.1
+github.com/golang/snappy
+# github.com/gorilla/websocket v1.4.2
+github.com/gorilla/websocket
+# github.com/jinzhu/inflection v1.0.0
+github.com/jinzhu/inflection
+# github.com/jinzhu/now v1.1.2
+github.com/jinzhu/now
+# github.com/onsi/gomega v1.14.0
+## explicit
+# github.com/panjf2000/ants/v2 v2.4.6
+## explicit
+github.com/panjf2000/ants/v2
+github.com/panjf2000/ants/v2/internal
+# github.com/pkg/errors v0.9.1
+github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
+# github.com/shirou/gopsutil v3.20.11+incompatible
+github.com/shirou/gopsutil/cpu
+github.com/shirou/gopsutil/internal/common
+github.com/shirou/gopsutil/mem
+github.com/shirou/gopsutil/net
+github.com/shirou/gopsutil/process
+# github.com/stretchr/testify v1.7.0
+## explicit
+github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
+# github.com/valyala/fastrand v1.0.0
+## explicit
+github.com/valyala/fastrand
+# go.uber.org/atomic v1.7.0
+go.uber.org/atomic
+# go.uber.org/multierr v1.6.0
+go.uber.org/multierr
+# go.uber.org/zap v1.18.1
+## explicit
+go.uber.org/zap
+go.uber.org/zap/buffer
+go.uber.org/zap/internal/bufferpool
+go.uber.org/zap/internal/color
+go.uber.org/zap/internal/exit
+go.uber.org/zap/zapcore
+# golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+## explicit
+golang.org/x/net/websocket
+# golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
+## explicit
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+gopkg.in/yaml.v3
+# gorm.io/driver/mysql v1.1.2
+## explicit
+gorm.io/driver/mysql
+# gorm.io/gorm v1.21.13
+## explicit
+gorm.io/gorm
+gorm.io/gorm/callbacks
+gorm.io/gorm/clause
+gorm.io/gorm/logger
+gorm.io/gorm/migrator
+gorm.io/gorm/schema
+gorm.io/gorm/utils

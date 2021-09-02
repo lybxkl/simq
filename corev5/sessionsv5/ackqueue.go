@@ -43,10 +43,10 @@ type ackmsg struct {
 	OnComplete interface{}
 }
 
-// Ackqueue is a growing queue implemented based on a ring buffer. As the buffer
+// ackqueue is a growing queue implemented based on a ring buffer. As the buffer
 // gets full, it will auto-grow.
 //
-// Ackqueue is used to store messages that are waiting for acks to come back. There
+// ackqueue is used to store messages that are waiting for acks to come back. There
 // are a few scenarios in which acks are required.
 //   1. Client sends SUBSCRIBE messagev5 to server, waits for SUBACK.
 //   2. Client sends UNSUBSCRIBE messagev5 to server, waits for UNSUBACK.
@@ -77,7 +77,7 @@ type ackmsg struct {
 // 9。 客户端发送PUBREC消息到服务器，等待PUBREL。
 // 10。 服务器向客户端发送PUBREL消息，等待PUBCOMP。
 // 11。 客户端发送PINGREQ消息到服务器，等待PINGRESP。
-type Ackqueue struct {
+type ackqueue struct {
 	size  int64
 	mask  int64
 	count int64
@@ -94,13 +94,13 @@ type Ackqueue struct {
 	mu sync.Mutex
 }
 
-func newAckqueue(n int) *Ackqueue {
+func newAckqueue(n int) Ackqueue {
 	m := int64(n)
 	if !powerOfTwo64(m) {
 		m = roundUpPowerOfTwo64(m)
 	}
 
-	return &Ackqueue{
+	return &ackqueue{
 		size:    m,
 		mask:    m - 1,
 		count:   0,
@@ -116,7 +116,7 @@ func newAckqueue(n int) *Ackqueue {
 // ack messagev5 to be received.
 // Wait()将消息复制到一个等待队列中，并等待相应的消息
 // ack消息被接收。
-func (this *Ackqueue) Wait(msg messagev5.Message, onComplete interface{}) error {
+func (this *ackqueue) Wait(msg messagev5.Message, onComplete interface{}) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -153,7 +153,7 @@ const MQ_TAG_CLU = messagev5.RESERVED2
 
 // Ack() takes the ack messagev5 supplied and updates the status of messages waiting.
 // Ack()获取提供的Ack消息并更新消息等待的状态。
-func (this *Ackqueue) Ack(msg messagev5.Message) error {
+func (this *ackqueue) Ack(msg messagev5.Message) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -195,7 +195,7 @@ func (this *Ackqueue) Ack(msg messagev5.Message) error {
 
 // Acked() returns the list of messages that have completed the ack cycle.
 //返回已完成ack循环的消息列表。
-func (this *Ackqueue) Acked() []ackmsg {
+func (this *ackqueue) Acked() []ackmsg {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -220,7 +220,7 @@ FORNOTEMPTY:
 
 	return this.ackdone
 }
-func (this *Ackqueue) SetCluserTag(pktid uint16) bool {
+func (this *ackqueue) SetCluserTag(pktid uint16) bool {
 	v := this.ring[this.emap[pktid]]
 	v.State = MQ_TAG_CLU
 	this.ring[this.emap[pktid]] = v
@@ -229,7 +229,7 @@ func (this *Ackqueue) SetCluserTag(pktid uint16) bool {
 }
 
 //集群发来的消息处理
-func (this *Ackqueue) Acked02() []ackmsg {
+func (this *ackqueue) Acked02() []ackmsg {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -254,7 +254,7 @@ FORNOTEMPTY:
 
 	return this.ackdone
 }
-func (this *Ackqueue) insert(pktid uint16, msg messagev5.Message, onComplete interface{}) error {
+func (this *ackqueue) insert(pktid uint16, msg messagev5.Message, onComplete interface{}) error {
 	if this.full() {
 		this.grow()
 	}
@@ -290,6 +290,7 @@ func (this *Ackqueue) insert(pktid uint16, msg messagev5.Message, onComplete int
 
 		// If this is a publish messagev5, then the DUP flag must be set. This is the
 		// only scenario in which we will receive duplicate messages.
+		// 重复交付，将dup位置1
 		if pm.Dup() {
 			return fmt.Errorf("ack/insert: duplicate packet ID for PUBLISH messagev5, but DUP flag is not set")
 		}
@@ -300,7 +301,7 @@ func (this *Ackqueue) insert(pktid uint16, msg messagev5.Message, onComplete int
 	return nil
 }
 
-func (this *Ackqueue) removeHead() error {
+func (this *ackqueue) removeHead() error {
 	if this.empty() {
 		return errQueueEmpty
 	}
@@ -316,7 +317,7 @@ func (this *Ackqueue) removeHead() error {
 	return nil
 }
 
-func (this *Ackqueue) grow() {
+func (this *ackqueue) grow() {
 	if math.MaxInt64/2 < this.size {
 		panic("new size will overflow int64")
 	}
@@ -345,27 +346,27 @@ func (this *Ackqueue) grow() {
 	}
 }
 
-func (this *Ackqueue) len() int {
+func (this *ackqueue) len() int {
 	return int(this.count)
 }
 
-func (this *Ackqueue) cap() int {
+func (this *ackqueue) cap() int {
 	return int(this.size)
 }
 
-func (this *Ackqueue) index(n int64) int64 {
+func (this *ackqueue) index(n int64) int64 {
 	return n & this.mask
 }
 
-func (this *Ackqueue) full() bool {
+func (this *ackqueue) full() bool {
 	return this.count == this.size
 }
 
-func (this *Ackqueue) empty() bool {
+func (this *ackqueue) empty() bool {
 	return this.count == 0
 }
 
-func (this *Ackqueue) increment(n int64) int64 {
+func (this *ackqueue) increment(n int64) int64 {
 	return this.index(n + 1)
 }
 
@@ -386,4 +387,12 @@ func roundUpPowerOfTwo64(n int64) int64 {
 	n++
 
 	return n
+}
+
+type Ackqueue interface {
+	Wait(msg messagev5.Message, onComplete interface{}) error
+	Ack(msg messagev5.Message) error
+	Acked() []ackmsg
+	SetCluserTag(pktid uint16) bool
+	Acked02() []ackmsg
 }

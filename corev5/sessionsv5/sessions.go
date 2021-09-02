@@ -17,8 +17,8 @@ var (
 )
 
 type SessionsProvider interface {
-	New(id string) (*Session, error)
-	Get(id string) (*Session, error)
+	New(id string) (Session, error)
+	Get(id string) (Session, error)
 	Del(id string)
 	Save(id string) error
 	Count() int
@@ -66,14 +66,14 @@ func NewManager(providerName string) (*Manager, error) {
 	return &Manager{p: p}, nil
 }
 
-func (this *Manager) New(id string) (*Session, error) {
+func (this *Manager) New(id string) (Session, error) {
 	if id == "" {
 		id = this.sessionId()
 	}
 	return this.p.New(id)
 }
 
-func (this *Manager) Get(id string) (*Session, error) {
+func (this *Manager) Get(id string) (Session, error) {
 	return this.p.Get(id)
 }
 

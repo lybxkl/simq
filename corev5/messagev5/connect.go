@@ -257,7 +257,11 @@ func (this *ConnectMessage) build() {
 		willPropertiesLen += len(this.correlationData)
 	}
 	this.willPropertiesLen = uint32(willPropertiesLen)
-	_ = this.SetRemainingLength(int32(remlen + propertiesLen + len(lbEncode(this.propertiesLen)) + willPropertiesLen + len(lbEncode(this.willPropertiesLen))))
+	rl := int32(remlen + propertiesLen + len(lbEncode(this.propertiesLen)))
+	if this.WillFlag() {
+		rl += int32(willPropertiesLen + len(lbEncode(this.willPropertiesLen)))
+	}
+	_ = this.SetRemainingLength(rl)
 }
 func (this *ConnectMessage) PropertiesLen() uint32 {
 	return this.propertiesLen

@@ -5,7 +5,7 @@ serverVersion = "5.0.1"
 
 [broker]
     # broker 监听的addr
-    tcpAddr = "tcp://:1883"
+    tcpAddr = "tcp://:1884"
     # 是否开启tls
     tcpTlsOpen = false
 
@@ -15,7 +15,7 @@ serverVersion = "5.0.1"
     # websocket的path
     wsPath = "/mqtt"
 
-    wssAddr=":8761"
+    wssAddr=":8762"
     wssCertPath=""
     wssKeyPath=""
 
@@ -24,13 +24,16 @@ serverVersion = "5.0.1"
 
 [cluster]
     # 是否开启集群模式
-    enabled = false
+    enabled = true
+    taskClusterPoolSize=1000 # 节点处理其它节点发来的消息的协程池大小
+    taskServicePoolSize=1000 # 服务向其它节点发送的协程池大小
+
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
-    clusterName = "node1"
+    clusterName = "node2"
     # 集群模式监听的IP，用来和集群中其他节点通信
-    clusterHost = "0.0.0.0"
+    clusterHost = "127.0.0.1"
     # 集群模式监听的端口
-    clusterPort = 2884
+    clusterPort = 2885
     # 集群模式是否使用tls
     clusterTls = false
     # 服务器端证书
@@ -41,7 +44,12 @@ serverVersion = "5.0.1"
     clientCertFile = "certs/client.crt"
     # 客户端秘钥
     clientKeyFile = "certs/client.key"
-
+    [[cluster.staticNodeList]]
+        name="node1"
+        addr= "127.0.0.1:2884"
+    [[cluster.staticNodeList]]
+        name="node2"
+        addr= "127.0.0.1:2885"
 [defaultConfig]
     [defaultConfig.connect]
         keepalive=300 # 单位s，可以作为读超时
@@ -69,4 +77,4 @@ serverVersion = "5.0.1"
         poolSize=10
 [pprof]
 port = 8080
-open = true
+open = false
