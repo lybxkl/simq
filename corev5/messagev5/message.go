@@ -36,6 +36,17 @@ const (
 	QosFailure = 0x80
 )
 
+type RetainHandling byte
+
+const (
+	// 0 = 订阅建立时发送保留消息
+	CanSendRetain RetainHandling = iota
+	// 1 = 订阅建立时，若该订阅当前不存在则发送保留消息
+	NoExistSubSendRetain
+	// 2 = 订阅建立时不要发送保留消息
+	NoSendRetain
+)
+
 // SupportedVersions is a map of the version number (0x3 or 0x4) to the version string,
 // "MQIsdp" for 0x3, and "MQTT" for 0x4.
 var SupportedVersions map[byte]string = map[byte]string{

@@ -21,7 +21,37 @@ type SubscribeMessage struct {
 	// 载荷
 
 	topics [][]byte
-	qos    []byte
+	qos    []byte // 订阅选项的第0和1比特代表最大服务质量字段
+
+	/**
+	非本地（No Local）和发布保留（Retain As Published）订阅选项在客户端把消息发送给其他服务端的情况下，可以被用来实现桥接。
+
+	已存在订阅的情况下不发送保留消息是很有用的，比如重连完成时客户端不确定订阅是否在之前的会话连接中被创建
+
+	不发送保存的保留消息给新创建的订阅是很有用的，比如客户端希望接收变更通知且不需要知道最初的状态
+
+	对于某个指示其不支持保留消息的服务端，发布保留和保留处理选项的所有有效值都将得到同样的结果：
+			订阅时不发送任何保留消息，且所有消息的保留标志都会被设置为0
+	**/
+
+	// 订阅选项的第2比特表示非本地（No Local）选项。
+	//	值为1，表示应用消息不能被转发给发布此消息的客户端。
+	// 共享订阅时把非本地选项设为1将造成协议错误
+	local []byte
+	// 订阅选项的第3比特表示发布保留（Retain As Published）选项。
+	//   值为1，表示向此订阅转发应用消息时保持消息被发布时设置的保留（RETAIN）标志。
+	//   值为0，表示向此订阅转发应用消息时把保留标志设置为0。当订阅建立之后，发送保留消息时保留标志设置为1。
+	retainAsPub []byte
+	// 订阅选项的第4和5比特表示保留操作（Retain Handling）选项。
+	//	此选项指示当订阅建立时，是否发送保留消息。
+	//	此选项不影响之后的任何保留消息的发送。
+	//	如果没有匹配主题过滤器的保留消息，则此选项所有值的行为都一样。值可以设置为：
+	//		0 = 订阅建立时发送保留消息
+	//		1 = 订阅建立时，若该订阅当前不存在则发送保留消息
+	//		2 = 订阅建立时不要发送保留消息
+	//	保留操作的值设置为3将造成协议错误（Protocol Error）。
+	retainHandling []byte
+	// 订阅选项的第6和7比特为将来所保留。服务端必须把此保留位非0的SUBSCRIBE报文当做无效报文
 }
 
 func (this *SubscribeMessage) PropertiesLen() uint32 {
@@ -70,7 +100,8 @@ func (this SubscribeMessage) String() string {
 	msgstr = fmt.Sprintf("%s, PropertiesLen=%v, Subscription Identifier=%v, User Properties=%v", msgstr, this.PropertiesLen(), this.subscriptionIdentifier, this.UserProperty())
 
 	for i, t := range this.topics {
-		msgstr = fmt.Sprintf("%s, Topic[%d]=%q/%d", msgstr, i, string(t), this.qos[i])
+		msgstr = fmt.Sprintf("%s, Topic[%d]=%q，Qos：%d，Local：%d，Retain As Publish：%d，RetainHandling：%d",
+			msgstr, i, string(t), this.qos[i], this.local[i], this.retainAsPub[i], this.retainHandling[i])
 	}
 
 	return msgstr
@@ -106,6 +137,51 @@ func (this *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
 
 	this.topics = append(this.topics, topic)
 	this.qos = append(this.qos, qos)
+	this.local = append(this.local, 0)
+	this.retainAsPub = append(this.retainAsPub, 0)
+	this.retainHandling = append(this.retainHandling, 0)
+	this.dirty = true
+
+	return nil
+}
+func (this *SubscribeMessage) AddTopicAll(topic []byte, qos byte, local, retainAsPub bool, retainHandling byte) error {
+	if !ValidQos(qos) {
+		return fmt.Errorf("Invalid QoS %d", qos)
+	}
+	if retainHandling > 2 {
+		return fmt.Errorf("Invalid Sub Option RetainHandling %d", retainHandling)
+	}
+
+	var i int
+	var t []byte
+	var found bool
+
+	for i, t = range this.topics {
+		if bytes.Equal(t, topic) {
+			found = true
+			break
+		}
+	}
+
+	if found {
+		this.qos[i] = qos
+		return nil
+	}
+
+	this.topics = append(this.topics, topic)
+	this.qos = append(this.qos, qos)
+	if local {
+		this.local = append(this.local, 1)
+	} else {
+		this.local = append(this.local, 0)
+	}
+	if retainAsPub {
+		this.retainAsPub = append(this.retainAsPub, 1)
+	} else {
+		this.retainAsPub = append(this.retainAsPub, 0)
+	}
+
+	this.retainHandling = append(this.retainHandling, retainHandling)
 	this.dirty = true
 
 	return nil
@@ -128,6 +204,9 @@ func (this *SubscribeMessage) RemoveTopic(topic []byte) {
 	if found {
 		this.topics = append(this.topics[:i], this.topics[i+1:]...)
 		this.qos = append(this.qos[:i], this.qos[i+1:]...)
+		this.local = append(this.local[:i], this.local[i+1:]...)
+		this.retainAsPub = append(this.retainAsPub[:i], this.retainAsPub[i+1:]...)
+		this.retainHandling = append(this.retainHandling[:i], this.retainHandling[i+1:]...)
 	}
 
 	this.dirty = true
@@ -154,6 +233,65 @@ func (this *SubscribeMessage) TopicQos(topic []byte) byte {
 	}
 
 	return QosFailure
+}
+func (this *SubscribeMessage) TopicLocal(topic []byte) bool {
+	for i, t := range this.topics {
+		if bytes.Equal(t, topic) {
+			return this.local[i] > 0
+		}
+	}
+	return false
+}
+func (this *SubscribeMessage) SetTopicLocal(topic []byte, local bool) {
+	for i, t := range this.topics {
+		if bytes.Equal(t, topic) {
+			if local {
+				this.local[i] = 1
+			} else {
+				this.local[i] = 0
+			}
+			this.dirty = true
+			return
+		}
+	}
+}
+func (this *SubscribeMessage) TopicRetainAsPublished(topic []byte) bool {
+	for i, t := range this.topics {
+		if bytes.Equal(t, topic) {
+			return this.retainAsPub[i] > 0
+		}
+	}
+	return false
+}
+func (this *SubscribeMessage) SetTopicRetainAsPublished(topic []byte, rap bool) {
+	for i, t := range this.topics {
+		if bytes.Equal(t, topic) {
+			if rap {
+				this.retainAsPub[i] = 1
+			} else {
+				this.retainAsPub[i] = 0
+			}
+			this.dirty = true
+			return
+		}
+	}
+}
+func (this *SubscribeMessage) TopicRetainHandling(topic []byte) RetainHandling {
+	for i, t := range this.topics {
+		if bytes.Equal(t, topic) {
+			return RetainHandling(this.retainHandling[i])
+		}
+	}
+	return CanSendRetain
+}
+func (this *SubscribeMessage) SetTopicRetainHandling(topic []byte, hand RetainHandling) {
+	for i, t := range this.topics {
+		if bytes.Equal(t, topic) {
+			this.retainHandling[i] = byte(hand)
+			this.dirty = true
+			return
+		}
+	}
 }
 
 // Qos returns the list of QoS current in the message.
@@ -239,7 +377,19 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 
 		this.topics = append(this.topics, t)
 
-		this.qos = append(this.qos, src[total])
+		this.qos = append(this.qos, src[total]&3)
+		if src[total]&3 == 3 {
+			return 0, ProtocolError
+		}
+		this.local = append(this.local, (src[total]&4)>>2)
+		this.retainAsPub = append(this.retainAsPub, (src[total]&8)>>3)
+		this.retainHandling = append(this.retainHandling, (src[total]&48)>>4)
+		if (src[total]&48)>>4 == 3 {
+			return 0, ProtocolError
+		}
+		if src[total]>>6 != 0 {
+			return 0, ProtocolError
+		}
 		total++
 
 		remlen = remlen - n - 1
@@ -320,8 +470,13 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 		if err != nil {
 			return total, err
 		}
-
-		dst[total] = this.qos[i]
+		// 订阅选项
+		subOp := byte(0)
+		subOp |= this.qos[i]
+		subOp |= this.local[i] << 2
+		subOp |= this.retainAsPub[i] << 3
+		subOp |= this.retainHandling[i] << 4
+		dst[total] = subOp
 		total++
 	}
 
