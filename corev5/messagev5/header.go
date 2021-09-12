@@ -50,6 +50,18 @@ func (this header) String() string {
 func (this *header) Name() string {
 	return this.Type().Name()
 }
+func (this *header) MtypeFlags() byte {
+	if this.mtypeflags == nil {
+		return 0
+	}
+	return this.mtypeflags[0]
+}
+func (this *header) SetMtypeFlags(mtypeflags byte) {
+	if len(this.mtypeflags) != 1 {
+		this.mtypeflags = make([]byte, 1)
+	}
+	this.mtypeflags[0] = mtypeflags
+}
 
 // Desc returns a string description of the message type. For example, a
 // CONNECT message would return "Client request to connect to Server." These

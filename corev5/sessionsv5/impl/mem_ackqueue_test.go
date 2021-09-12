@@ -1,4 +1,4 @@
-package sessionsv5
+package impl
 
 //import (
 //	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"

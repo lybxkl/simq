@@ -3,6 +3,7 @@ package servicev5
 import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/store"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
@@ -137,6 +138,10 @@ type service struct {
 
 	clusterClient     *sync.Map // name --> *client.Client
 	shareTopicMapNode cluster.ShareTopicMapNode
+
+	SessionStore store.SessionStore
+	MessageStore store.MessageStore
+	EventStore   store.EventStore
 }
 
 func (this *service) start() error {
@@ -283,12 +288,17 @@ func (this *service) stop() {
 	this.out = nil
 }
 
-func (this *service) publish(msg *messagev5.PublishMessage, onComplete OnCompleteFunc) error {
+func (this *service) publish(msg *messagev5.PublishMessage, onComplete OnCompleteFunc) (err error) {
 	//glog.Logger.Debug("service/publish: Publishing %s", msg)
-	_, err := this.writeMessage(msg)
-	if err != nil {
-		return fmt.Errorf("(%s) Error sending %s messagev5: %v", this.cid(), msg.Name(), err)
-	}
+	defer func() {
+		if err != nil {
+			return
+		}
+		_, err = this.writeMessage(msg)
+		if err != nil {
+			err = fmt.Errorf("(%s) Error sending %s messagev5: %v", this.cid(), msg.Name(), err)
+		}
+	}()
 
 	switch msg.QoS() {
 	case messagev5.QosAtMostOnce:
@@ -353,18 +363,18 @@ func (this *service) subscribe(msg *messagev5.SubscribeMessage, onComplete OnCom
 		}
 
 		retcodes := suback.ReasonCodes()
-		topicsv5 := sub.Topics()
+		topics := sub.Topics()
 
-		if len(topicsv5) != len(retcodes) {
+		if len(topics) != len(retcodes) {
 			if onComplete != nil {
-				return onComplete(msg, ack, fmt.Errorf("Incorrect number of return codes received. Expecting %d, got %d.", len(topicsv5), len(retcodes)))
+				return onComplete(msg, ack, fmt.Errorf("Incorrect number of return codes received. Expecting %d, got %d.", len(topics), len(retcodes)))
 			}
 			return nil
 		}
 
 		var err2 error = nil
 
-		for i, t := range topicsv5 {
+		for i, t := range topics {
 			c := retcodes[i]
 
 			if c == messagev5.QosFailure {

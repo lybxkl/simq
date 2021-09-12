@@ -16,15 +16,6 @@ var (
 	providers = make(map[string]SessionsProvider)
 )
 
-type SessionsProvider interface {
-	New(id string) (Session, error)
-	Get(id string) (Session, error)
-	Del(id string)
-	Save(id string) error
-	Count() int
-	Close() error
-}
-
 // Register makes a session provider available by the provided name.
 // If a Register is called twice with the same name or if the driver is nil,
 // it panics.
@@ -66,15 +57,15 @@ func NewManager(providerName string) (*Manager, error) {
 	return &Manager{p: p}, nil
 }
 
-func (this *Manager) New(id string) (Session, error) {
+func (this *Manager) New(id string, cleanStart bool) (Session, error) {
 	if id == "" {
 		id = this.sessionId()
 	}
-	return this.p.New(id)
+	return this.p.New(id, cleanStart)
 }
 
-func (this *Manager) Get(id string) (Session, error) {
-	return this.p.Get(id)
+func (this *Manager) Get(id string, cleanStart bool) (Session, error) {
+	return this.p.Get(id, cleanStart)
 }
 
 func (this *Manager) Del(id string) {

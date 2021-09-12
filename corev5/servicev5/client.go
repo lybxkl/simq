@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
-	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5/impl"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
+	impl2 "gitee.com/Ljolan/si-mqtt/corev5/topicsv5/impl"
 	"net"
 	"net/url"
 	"reflect"
@@ -171,7 +172,7 @@ redirect:
 		return err
 	}
 
-	p := topicsv5.NewMemProvider()
+	p := impl2.NewMemProvider()
 	topicsv5.Register(this.svc.sess.ID(), p)
 
 	this.svc.topicsMgr, err = topicsv5.NewManager(this.svc.sess.ID())
@@ -262,7 +263,7 @@ func (this *Client) Disconnect() {
 
 func (this *Client) getSession(svc *service, req *messagev5.ConnectMessage, resp *messagev5.ConnackMessage) error {
 	//id := string(req.ClientId())
-	svc.sess = sessionsv5.NewMemSession()
+	svc.sess = impl.NewMemSession(string(req.ClientId()))
 	return svc.sess.Init(req)
 }
 

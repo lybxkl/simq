@@ -13,6 +13,7 @@ require (
 	github.com/panjf2000/ants/v2 v2.4.6
 	github.com/stretchr/testify v1.7.0
 	github.com/valyala/fastrand v1.0.0
+	go.mongodb.org/mongo-driver v1.7.2
 	go.uber.org/zap v1.18.1
 	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect

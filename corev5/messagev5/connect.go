@@ -464,6 +464,9 @@ func (this *ConnectMessage) SetVersion(v byte) error {
 func (this *ConnectMessage) CleanSession() bool {
 	return ((this.connectFlags >> 1) & 0x1) == 1
 }
+func (this *ConnectMessage) CleanStart() bool {
+	return ((this.connectFlags >> 1) & 0x1) == 1
+}
 
 // SetCleanSession sets the bit that specifies the handling of the Session state.
 func (this *ConnectMessage) SetCleanSession(v bool) {

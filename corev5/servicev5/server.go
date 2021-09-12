@@ -1,17 +1,21 @@
 package servicev5
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/client"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/server"
+	"gitee.com/Ljolan/si-mqtt/cluster/store"
+	"gitee.com/Ljolan/si-mqtt/cluster/store/repo"
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
+	"gitee.com/Ljolan/si-mqtt/utils"
 	"io"
 	"net"
 	"net/url"
@@ -146,6 +150,10 @@ type Server struct {
 	ClusterClient     *sync.Map // name --> *client.Client
 	ShareTopicMapNode cluster.ShareTopicMapNode
 
+	SessionStore store.SessionStore
+	MessageStore store.MessageStore
+	EventStore   store.EventStore
+
 	subs []interface{}
 	qoss []byte
 
@@ -187,7 +195,9 @@ func (this *Server) ListenAndServe(uri string) error {
 	if err != nil {
 		panic(err)
 	}
-
+	// store
+	this.InitStore()
+	// cluster
 	this.RunClusterComp()
 
 	printBanner(this.Version)
@@ -238,6 +248,16 @@ func (this *Server) ListenAndServe(uri string) error {
 			}
 		}()
 	}
+}
+
+func (this *Server) InitStore() {
+	this.SessionStore = repo.NewSessionStore()
+	this.MessageStore = repo.NewMessageStore()
+	this.EventStore = repo.NewEventStore()
+	ctx := context.Background()
+	utils.MustPanic(this.SessionStore.Start(ctx, *this.ConFig))
+	utils.MustPanic(this.MessageStore.Start(ctx, *this.ConFig))
+	utils.MustPanic(this.EventStore.Start(ctx, *this.ConFig))
 }
 func (this *Server) RunClusterComp() {
 	cfg := this.ConFig
@@ -628,11 +648,12 @@ func (this *Server) getSession(svc *service, req *messagev5.ConnectMessage, resp
 	// If found, return it.
 	//如果没有设置清除会话，请检查会话存储是否存在会话。
 	//如果找到，返回。
-	if !req.CleanSession() {
-		if svc.sess, err = this.sessMgr.Get(cid); err == nil {
+	if !req.CleanStart() {
+		// FIXME 当断线前是cleanStare=true，我们使用的是mem，但是重新连接时，使用了false，how to deal?
+		if svc.sess, err = this.sessMgr.Get(cid, req.CleanStart()); err == nil {
 			resp.SetSessionPresent(true)
 
-			if err := svc.sess.Update(req); err != nil {
+			if err = svc.sess.Update(req); err != nil {
 				return err
 			}
 		}
@@ -641,13 +662,15 @@ func (this *Server) getSession(svc *service, req *messagev5.ConnectMessage, resp
 	//如果没有session则创建一个
 	// If CleanSession, or no existing session found, then create a new one
 	if svc.sess == nil {
-		if svc.sess, err = this.sessMgr.New(cid); err != nil {
+		if svc.sess, err = this.sessMgr.New(cid, req.CleanStart()); err != nil {
 			return err
 		}
+		svc.sess.(store.Store).SetStore(this.SessionStore, this.MessageStore)
+
 		// 新建的present设置为false
 		resp.SetSessionPresent(false)
 		// 从当前connectMessage初始话该session
-		if err := svc.sess.Init(req); err != nil {
+		if err = svc.sess.Init(req); err != nil {
 			return err
 		}
 	}

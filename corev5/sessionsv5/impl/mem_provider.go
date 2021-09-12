@@ -1,38 +1,46 @@
-package sessionsv5
+package impl
 
 import (
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"strconv"
 	"sync"
 )
 
-var _ SessionsProvider = (*memProvider)(nil)
+var _ sessionsv5.SessionsProvider = (*memProvider)(nil)
 
+func init() {
+	memProviderInit()
+}
 func memProviderInit() {
-	Register("", NewMemProvider())
+	sessionsv5.Register("", NewMemProvider())
 	logger.Logger.Info("开启mem进行session管理")
 }
 
 type memProvider struct {
-	st map[string]Session
+	st map[string]sessionsv5.Session
 	mu sync.RWMutex
 }
 
 func NewMemProvider() *memProvider {
 	return &memProvider{
-		st: make(map[string]Session),
+		st: make(map[string]sessionsv5.Session),
 	}
 }
 
-func (this *memProvider) New(id string) (Session, error) {
+func (this *memProvider) New(id string, cleanStart bool) (sessionsv5.Session, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
-	this.st[id] = &session{id: id}
+	if cleanStart {
+		this.st[id] = NewMemSession(id)
+	} else {
+		this.st[id] = NewDBSession(id) // 新开始，需要删除旧的
+	}
 	return this.st[id], nil
 }
 
-func (this *memProvider) Get(id string) (Session, error) {
+func (this *memProvider) Get(id string, cleanStart bool) (sessionsv5.Session, error) {
 	this.mu.RLock()
 	defer this.mu.RUnlock()
 
@@ -59,6 +67,6 @@ func (this *memProvider) Count() int {
 }
 
 func (this *memProvider) Close() error {
-	this.st = make(map[string]Session)
+	this.st = make(map[string]sessionsv5.Session)
 	return nil
 }

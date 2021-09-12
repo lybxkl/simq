@@ -78,11 +78,13 @@ func (this *service) receiver() {
 
 			if err != nil {
 				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
+					// TODO 更新session状态
 					logger.Logger.Warnf("<<(%s)>> 读超时关闭：%v", this.cid(), er)
 					return
 				}
 				if err != io.EOF {
 					//连接异常或者断线啥的
+					// TODO 更新session状态
 					logger.Logger.Errorf("<<(%s)>> 连接异常关闭：%v", this.cid(), err.Error())
 				}
 				return
