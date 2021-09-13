@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"SI-MQTT/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/message"
 	"github.com/stretchr/testify/require"
 )
 
@@ -134,55 +134,55 @@ func TestReadMessageError2(t *testing.T) {
 	require.Equal(t, io.EOF, err)
 }
 
-func TestWriteMessage(t *testing.T) {
-	msgBytes := []byte{
-		byte(message.CONNECT << 4),
-		60,
-		0, // Length MSB (0)
-		4, // Length LSB (4)
-		'M', 'Q', 'T', 'T',
-		4,   // Protocol level 4
-		206, // connect flags 11001110, will QoS = 01
-		0,   // Keep Alive MSB (0)
-		10,  // Keep Alive LSB (10)
-		0,   // Client ID MSB (0)
-		7,   // Client ID LSB (7)
-		's', 'u', 'r', 'g', 'e', 'm', 'q',
-		0, // Will Topic MSB (0)
-		4, // Will Topic LSB (4)
-		'w', 'i', 'l', 'l',
-		0,  // Will Message MSB (0)
-		12, // Will Message LSB (12)
-		's', 'e', 'n', 'd', ' ', 'm', 'e', ' ', 'h', 'o', 'm', 'e',
-		0, // Username ID MSB (0)
-		7, // Username ID LSB (7)
-		's', 'u', 'r', 'g', 'e', 'm', 'q',
-		0,  // Password ID MSB (0)
-		10, // Password ID LSB (10)
-		'v', 'e', 'r', 'y', 's', 'e', 'c', 'r', 'e', 't',
-	}
-
-	msg := newConnectMessage()
-	msg.SetClientId([]byte("surgemq"))
-	var err error
-
-	svc := &service{}
-	svc.out, err = newBuffer(16384)
-
-	require.NoError(t, err)
-
-	n, err := svc.writeMessage(msg)
-
-	require.NoError(t, err, "error decoding message.")
-
-	require.Equal(t, len(msgBytes), n, "error decoding message.")
-
-	dst, err := svc.out.ReadPeek(len(msgBytes))
-
-	require.NoError(t, err)
-
-	require.Equal(t, msgBytes, dst, "error decoding message.")
-}
+//func TestWriteMessage(t *testing.T) {
+//	msgBytes := []byte{
+//		byte(message.CONNECT << 4),
+//		60,
+//		0, // Length MSB (0)
+//		4, // Length LSB (4)
+//		'M', 'Q', 'T', 'T',
+//		4,   // Protocol level 4
+//		206, // connect flags 11001110, will QoS = 01
+//		0,   // Keep Alive MSB (0)
+//		10,  // Keep Alive LSB (10)
+//		0,   // Client ID MSB (0)
+//		7,   // Client ID LSB (7)
+//		's', 'u', 'r', 'g', 'e', 'm', 'q',
+//		0, // Will Topic MSB (0)
+//		4, // Will Topic LSB (4)
+//		'w', 'i', 'l', 'l',
+//		0,  // Will Message MSB (0)
+//		12, // Will Message LSB (12)
+//		's', 'e', 'n', 'd', ' ', 'm', 'e', ' ', 'h', 'o', 'm', 'e',
+//		0, // Username ID MSB (0)
+//		7, // Username ID LSB (7)
+//		's', 'u', 'r', 'g', 'e', 'm', 'q',
+//		0,  // Password ID MSB (0)
+//		10, // Password ID LSB (10)
+//		'v', 'e', 'r', 'y', 's', 'e', 'c', 'r', 'e', 't',
+//	}
+//
+//	msg := newConnectMessage()
+//	msg.SetClientId([]byte("surgemq"))
+//	var err error
+//
+//	svc := &service{}
+//	svc.out, err = newBuffer(16384)
+//
+//	require.NoError(t, err)
+//
+//	n, err := svc.writeMessage(msg)
+//
+//	require.NoError(t, err, "error decoding message.")
+//
+//	require.Equal(t, len(msgBytes), n, "error decoding message.")
+//
+//	dst, err := svc.out.ReadPeek(len(msgBytes))
+//
+//	require.NoError(t, err)
+//
+//	require.Equal(t, msgBytes, dst, "error decoding message.")
+//}
 
 func newTestBuffer(t *testing.T, msgBytes []byte) *service {
 	buf := bytes.NewBuffer(msgBytes)

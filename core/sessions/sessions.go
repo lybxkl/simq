@@ -1,11 +1,11 @@
 package sessions
 
 import (
-	"SI-MQTT/core/logger"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 )
 
@@ -40,7 +40,7 @@ func Register(name string, provider SessionsProvider) {
 	if _, dup := providers[name]; dup {
 		panic("session: Register called twice for provider " + name)
 	}
-	logger.Logger.Infof("Register SessionProvide：'%s' success，%T", name, provider)
+	logger2.Logger.Infof("Register SessionProvide：'%s' success，%T", name, provider)
 	providers[name] = provider
 }
 

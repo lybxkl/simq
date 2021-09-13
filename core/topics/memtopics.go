@@ -1,11 +1,11 @@
 package topics
 
 import (
-	"SI-MQTT/core/logger"
-	"SI-MQTT/core/message"
-	"SI-MQTT/core/topics/share"
-	"SI-MQTT/core/topics/sys"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/core/message"
+	"gitee.com/Ljolan/si-mqtt/core/topics/share"
+	"gitee.com/Ljolan/si-mqtt/core/topics/sys"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"reflect"
 	"sync"
 )
@@ -33,7 +33,7 @@ type memTopics struct {
 
 func memTopicInit() {
 	Register("", NewMemProvider())
-	logger.Logger.Info("开启mem进行普通topic管理")
+	logger2.Logger.Info("开启mem进行普通topic管理")
 }
 
 var _ TopicsProvider = (*memTopics)(nil)

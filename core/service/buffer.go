@@ -1,9 +1,9 @@
 package service
 
 import (
-	"SI-MQTT/core/logger"
 	"bufio"
 	"fmt"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"math"
 	"sync"
@@ -195,7 +195,7 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 		if len(p) > 0 {
 			n, err := w.Write(p)
 			total += int64(n)
-			logger.Logger.Debugf("Wrote %d bytes, totaling %d bytes", n, total)
+			logger2.Logger.Debugf("Wrote %d bytes, totaling %d bytes", n, total)
 
 			if err != nil {
 				return total, err

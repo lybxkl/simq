@@ -1,0 +1,894 @@
+@startuml
+namespace corev5 {}
+namespace cluster {}
+namespace cluster.stat {}
+namespace corev5.authv5 {}
+namespace corev5.topicsv5 {}
+namespace cluster.stat.colong {}
+namespace cluster.stat.colong.tcp {}
+namespace cluster {
+ class shareMapImpl {
+  - topicmapnode.TopicsMapNodeProvider
+} 
+}
+namespace cluster {
+ class Node {
+  + NNA string
+  + Addr string
+} 
+}
+namespace cluster {
+ class nodeDiscover {
+  - sync.RWMutex
+  - nodes map[string]Node
+} 
+}
+namespace cluster.stat.colong {
+ class closer {
+} 
+}
+namespace cluster.stat.colong {
+ class innerImpl {
+} 
+}
+namespace cluster.stat.colong {
+ class messageHandler {
+  + SessionOnOpen func(- name string,- session getty.Session)
+  - inner
+  - curName string
+} 
+}
+namespace cluster.stat.colong {
+ class serverMessageHandler {
+  + SessionOnOpen func(- session getty.Session)
+  - inner
+  - clusterInToPub ClusterInToPub
+  - clusterInToPubShare ClusterInToPubShare
+  - clusterInToPubSys ClusterInToPubSys
+  - shareTopicMapNode cluster.ShareTopicMapNode
+} 
+}
+namespace cluster.stat.colong {
+ class PackageHandler {
+} 
+}
+namespace cluster.stat.colong.tcp.client {
+ class Client {
+  - serverName string
+  - c getty.Client
+  - taskPool gxsync.GenericTaskPool
+} 
+}
+namespace cluster.stat.colong.tcp.server {
+ class Server {
+  - name string
+  - s getty.Server
+} 
+}
+namespace cluster.stat.colong {
+ class wrapCMsgImpl {
+  - cmsgtype byte
+  - tag []string
+  - status map[string]string
+  - msg messagev5.Message
+} 
+}
+namespace config {
+ class SIConfig {
+  + ServerVersion string
+  + Log Log
+  + Broker Broker
+  + Cluster Cluster
+  + DefaultConfig DefaultConfig
+  + Store Store
+  + PProf PProf
+} 
+}
+namespace config {
+ class Log {
+  + Level string
+} 
+}
+namespace config {
+ class PProf {
+  + Open bool
+  + Port int64
+} 
+}
+namespace config {
+ class Broker {
+  + TcpAddr string
+  + TcpTLSOpen bool
+  + WsAddr string
+  + WsPath string
+  + WssAddr string
+  + WssCertPath string
+  + WssKeyPath string
+  + Ca string
+} 
+}
+namespace config {
+ class Cluster {
+  + Enabled bool
+  + TaskClusterPoolSize int32
+  + TaskServicePoolSize int32
+  + ClusterName string
+  + ClusterHost string
+  + ClusterPort int
+  + ClusterTLS bool
+  + ServerCertFile string
+  + ServerKeyFile string
+  + ClientCertFile string
+  + ClientKeyFile string
+  + StaticNodeList []NodeInfo
+} 
+}
+namespace config {
+ class NodeInfo {
+  + Name string
+  + Addr string
+} 
+}
+namespace config {
+ class Connect {
+  + Keepalive int
+  + WriteTimeout int
+  + ConnectTimeout int
+  + AckTimeout int
+  + TimeoutRetries int
+} 
+}
+namespace config {
+ class Provider {
+  + SessionsProvider string
+  + TopicsProvider string
+  + Authenticator string
+} 
+}
+namespace config {
+ class DefaultConfig {
+  + Connect Connect
+  + Provider Provider
+  + Auth Auth
+  + Server Server
+} 
+}
+namespace config {
+ class Auth {
+  + Allows []string
+} 
+}
+namespace config {
+ class Server {
+  + Redirects []string
+  + RedirectOpen bool
+  + RedirectIsForEver bool
+} 
+}
+namespace config {
+ class Mysql {
+  + Source string
+  + PoolSize int
+} 
+}
+namespace config {
+ class Redis {
+  + Source string
+  + Db int
+  + PoolSize int
+} 
+}
+namespace config {
+ class Store {
+  + Mysql Mysql
+  + Redis Redis
+} 
+}
+namespace corev5.authv5 {
+ class Manager {
+  - p Authenticator
+} 
+}
+namespace corev5.authv5.authplus {
+ class Manager {
+  - p AuthPlus
+} 
+}
+namespace corev5.authv5.authplus {
+ class defaultAuth {
+  - i int
+} 
+}
+namespace corev5.messagev5 {
+ class AuthMessage {
+  - header
+  - reasonCode ReasonCode
+  - propertiesLen uint32
+  - authMethod []byte
+  - authData []byte
+  - reasonStr []byte
+  - userProperty [][]byte
+} 
+}
+namespace corev5.messagev5 {
+ class ConnackMessage {
+  - header
+  - sessionPresent bool
+  - reasonCode ReasonCode
+  - propertiesLen uint32
+  - sessionExpiryInterval uint32
+  - receiveMaximum uint16
+  - maxQos byte
+  - retainAvailable byte
+  - maxPacketSize uint32
+  - assignedIdentifier []byte
+  - topicAliasMax uint16
+  - reasonStr []byte
+  - userProperties [][]byte
+  - wildcardSubscriptionAvailable byte
+  - subscriptionIdentifierAvailable byte
+  - sharedSubscriptionAvailable byte
+  - serverKeepAlive uint16
+  - responseInformation []byte
+  - serverReference []byte
+  - authMethod []byte
+  - authData []byte
+} 
+}
+namespace corev5.messagev5 {
+ class ConnectMessage {
+  - header
+  - connectFlags byte
+  - version byte
+  - keepAlive uint16
+  - protoName,clientId,willTopic,willMessage,username,password []byte
+  - propertiesLen uint32
+  - sessionExpiryInterval uint32
+  - receiveMaximum uint16
+  - maxPacketSize uint32
+  - topicAliasMax uint16
+  - requestRespInfo byte
+  - requestProblemInfo byte
+  - userProperty [][]byte
+  - authMethod []byte
+  - authData []byte
+  - willPropertiesLen uint32
+  - willDelayInterval uint32
+  - payloadFormatIndicator byte
+  - willMsgExpiryInterval uint32
+  - contentType []byte
+  - willUserProperty [][]byte
+  - responseTopic []byte
+  - correlationData []byte
+} 
+}
+namespace corev5.messagev5 {
+ class DisconnectMessage {
+  - header
+  - reasonCode ReasonCode
+  - propertyLen uint32
+  - sessionExpiryInterval uint32
+  - reasonStr []byte
+  - serverReference []byte
+  - userProperty [][]byte
+} 
+}
+namespace corev5.messagev5 {
+ class header {
+  - remlen int32
+  - mtypeflags []byte
+  - packetId []byte
+  - dbuf []byte
+  - dirty bool
+} 
+}
+namespace corev5.messagev5 {
+ class PingreqMessage {
+  - header
+} 
+}
+namespace corev5.messagev5 {
+ class PingrespMessage {
+  - header
+} 
+}
+namespace corev5.messagev5 {
+ class PubackMessage {
+  - header
+  - reasonCode ReasonCode
+  - propertyLen uint32
+  - reasonStr []byte
+  - userProperty [][]byte
+} 
+}
+namespace corev5.messagev5 {
+ class PubcompMessage {
+  + PubackMessage
+} 
+}
+namespace corev5.messagev5 {
+ class PublishMessage {
+  - header
+  - topic []byte
+  - propertiesLen uint32
+  - payloadFormatIndicator byte
+  - messageExpiryInterval uint32
+  - topicAlias uint16
+  - responseTopic []byte
+  - correlationData []byte
+  - userProperty [][]byte
+  - subscriptionIdentifier uint32
+  - contentType []byte
+  - payload []byte
+} 
+}
+namespace corev5.messagev5 {
+ class PubrecMessage {
+  + PubackMessage
+} 
+}
+namespace corev5.messagev5 {
+ class PubrelMessage {
+  + PubackMessage
+} 
+}
+namespace corev5.messagev5 {
+ class SubackMessage {
+  - header
+  - propertiesLen uint32
+  - reasonStr []byte
+  - userProperty [][]byte
+  - reasonCodes []byte
+} 
+}
+namespace corev5.messagev5 {
+ class SubscribeMessage {
+  - header
+  - propertiesLen uint32
+  - subscriptionIdentifier uint32
+  - userProperty [][]byte
+  - topics [][]byte
+  - qos []byte
+} 
+}
+namespace corev5.messagev5 {
+ class UnsubackMessage {
+  - header
+  - propertyLen uint32
+  - reasonStr []byte
+  - userProperty [][]byte
+  - reasonCodes []byte
+} 
+}
+namespace corev5.messagev5 {
+ class UnsubscribeMessage {
+  - header
+  - propertyLen uint32
+  - userProperty [][]byte
+  - topics [][]byte
+} 
+}
+namespace corev5.servicev5 {
+ class sequence {
+  - cursor,gate,p2,p3,p4,p5,p6,p7 int64
+} 
+}
+namespace corev5.servicev5 {
+ class buffer {
+  - id int64
+  - buf []byte
+  - tmp []byte
+  - size int64
+  - mask int64
+  - done int64
+  - pseq *sequence
+  - cseq *sequence
+  - pcond *sync.Cond
+  - ccond *sync.Cond
+  - cwait int64
+  - pwait int64
+} 
+}
+namespace corev5.servicev5 {
+ class Client {
+  + KeepAlive int
+  + ConnectTimeout int
+  + AuthPlus authplus.AuthPlus
+  + AckTimeout int
+  + TimeoutRetries int
+  - svc *service
+} 
+}
+namespace corev5.servicev5 {
+ class closer {
+} 
+}
+namespace corev5.servicev5 {
+ class SafeMap {
+  - v map[uint16]interface  { }
+  - wg *sync.RWMutex
+} 
+}
+namespace corev5.servicev5 {
+ class timeoutWriter {
+  - d time.Duration
+  - conn netWriter
+} 
+}
+namespace corev5.servicev5 {
+ class timeoutReader {
+  - d time.Duration
+  - conn netReader
+} 
+}
+namespace corev5.servicev5 {
+ class Server {
+  + Version string
+  + ConFig *config.SIConfig
+  + KeepAlive int
+  + WriteTimeout int
+  + ConnectTimeout int
+  + AckTimeout int
+  + TimeoutRetries int
+  + Authenticator string
+  + SessionsProvider string
+  + TopicsProvider string
+  + AuthPlusProvider []string
+  - authMgr *authv5.Manager
+  - authPlusAllows map[string]*authplus.Manager
+  - sessMgr *sessionsv5.Manager
+  - topicsMgr *topicsv5.Manager
+  - quit chan struct { }
+  - ln net.Listener
+  - svcs []*service
+  - mu sync.Mutex
+  - running int32
+  - configOnce sync.Once
+  + ClusterDiscover cluster.NodeDiscover
+  + ClusterServer *server.Server
+  + ClusterClient *sync.Map
+  + ShareTopicMapNode cluster.ShareTopicMapNode
+  - subs []interface  { }
+  - qoss []byte
+  - close []io.Closer
+} 
+}
+namespace corev5.servicev5 {
+ class stat {
+  - bytes int64
+  - msgs int64
+} 
+}
+namespace corev5.servicev5 {
+ class service {
+  - clusterBelong bool
+  - clusterOpen bool
+  - id uint64
+  - ccid string
+  - client bool
+  - keepAlive int
+  - writeTimeout int
+  - connectTimeout int
+  - ackTimeout int
+  - timeoutRetries int
+  - conn io.Closer
+  - sessMgr *sessionsv5.Manager
+  - topicsMgr *topicsv5.Manager
+  - sess sessionsv5.Session
+  - wgStarted sync.WaitGroup
+  - wgStopped sync.WaitGroup
+  - wmu sync.Mutex
+  - closed int64
+  - done chan struct { }
+  - in *buffer
+  - out *buffer
+  - onpub OnPublishFunc
+  - inStat stat
+  - outStat stat
+  - intmp []byte
+  - outtmp []byte
+  - rmsgs []*messagev5.PublishMessage
+  - clusterClient *sync.Map
+  - shareTopicMapNode cluster.ShareTopicMapNode
+} 
+}
+namespace corev5.sessionsv5 {
+ class ackmsg {
+  + Mtype messagev5.MessageType
+  + State messagev5.MessageType
+  + Pktid uint16
+  + Msgbuf []byte
+  + Ackbuf []byte
+  + OnComplete interface  { }
+} 
+}
+namespace corev5.sessionsv5 {
+ class ackqueue {
+  - size int64
+  - mask int64
+  - count int64
+  - head int64
+  - tail int64
+  - ping ackmsg
+  - ring []ackmsg
+  - emap map[uint16]int64
+  - ackdone []ackmsg
+  - mu sync.Mutex
+} 
+}
+namespace corev5.sessionsv5 {
+ class memProvider {
+  - st map[string]Session
+  - mu sync.RWMutex
+} 
+}
+namespace corev5.sessionsv5 {
+ class session {
+  - pub1ack Ackqueue
+  - pub2in Ackqueue
+  - pub2out Ackqueue
+  - suback Ackqueue
+  - unsuback Ackqueue
+  - pingack Ackqueue
+  - cmsg *messagev5.ConnectMessage
+  - will *messagev5.PublishMessage
+  - cbuf []byte
+  - rbuf []byte
+  - topics map[string]byte
+  - initted bool
+  - mu sync.Mutex
+  - id string
+} 
+}
+namespace corev5.sessionsv5 {
+ class SessionInitTopic {
+  + Topic string
+  + Qos byte
+} 
+}
+namespace corev5.sessionsv5 {
+ class Manager {
+  - p SessionsProvider
+} 
+}
+namespace corev5.topicsv5 {
+ class memTopics {
+  - smu sync.RWMutex
+  - sroot *snode
+  - rmu sync.RWMutex
+  - rroot *rnode
+  - share share.ShareTopicsProvider
+  - sys sys.SysTopicsProvider
+} 
+}
+namespace corev5.topicsv5 {
+ class snode {
+  - subs []interface  { }
+  - qos []byte
+  - snodes map[string]*snode
+} 
+}
+namespace corev5.topicsv5 {
+ class rnode {
+  - msg *messagev5.PublishMessage
+  - buf []byte
+  - rnodes map[string]*rnode
+} 
+}
+namespace corev5.topicsv5.share {
+ class memTopics {
+  - smu sync.RWMutex
+  - sroot *snode
+  - rmu sync.RWMutex
+  - rroot *rnode
+} 
+}
+namespace corev5.topicsv5.share {
+ class sins {
+  - subs []interface  { }
+  - qos []byte
+} 
+}
+namespace corev5.topicsv5.share {
+ class snode {
+  - shares map[string]*sins
+  - snodes map[string]*snode
+} 
+}
+namespace corev5.topicsv5.share {
+ class rnode {
+  - msg *messagev5.PublishMessage
+  - buf []byte
+  - rnodes map[string]*rnode
+} 
+}
+namespace corev5.topicsv5.share {
+ class Manager {
+  - p ShareTopicsProvider
+} 
+}
+namespace corev5.topicsv5.sys {
+ class memTopics {
+  - smu sync.RWMutex
+  - sroot *rSnode
+  - rmu sync.RWMutex
+  - rroot *rRnode
+} 
+}
+namespace corev5.topicsv5.sys {
+ class rSnode {
+  - subs []interface  { }
+  - qos []byte
+  - rsnodes map[string]*rSnode
+} 
+}
+namespace corev5.topicsv5.sys {
+ class rRnode {
+  - msg *messagev5.PublishMessage
+  - buf []byte
+  - rrnodes map[string]*rRnode
+} 
+}
+namespace corev5.topicsv5.sys {
+ class Manager {
+  - p SysTopicsProvider
+} 
+}
+namespace corev5.topicsv5.topic_map_node {
+ class memTopicMapNode {
+  - smu sync.RWMutex
+  - sroot *rSnode
+} 
+}
+namespace corev5.topicsv5.topic_map_node {
+ class nodeWeight {
+  - node string
+  - wright uint32
+} 
+}
+namespace corev5.topicsv5.topic_map_node {
+ class rSnode {
+  - tmn map[string][]*nodeWeight
+  - rsnodes map[string]*rSnode
+} 
+}
+namespace corev5.topicsv5 {
+ class Manager {
+  - p TopicsProvider
+} 
+}
+namespace cluster {
+ interface ShareTopicMapNode  {
+  + GetShareNames(- topic []byte)(- map[string]string,- error)
+  + AddTopicMapNode(- topic []byte,- shareName,nodeName string)- error
+  + RemoveTopicMapNode(- topic []byte,- shareName,nodeName string)- error
+} 
+}
+namespace cluster {
+ interface NodeDiscover  {
+  + GetNodes()(+ []Node,- error)
+  + GetNodeMap()- map[string]Node
+  + GetNode(- name string)(+ Node,- error)
+  + RegisterMe(- node Node)- error
+  + RemoveNode(- name string)- error
+} 
+}
+namespace cluster.stat.colong {
+ interface inner  {
+  + GetAuthOk(- session getty.Session)- bool
+  + SetAuthOk(- getty.Session,- bool)
+} 
+}
+namespace cluster.stat.colong {
+ interface WrapCMsg  {
+  + Type()+ CMsgType
+  + Tag()+ []string
+  + Share()- bool
+  + Msg()- messagev5.Message
+  + Status()- map[string]string
+  + CloseSessions()+ []string
+  + SetShare(- shareName string,- msg messagev5.Message)
+  + AddTag(- tag string)
+  + SetMsg(- msg messagev5.Message)
+  + Len()- int
+} 
+}
+namespace cluster.stat.util {
+ interface Closer  {
+  + Close()
+} 
+}
+namespace corev5.authv5 {
+ interface Authenticator  {
+  + Authenticate(- id string,- cred interface  { })- error
+} 
+}
+namespace corev5.authv5.authplus {
+ interface AuthPlus  {
+  + Verify(- authData []byte)(- d []byte,- continueAuth bool,- err error)
+} 
+}
+namespace corev5.messagev5 {
+ interface Message  {
+  + Name()- string
+  + Desc()- string
+  + Type()+ MessageType
+  + PacketId()- uint16
+  + Encode(+ []byte)(- int,- error)
+  + Decode(+ []byte)(- int,- error)
+  + Len()- int
+} 
+}
+namespace corev5.servicev5 {
+ interface netReader  {
+  + SetReadDeadline(- t time.Time)- error
+} 
+}
+namespace corev5.servicev5 {
+ interface netWriter  {
+  + SetWriteDeadline(- t time.Time)- error
+} 
+}
+namespace corev5.sessionsv5 {
+ interface Ackqueue  {
+  + Wait(- msg messagev5.Message,- onComplete interface  { })- error
+  + Ack(- msg messagev5.Message)- error
+  + Acked()+ []ackmsg
+  + SetCluserTag(- pktid uint16)- bool
+  + Acked02()+ []ackmsg
+} 
+}
+namespace corev5.sessionsv5 {
+ interface Session  {
+  + Init(- msg *messagev5.ConnectMessage,- topics ... SessionInitTopic)- error
+  + Update(- msg *messagev5.ConnectMessage)- error
+  + AddTopic(- topic string,- qos byte)- error
+  + RemoveTopic(- topic string)- error
+  + Topics()(+ []string,+ []byte,- error)
+  + ID()- string
+  + IDs()+ []byte
+  + Cmsg()+ *messagev5.ConnectMessage
+  + Will()+ *messagev5.PublishMessage
+  + Pub1ack()+ Ackqueue
+  + Pub2in()+ Ackqueue
+  + Pub2out()+ Ackqueue
+  + Suback()+ Ackqueue
+  + Unsuback()+ Ackqueue
+  + Pingack()+ Ackqueue
+} 
+}
+namespace corev5.sessionsv5 {
+ interface SessionsProvider  {
+  + New(- id string)(+ Session,- error)
+  + Get(- id string)(+ Session,- error)
+  + Del(- id string)
+  + Save(- id string)- error
+  + Count()- int
+  + Close()- error
+} 
+}
+namespace corev5.topicsv5.share {
+ interface ShareTopicsProvider  {
+  + Subscribe(- topic,shareName []byte,- qos byte,- subscriber interface  { })(- byte,- error)
+  + Unsubscribe(- topic,shareName []byte,- subscriber interface  { })- error
+  + Subscribers(- topic,shareName []byte,- qos byte,- subs *[]interface  { },- qoss *[]byte)- error
+  + AllSubInfo()(- map[string][]string,- error)
+  + Retain(- msg *messagev5.PublishMessage,- shareName []byte)- error
+  + Retained(- topic,shareName []byte,- msgs *[]*messagev5.PublishMessage)- error
+  + Close()- error
+} 
+}
+namespace corev5.topicsv5.sys {
+ interface SysTopicsProvider  {
+  + Subscribe(- topic []byte,- qos byte,- subscriber interface  { })(- byte,- error)
+  + Unsubscribe(- topic []byte,- subscriber interface  { })- error
+  + Subscribers(- topic []byte,- qos byte,- subs *[]interface  { },- qoss *[]byte)- error
+  + Retain(- msg *messagev5.PublishMessage)- error
+  + Retained(- topic []byte,- msgs *[]*messagev5.PublishMessage)- error
+  + Close()- error
+} 
+}
+namespace corev5.topicsv5.topic_map_node {
+ interface TopicsMapNodeProvider  {
+  + Subscribe(- topic []byte,- shareName,node string)- error
+  + Unsubscribe(- topic []byte,- shareName,node string)- error
+  + Subscribers(- topic []byte,- shareNames,nodes *[]string)- error
+  + Close()- error
+} 
+}
+namespace corev5.topicsv5 {
+ interface TopicsProvider  {
+  + Subscribe(- topic []byte,- qos byte,- subscriber interface  { })(- byte,- error)
+  + Unsubscribe(- topic []byte,- subscriber interface  { })- error
+  + Subscribers(- topic []byte,- qos byte,- subs *[]interface  { },- qoss *[]byte,- svc bool,- shareName string,- onlyShare bool)- error
+  + AllSubInfo()(- map[string][]string,- error)
+  + Retain(- msg *messagev5.PublishMessage)- error
+  + Retained(- topic []byte,- msgs *[]*messagev5.PublishMessage)- error
+  + Close()- error
+} 
+}
+cluster.nodeDiscover ---> "*" cluster.Node : - nodes
+config.SIConfig ---> config.Log : + Log
+config.SIConfig ---> config.Broker : + Broker
+config.SIConfig ---> config.Cluster : + Cluster
+config.SIConfig ---> config.DefaultConfig : + DefaultConfig
+config.SIConfig ---> config.Store : + Store
+config.SIConfig ---> config.PProf : + PProf
+config.Cluster ---> "*" config.NodeInfo : + StaticNodeList
+config.DefaultConfig ---> config.Connect : + Connect
+config.DefaultConfig ---> config.Provider : + Provider
+config.DefaultConfig ---> config.Auth : + Auth
+config.DefaultConfig ---> config.Server : + Server
+config.Store ---> config.Mysql : + Mysql
+config.Store ---> config.Redis : + Redis
+corev5.messagev5.AuthMessage -||> corev5.messagev5.header
+corev5.messagev5.ConnackMessage -||> corev5.messagev5.header
+corev5.messagev5.ConnectMessage -||> corev5.messagev5.header
+corev5.messagev5.DisconnectMessage -||> corev5.messagev5.header
+corev5.messagev5.PingreqMessage -||> corev5.messagev5.header
+corev5.messagev5.PingrespMessage -||> corev5.messagev5.header
+corev5.messagev5.PubackMessage -||> corev5.messagev5.header
+corev5.messagev5.PubcompMessage -||> corev5.messagev5.PubackMessage
+corev5.messagev5.PublishMessage -||> corev5.messagev5.header
+corev5.messagev5.PubrecMessage -||> corev5.messagev5.PubackMessage
+corev5.messagev5.PubrelMessage -||> corev5.messagev5.PubackMessage
+corev5.messagev5.SubackMessage -||> corev5.messagev5.header
+corev5.messagev5.SubscribeMessage -||> corev5.messagev5.header
+corev5.messagev5.UnsubackMessage -||> corev5.messagev5.header
+corev5.messagev5.UnsubscribeMessage -||> corev5.messagev5.header
+corev5.servicev5.buffer ---> corev5.servicev5.sequence : - pseq
+corev5.servicev5.buffer ---> corev5.servicev5.sequence : - cseq
+corev5.servicev5.Client ---> corev5.servicev5.service : - svc
+corev5.servicev5.Server ---> "*" corev5.servicev5.service : - svcs
+corev5.servicev5.service ---> corev5.servicev5.buffer : - in
+corev5.servicev5.service ---> corev5.servicev5.buffer : - out
+corev5.servicev5.service ---> corev5.servicev5.stat : - inStat
+corev5.servicev5.service ---> corev5.servicev5.stat : - outStat
+corev5.sessionsv5.ackqueue ---> corev5.sessionsv5.ackmsg : - ping
+corev5.sessionsv5.ackqueue ---> "*" corev5.sessionsv5.ackmsg : - ring
+corev5.sessionsv5.ackqueue ---> "*" corev5.sessionsv5.ackmsg : + ackdone
+corev5.topicsv5.memTopics ---> corev5.topicsv5.snode : - sroot
+corev5.topicsv5.memTopics ---> corev5.topicsv5.rnode : - rroot
+corev5.topicsv5.snode ---> "*" corev5.topicsv5.snode : - snodes
+corev5.topicsv5.rnode ---> "*" corev5.topicsv5.rnode : - rnodes
+corev5.topicsv5.share.memTopics ---> corev5.topicsv5.share.snode : - sroot
+corev5.topicsv5.share.memTopics ---> corev5.topicsv5.share.rnode : - rroot
+corev5.topicsv5.share.snode ---> "*" corev5.topicsv5.share.sins : - shares
+corev5.topicsv5.share.snode ---> "*" corev5.topicsv5.share.snode : - snodes
+corev5.topicsv5.share.rnode ---> "*" corev5.topicsv5.share.rnode : - rnodes
+corev5.topicsv5.sys.memTopics ---> corev5.topicsv5.sys.rSnode : - sroot
+corev5.topicsv5.sys.memTopics ---> corev5.topicsv5.sys.rRnode : - rroot
+corev5.topicsv5.sys.rSnode ---> "*" corev5.topicsv5.sys.rSnode : - rsnodes
+corev5.topicsv5.sys.rRnode ---> "*" corev5.topicsv5.sys.rRnode : - rrnodes
+corev5.topicsv5.topic_map_node.memTopicMapNode ---> corev5.topicsv5.topic_map_node.rSnode : - sroot
+corev5.topicsv5.topic_map_node.rSnode ---> "*" corev5.topicsv5.topic_map_node.nodeWeight : - tmn
+corev5.topicsv5.topic_map_node.rSnode ---> "*" corev5.topicsv5.topic_map_node.rSnode : - rsnodes
+cluster.ShareTopicMapNode <|.. cluster.shareMapImpl
+cluster.NodeDiscover <|.. cluster.nodeDiscover
+cluster.stat.colong.inner <|.. cluster.stat.colong.innerImpl
+cluster.stat.colong.WrapCMsg <|.. cluster.stat.colong.wrapCMsgImpl
+cluster.stat.util.Closer <|.. cluster.stat.colong.tcp.client.Client
+cluster.stat.util.Closer <|.. cluster.stat.colong.tcp.server.Server
+corev5.authv5.Authenticator <|.. corev5.authv5.Manager
+corev5.authv5.authplus.AuthPlus <|.. corev5.authv5.authplus.Manager
+corev5.authv5.authplus.AuthPlus <|.. corev5.authv5.authplus.defaultAuth
+corev5.sessionsv5.Ackqueue <|.. corev5.sessionsv5.ackqueue
+corev5.sessionsv5.Session <|.. corev5.sessionsv5.session
+corev5.sessionsv5.SessionsProvider <|.. corev5.sessionsv5.memProvider
+corev5.sessionsv5.SessionsProvider <|.. corev5.sessionsv5.Manager
+corev5.topicsv5.share.ShareTopicsProvider <|.. corev5.topicsv5.share.memTopics
+corev5.topicsv5.share.ShareTopicsProvider <|.. corev5.topicsv5.share.Manager
+corev5.topicsv5.sys.SysTopicsProvider <|.. corev5.topicsv5.sys.memTopics
+corev5.topicsv5.sys.SysTopicsProvider <|.. corev5.topicsv5.sys.Manager
+corev5.topicsv5.topic_map_node.TopicsMapNodeProvider <|.. corev5.topicsv5.topic_map_node.memTopicMapNode
+corev5.topicsv5.TopicsProvider <|.. corev5.topicsv5.memTopics
+corev5.topicsv5.TopicsProvider <|.. corev5.topicsv5.Manager
+corev5.authv5.Manager ---> corev5.authv5.Authenticator : - p
+corev5.authv5.authplus.Manager ---> corev5.authv5.authplus.AuthPlus : - p
+corev5.servicev5.timeoutWriter ---> corev5.servicev5.netWriter : - conn
+corev5.servicev5.timeoutReader ---> corev5.servicev5.netReader : - conn
+corev5.sessionsv5.Manager ---> corev5.sessionsv5.SessionsProvider : - p
+corev5.topicsv5.share.Manager ---> corev5.topicsv5.share.ShareTopicsProvider : - p
+corev5.topicsv5.sys.Manager ---> corev5.topicsv5.sys.SysTopicsProvider : - p
+corev5.topicsv5.Manager ---> corev5.topicsv5.TopicsProvider : - p
+@enduml

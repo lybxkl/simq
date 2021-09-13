@@ -1,0 +1,80 @@
+serverVersion = "5.0.1"
+
+[log]
+    level = "debug"
+
+[broker]
+    # broker 监听的addr
+    tcpAddr = "tcp://:1883"
+    # 是否开启tls
+    tcpTlsOpen = false
+
+
+    # 开启websocket监听的addr
+    wsAddr = ":8764"
+    # websocket的path
+    wsPath = "/mqtt"
+
+    wssAddr=":8761"
+    wssCertPath=""
+    wssKeyPath=""
+
+    # 根证书
+    ca = "certs/root.crt"
+
+[cluster]
+    # 是否开启集群模式
+    enabled = false
+    taskClusterPoolSize=1000 # 节点处理其它节点发来的消息的协程池大小
+    taskServicePoolSize=1000 # 服务向其它节点发送的协程池大小
+
+    # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
+    clusterName = "node1"
+    # 集群模式监听的IP，用来和集群中其他节点通信
+    clusterHost = "127.0.0.1"
+    # 集群模式监听的端口
+    clusterPort = 2884
+    # 集群模式是否使用tls
+    clusterTls = false
+    # 服务器端证书
+    serverCertFile = "certs/server.crt"
+    # 服务器端秘钥
+    serverKeyFile = "certs/server.key"
+    # 客户端证书，如果集群节点通信开启了tls时需要使用
+    clientCertFile = "certs/client.crt"
+    # 客户端秘钥
+    clientKeyFile = "certs/client.key"
+    [[cluster.staticNodeList]]
+        name="node1"
+        addr= "127.0.0.1:2884"
+    [[cluster.staticNodeList]]
+        name="node2"
+        addr= "127.0.0.1:2885"
+[defaultConfig]
+    [defaultConfig.connect]
+        keepalive=300 # 单位s，可以作为读超时
+        writeTimeout = 30 # 单位s, 写超时
+        connectTimeout=2 # 单位s
+        ackTimeout=20 #单位s
+        timeOutRetries=3 # 超时重试次数
+    [defaultConfig.provider]
+        sessionsProvider=""
+        topicsProvider=""
+        authenticator="" # 不填则会采用默认，开启身份验证的验证钩子，可选【"default","mysql","redis"】
+    [defaultConfig.auth]
+        allows = [""]
+    [defaultConfig.server]
+        redirects = ["127.0.0.1:2883","myserver.xyz.org","myserver.xyz.org:8883","[fe80::9610:3eff:fe1c]:1883"]
+        redirectIsForEver = true # 临时还是永久
+        redirectOpen = false # 开关
+[store]
+    [store.mysql]
+        source = ""
+        poolSize=10
+    [store.redis]
+        source=""
+        db=1
+        poolSize=10
+[pprof]
+port = 8080
+open = false

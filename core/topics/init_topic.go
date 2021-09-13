@@ -1,8 +1,8 @@
 package topics
 
 import (
-	"SI-MQTT/core/topics/share"
-	"SI-MQTT/core/topics/sys"
+	"gitee.com/Ljolan/si-mqtt/core/topics/share"
+	"gitee.com/Ljolan/si-mqtt/core/topics/sys"
 )
 
 func TopicInit(topicPro string) {

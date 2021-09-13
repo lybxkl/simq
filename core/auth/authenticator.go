@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"SI-MQTT/core/logger"
 	"errors"
 	"fmt"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 )
 
 var (
@@ -32,7 +32,7 @@ func Register(name string, provider Authenticator) {
 	}
 
 	providers[name] = provider
-	logger.Logger.Infof("Register AuthProvide：'%s' success，%T", name, provider)
+	logger2.Logger.Infof("Register AuthProvide：'%s' success，%T", name, provider)
 }
 
 func Unregister(name string) {

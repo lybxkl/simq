@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"SI-MQTT/core/logger"
+	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 )
 
 type authenticator bool
@@ -15,7 +15,7 @@ var (
 // mysql auth的初始化
 func mysqlAuthInit() {
 	Register("mysql", NewMysqlAuth())
-	logger.Logger.Info("开启mysql账号认证")
+	logger2.Logger.Info("开启mysql账号认证")
 }
 func NewMysqlAuth() Authenticator {
 	return &mysqlAuthenticator
@@ -25,14 +25,14 @@ func NewMysqlAuth() Authenticator {
 func (this authenticator) Authenticate(id string, cred interface{}) error {
 	if this {
 		if clientID, ok := checkAuth(id, cred); ok {
-			logger.Logger.Infof("mysql : 账号：%s，密码：%v，登陆成功，clientID==%s", id, cred, clientID)
+			logger2.Logger.Infof("mysql : 账号：%s，密码：%v，登陆成功，clientID==%s", id, cred, clientID)
 			return nil
 		} else {
-			logger.Logger.Infof("mysql : 账号：%s，密码：%v，登陆失败", id, cred)
+			logger2.Logger.Infof("mysql : 账号：%s，密码：%v，登陆失败", id, cred)
 			return ErrAuthFailure
 		}
 	}
-	logger.Logger.Info("当前未开启账号验证，取消一切连接。。。")
+	logger2.Logger.Info("当前未开启账号验证，取消一切连接。。。")
 	//取消客户端登陆连接
 	return ErrAuthFailure
 }
