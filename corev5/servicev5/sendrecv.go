@@ -7,6 +7,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"net"
+	"strings"
 	"time"
 )
 
@@ -76,10 +77,15 @@ func (this *service) receiver() {
 		for {
 			_, err := this.in.ReadFrom(r)
 
+			// 检查done是否关闭，如果关闭，退出
+
 			if err != nil {
 				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
 					// TODO 更新session状态
 					logger.Logger.Warnf("<<(%s)>> 读超时关闭：%v", this.cid(), er)
+					return
+				}
+				if this.isDone() && (strings.Contains(err.Error(), "use of closed network connection") || this.in.Len() == 0) {
 					return
 				}
 				if err != io.EOF {
@@ -128,6 +134,11 @@ func (this *service) sender() {
 			if err != nil {
 				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
 					logger.Logger.Warnf("<<(%s)>> 写超时关闭：%v", this.cid(), er)
+					return
+				}
+				if this.isDone() && (strings.Contains(err.Error(), "use of closed network connection")) {
+					// TODO 怎么处理这些未发送的
+					//
 					return
 				}
 				if err != io.EOF {

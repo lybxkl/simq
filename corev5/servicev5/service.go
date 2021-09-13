@@ -477,6 +477,9 @@ func (this *service) isDone() bool {
 		return true
 
 	default:
+		if this.closed > 0 {
+			return true
+		}
 	}
 
 	return false

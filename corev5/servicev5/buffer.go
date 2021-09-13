@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
-	"math"
 	"sync"
 	"sync/atomic"
 )
@@ -19,22 +18,6 @@ var (
 	defaultReadBlockSize  int64 = 1024       //comment.DefaultReadBlockSize
 	defaultWriteBlockSize int64 = 1024       //comment.DefaultWriteBlockSize
 )
-
-// buff 配置设置
-func QUICBuffConfigInit(bufferSize, readBlockSize, writeBlockSize uint64) {
-	if bufferSize > math.MaxInt64 {
-		panic("bufferSize more than math.MaxInt64")
-	}
-	if readBlockSize > math.MaxInt64 {
-		panic("readBlockSize more than math.MaxInt64")
-	}
-	if writeBlockSize > math.MaxInt64 {
-		panic("writeBlockSize more than math.MaxInt64")
-	}
-	defaultBufferSize = int64(bufferSize)
-	defaultReadBlockSize = int64(readBlockSize)
-	defaultWriteBlockSize = int64(writeBlockSize)
-}
 
 type sequence struct {
 	// The current position of the producer or consumer
