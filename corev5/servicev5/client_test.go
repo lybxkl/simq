@@ -7,24 +7,32 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"github.com/stretchr/testify/require"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
+var once sync.Once
+
 func TestExampleClient(t *testing.T) {
-	logger2.LogInit("debug") // 日志必须提前初始化
-	topicsv5.TopicInit("")
-	// Instantiates a new Client
+	clientId := "surgemq"
+
+	once.Do(func() {
+		logger2.LogInit("info") // 日志必须提前初始化
+	})
+	authplus.Register(clientId, authplus.NewDefaultAuth())
+	vp, _ := authplus.NewManager(clientId)
+	var pkid uint32 = 0
+
 	c := &Client{}
-	authplus.Register("", authplus.NewDefaultAuth())
-	vp, _ := authplus.NewManager("")
 	c.AuthPlus = vp
 	// Creates a new MQTT CONNECT messagev5 and sets the proper parameters
 	msg := messagev5.NewConnectMessage()
 	msg.SetWillQos(1)
 	msg.SetVersion(5)
 	msg.SetCleanSession(true)
-	msg.SetClientId([]byte("surgemq"))
+	msg.SetClientId([]byte(clientId))
 	msg.SetKeepAlive(30)
 	msg.SetWillTopic([]byte("will"))
 	msg.SetWillMessage([]byte("send me home"))
@@ -43,6 +51,9 @@ func TestExampleClient(t *testing.T) {
 	pubmsg.SetPayload([]byte("1234567890"))
 	pubmsg.SetQoS(2)
 
+	if pubmsg.QoS() > 0 {
+		pubmsg.SetPacketId(uint16(atomic.AddUint32(&pkid, 1)))
+	}
 	// Publishes to the server by sending the messagev5
 	fmt.Println("====== >>> Publish")
 	err = c.Publish(pubmsg, func(msg, ack messagev5.Message, err error) error {

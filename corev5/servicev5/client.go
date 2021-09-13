@@ -256,6 +256,8 @@ func (this *Client) Ping(onComplete OnCompleteFunc) error {
 // terminates after the sending of the DISCONNECT messagev5.
 //向服务器发送一条断开连接的消息。客户端立即
 //发送断开连接的消息后终止。
+// 如果是并发测试时，需要对Disconnect加锁，因为内部取消Topic等管理器会出现并发操作map
+// 因为不想因为Client而对内部加锁，影响性能，所以使用者自行加锁
 func (this *Client) Disconnect() {
 	//msg := messagev5.NewDisconnectMessage()
 	this.svc.stop()
