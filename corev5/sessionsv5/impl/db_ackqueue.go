@@ -54,11 +54,11 @@ func (d *dbAckqueue) Ack(msg messagev5.Message) (err error) {
 	switch msg.Type() {
 	case messagev5.PUBACK:
 		// 服务端下发qos=1的消息的回应
-		// 需要删除db中的数据
+		// 需要删除db中的数据 // TODO 批量删除
 		_, err = d.sessionStore.ReleaseOutflowMsg(context.Background(), d.clientId, msg.PacketId())
 	case messagev5.PUBREC:
 		// 服务端下发的qos=2的第一次回应
-		// 删除消息，插入过程消息
+		// 删除消息，插入过程消息 // TODO 批量删除
 		_, err = d.sessionStore.ReleaseOutflowMsg(context.Background(), d.clientId, msg.PacketId())
 		if err != nil {
 			logger.Logger.Error(err)
@@ -67,11 +67,11 @@ func (d *dbAckqueue) Ack(msg messagev5.Message) (err error) {
 		err = d.sessionStore.CacheOutflowSecMsgId(context.Background(), d.clientId, msg.PacketId())
 	case messagev5.PUBREL:
 		// 服务端收到的qos=2的第二次回应
-		// 删除过程消息
+		// 删除过程消息 // TODO 批量删除
 		_, err = d.sessionStore.ReleaseInflowMsg(context.Background(), d.clientId, msg.PacketId())
 	case messagev5.PUBCOMP:
 		// 服务端下发的qos=2的第二次回应
-		// 删除过程消息
+		// 删除过程消息 // TODO 批量删除
 		err = d.sessionStore.ReleaseOutflowSecMsgId(context.Background(), d.clientId, msg.PacketId())
 	case messagev5.PINGRESP:
 	default:

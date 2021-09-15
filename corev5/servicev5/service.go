@@ -9,6 +9,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
+	"math"
 	"sync"
 	"sync/atomic"
 )
@@ -158,12 +159,20 @@ func (this *service) start() error {
 	if err != nil {
 		return err
 	}
-
+	var pkid uint32 = 1
+	var max uint32 = math.MaxUint16 * 4 / 5
 	// If this is a server
 	if !this.client {
 		// Creat the onPublishFunc so it can be used for published messages
 		// 这个是发送给订阅者的，是每个订阅者都有一份的方法
 		this.onpub = func(msg *messagev5.PublishMessage) error {
+			if msg.QoS() > 0 {
+				pid := atomic.AddUint32(&pkid, 1) // FIXME 这里只是简单的处理pkid
+				if pid > max {
+					atomic.StoreUint32(&pkid, 1)
+				}
+				msg.SetPacketId(uint16(pid))
+			}
 			if err := this.publish(msg, func(msg, ack messagev5.Message, err error) error {
 				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
 				return nil
