@@ -174,7 +174,9 @@ func (this *session) Init(msg *messagev5.ConnectMessage, topics ...sessionsv5.Se
 
 	return nil
 }
-
+func (this *session) OfflineMsg() []messagev5.Message {
+	return nil
+}
 func (this *session) Update(msg *messagev5.ConnectMessage) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()

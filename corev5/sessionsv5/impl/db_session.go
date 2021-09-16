@@ -5,12 +5,15 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/logger"
+	"time"
 )
 
 type dbSession struct {
 	sessionStore store.SessionStore
 	messageStore store.MessageStore
 	memSession   *session
+	offline      []messagev5.Message
 }
 
 func NewDBSession(id string) sessionsv5.Session {
@@ -26,31 +29,104 @@ func (d *dbSession) SetStore(sessionStore store.SessionStore, messageStore store
 	d.messageStore = messageStore
 }
 
-func (d *dbSession) Init(msg *messagev5.ConnectMessage, topics ...sessionsv5.SessionInitTopic) error {
+// 此dbsession的init不会有topic数据来
+func (d *dbSession) Init(msg *messagev5.ConnectMessage, _ ...sessionsv5.SessionInitTopic) error {
 	cid := string(msg.ClientId())
 	ctx := context.Background()
-
-	err := d.memSession.InitSample(msg, d.sessionStore, topics...)
+	// 拉取订阅
+	subs, err := d.sessionStore.GetSubscriptions(ctx, cid)
+	topics := make([]sessionsv5.SessionInitTopic, len(subs))
+	for i := 0; i < len(subs); i++ {
+		topics[i] = sessionsv5.SessionInitTopic{
+			Topic: topics[i].Topic,
+			Qos:   topics[i].Qos,
+		}
+	}
+	err = d.memSession.InitSample(msg, d.sessionStore, topics...)
 	if err != nil {
 		return err
+	}
+	// 将离线消息qos>0的转至outflow表中，再删除离线消息表中数据
+	// 拉取过程消息，inflow，outflow，outflow2
+	offline, _, err := d.sessionStore.GetAllOfflineMsg(ctx, cid)
+	if err != nil {
+		logger.Logger.Errorf("get client: %v all offline message error: %v", cid, err)
+	}
+	if len(offline) > 0 {
+		err = d.sessionStore.ClearOfflineMsgs(ctx, cid)
+		if err != nil {
+			logger.Logger.Errorf("del client: %v all offline message error: %v", cid, err)
+		}
+		d.offline = offline
+	}
+	// info
+	info, err := d.sessionStore.GetAllInflowMsg(ctx, cid)
+	if err != nil {
+		logger.Logger.Errorf("get client: %v all info message error: %v", cid, err)
+	}
+	for i := 0; i < len(info); i++ {
+		// 如果超过int64一半 会导致panic
+		_ = d.memSession.pub2in.Wait(info[i], func(msg, ack messagev5.Message, err error) {
+			if err != nil {
+				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
+			} else {
+				logger.Logger.Debugf("发送失败：%v,%v,%v", msg, ack, err)
+			}
+		})
+	}
+	// outflow
+	outflow, err := d.sessionStore.GetAllOutflowMsg(ctx, cid)
+	if err != nil {
+		logger.Logger.Errorf("get client: %v all outflow message error: %v", cid, err)
+	}
+	for i := 0; i < len(outflow); i++ {
+		if of := outflow[i].(*messagev5.PublishMessage); of.QoS() == 2 {
+			// 如果超过int64一半 会导致panic
+			_ = d.memSession.pub2out.Wait(of, func(msg, ack messagev5.Message, err error) {
+				if err != nil {
+					logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
+				} else {
+					logger.Logger.Debugf("发送失败：%v,%v,%v", msg, ack, err)
+				}
+			})
+		} else {
+			// 如果超过int64一半 会导致panic
+			_ = d.memSession.pub1ack.Wait(of, func(msg, ack messagev5.Message, err error) {
+				if err != nil {
+					logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
+				} else {
+					logger.Logger.Debugf("发送失败：%v,%v,%v", msg, ack, err)
+				}
+			})
+		}
+	}
+	// outflow2
+	outflow2, err := d.sessionStore.GetAllOutflowSecMsg(ctx, cid)
+	if err != nil {
+		logger.Logger.Errorf("get client: %v all outflow2 message error: %v", cid, err)
+	}
+	for i := 0; i < len(outflow2); i++ {
+		outflow2ack := messagev5.NewPublishMessage()
+		outflow2ack.SetPacketId(outflow2[i])
+		// 如果超过int64一半 会导致panic
+		_ = d.memSession.pub2out.Wait(outflow2ack, func(msg, ack messagev5.Message, err error) {
+			if err != nil {
+				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
+			} else {
+				logger.Logger.Debugf("发送失败：%v,%v,%v", msg, ack, err)
+			}
+		})
 	}
 	err = d.sessionStore.StoreSession(ctx, cid, d.memSession)
 	if err != nil {
 		return err
 	}
-	if len(topics) == 0 {
-		return nil
-	}
-	sub := messagev5.NewSubscribeMessage()
-	for i := 0; i < len(topics); i++ {
-		err = sub.AddTopic([]byte(topics[i].Topic), topics[i].Qos)
-		if err != nil {
-			return err
-		}
-	}
-	return d.sessionStore.StoreSubscription(ctx, cid, sub)
-}
 
+	return nil
+}
+func (d *dbSession) OfflineMsg() []messagev5.Message {
+	return d.offline
+}
 func (d *dbSession) Update(msg *messagev5.ConnectMessage) error {
 	cid := string(msg.ClientId())
 	ctx := context.Background()
@@ -177,6 +253,8 @@ func (d *dbSession) SetExpiryInterval(u uint32) {
 
 func (d *dbSession) SetStatus(status sessionsv5.Status) {
 	d.memSession.SetStatus(status)
+	d.memSession.SetOfflineTime(time.Now().UnixNano())
+	_ = d.sessionStore.StoreSession(context.Background(), d.ClientId(), d)
 }
 
 func (d *dbSession) SetClientId(s string) {

@@ -24,6 +24,12 @@ func newDbAckQueue(sessionStore store.SessionStore,
 		isIn:         isIn,
 	}
 }
+func (d *dbAckqueue) Size() int64 {
+	return d.memAQ.size
+}
+func (d *dbAckqueue) Len() int {
+	return d.memAQ.Len()
+}
 func (d *dbAckqueue) Wait(msg messagev5.Message, onComplete interface{}) (err error) {
 	switch msg := msg.(type) {
 	case *messagev5.PublishMessage:

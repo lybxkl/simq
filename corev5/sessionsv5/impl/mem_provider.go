@@ -29,10 +29,10 @@ func NewMemProvider() *memProvider {
 	}
 }
 
-func (this *memProvider) New(id string, cleanStart bool) (sessionsv5.Session, error) {
+func (this *memProvider) New(id string, cleanStart bool, expiryTime uint32) (sessionsv5.Session, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
-	if cleanStart {
+	if expiryTime == 0 {
 		this.st[id] = NewMemSession(id)
 	} else {
 		this.st[id] = NewDBSession(id) // 新开始，需要删除旧的
@@ -40,7 +40,7 @@ func (this *memProvider) New(id string, cleanStart bool) (sessionsv5.Session, er
 	return this.st[id], nil
 }
 
-func (this *memProvider) Get(id string, cleanStart bool) (sessionsv5.Session, error) {
+func (this *memProvider) Get(id string, cleanStart bool, expiryTime uint32) (sessionsv5.Session, error) {
 	this.mu.RLock()
 	defer this.mu.RUnlock()
 

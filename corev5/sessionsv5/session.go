@@ -11,6 +11,7 @@ type SessionInitTopic struct {
 type Session interface {
 	Init(msg *messagev5.ConnectMessage, topics ...SessionInitTopic) error
 	Update(msg *messagev5.ConnectMessage) error
+	OfflineMsg() []messagev5.Message
 
 	AddTopic(topic string, qos byte) error
 	RemoveTopic(topic string) error

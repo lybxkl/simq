@@ -183,7 +183,6 @@ func (this *service) start() error {
 
 			return nil
 		}
-
 		// If this is a recovered session, then add any topicsv5 it subscribed before
 		//如果这是一个恢复的会话，那么添加它之前订阅的任何主题
 		tpc, qoss, err := this.sess.Topics()
@@ -218,6 +217,13 @@ func (this *service) start() error {
 	this.wgStopped.Add(1)
 	go this.sender()
 
+	if !this.client {
+		offline := this.sess.OfflineMsg()   // TODO 发送获取到的离线消息
+		for i := 0; i < len(offline); i++ { // 依次处理离线消息
+			_ = this.onpub(offline[i].(*messagev5.PublishMessage))
+		}
+		// FIXME 是否主动发送未完成确认的过程消息，还是等客户端操作
+	}
 	// Wait for all the goroutines to start before returning
 	this.wgStarted.Wait()
 
@@ -286,9 +292,9 @@ func (this *service) stop() {
 	if this.client {
 		topicsv5.Unregister(this.sess.ID())
 	}
-	//如果该客户端支持清除session，则清除
-	// Remove the session from session store if it's suppose to be clean session
-	if this.sess.Cmsg().CleanSession() && this.sessMgr != nil {
+	// 直接删除session，重连时重新初始化
+	this.sess.SetStatus(sessionsv5.OFFLINE)
+	if this.sessMgr != nil { // this.sess.Cmsg().CleanSession() &&
 		this.sessMgr.Del(this.sess.ID())
 	}
 

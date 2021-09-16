@@ -101,6 +101,9 @@ func newAckqueue(n int) sessionsv5.Ackqueue {
 		ackdone: make([]sessionsv5.Ackmsg, 0),
 	}
 }
+func (d *ackqueue) Size() int64 {
+	return d.size
+}
 
 // Wait() copies the messagev5 into a waiting queue, and waits for the corresponding
 // ack messagev5 to be received.
@@ -199,10 +202,10 @@ func (this *ackqueue) Acked() []sessionsv5.Ackmsg {
 FORNOTEMPTY:
 	for !this.empty() {
 		switch this.ring[this.head].State {
-		case MQ_TAG_CLU, messagev5.PUBACK, messagev5.PUBREL, messagev5.PUBCOMP, messagev5.SUBACK, messagev5.UNSUBACK:
+		case messagev5.PUBACK, messagev5.PUBREL, messagev5.PUBCOMP, messagev5.SUBACK, messagev5.UNSUBACK:
 			this.ackdone = append(this.ackdone, this.ring[this.head])
 			this.removeHead()
-
+		// TODO 之所以没有 messagev5.PUBREC，是因为在收到PUBCOMP后依旧会替换掉this.ring中那个位置的PUBCRC，到头来最终是执行的PUBCOMP
 		default:
 			break FORNOTEMPTY
 		}
@@ -302,7 +305,9 @@ func (this *ackqueue) grow() {
 		this.emap[this.ring[i].Pktid] = i
 	}
 }
-
+func (this *ackqueue) Len() int {
+	return this.len()
+}
 func (this *ackqueue) len() int {
 	return int(this.count)
 }

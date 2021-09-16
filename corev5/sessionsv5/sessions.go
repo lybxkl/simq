@@ -57,15 +57,15 @@ func NewManager(providerName string) (*Manager, error) {
 	return &Manager{p: p}, nil
 }
 
-func (this *Manager) New(id string, cleanStart bool) (Session, error) {
+func (this *Manager) New(id string, cleanStart bool, expiryTime uint32) (Session, error) {
 	if id == "" {
 		id = this.sessionId()
 	}
-	return this.p.New(id, cleanStart)
+	return this.p.New(id, cleanStart, expiryTime)
 }
 
-func (this *Manager) Get(id string, cleanStart bool) (Session, error) {
-	return this.p.Get(id, cleanStart)
+func (this *Manager) Get(id string, cleanStart bool, expiryTime uint32) (Session, error) {
+	return this.p.Get(id, cleanStart, expiryTime)
 }
 
 func (this *Manager) Del(id string) {

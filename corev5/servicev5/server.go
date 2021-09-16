@@ -648,28 +648,53 @@ func (this *Server) getSession(svc *service, req *messagev5.ConnectMessage, resp
 	// If found, return it.
 	//如果没有设置清除会话，请检查会话存储是否存在会话。
 	//如果找到，返回。
-	if !req.CleanStart() {
+	// TODO 通知其它节点断开那边的该客户端ID的连接，如果有的话
+	// ......FIXME 这里断开后，会丢失断开到重新连接其间的离线消息
+	// TODO 会话过期间隔 > 0 , 需要存储session，==0 则在连接断开时清除session
+	if !req.CleanStart() { // 使用旧session
 		// FIXME 当断线前是cleanStare=true，我们使用的是mem，但是重新连接时，使用了false，how to deal?
-		if svc.sess, err = this.sessMgr.Get(cid, req.CleanStart()); err == nil {
-			resp.SetSessionPresent(true)
+		if svc.sess, err = this.sessMgr.Get(cid, req.CleanStart(), req.SessionExpiryInterval()); err == nil {
+			// TODO 这里是懒删除，最好再加个定时删除
+			if svc.sess.Cmsg().SessionExpiryInterval() == 0 ||
+				(svc.sess.OfflineTime()+int64(svc.sess.Cmsg().SessionExpiryInterval()) <= time.Now().UnixNano()) {
+				// 删除session ， 因为已经过期了
+				svc.sess = nil
+				err = this.SessionStore.ClearSession(context.Background(), cid, true)
+				if err != nil {
+					return err
+				}
+				this.sessMgr.Del(cid)
+			} else {
+				// 如果在该节点，则可以直接使用该session，前提是集群节点通知断开、清理session是成功的
+				resp.SetSessionPresent(true)
 
-			if err = svc.sess.Update(req); err != nil {
-				return err
+				if err = svc.sess.Update(req); err != nil {
+					return err
+				}
 			}
+		} else {
+			// log
 		}
+	} else {
+		// 删除旧数据，清空旧连接的离线消息和未完成的过程消息，会话数据
+		err = this.SessionStore.ClearSession(context.Background(), cid, true)
+		if err != nil {
+			return err
+		}
+		this.sessMgr.Del(cid)
 	}
-
 	//如果没有session则创建一个
 	// If CleanSession, or no existing session found, then create a new one
 	if svc.sess == nil {
-		if svc.sess, err = this.sessMgr.New(cid, req.CleanStart()); err != nil {
+		// 这里因为前面通知其它节点断开旧连接，所以这里可以直接New
+		if svc.sess, err = this.sessMgr.New(cid, req.CleanStart(), req.SessionExpiryInterval()); err != nil {
 			return err
 		}
 		svc.sess.(store.Store).SetStore(this.SessionStore, this.MessageStore)
 
 		// 新建的present设置为false
 		resp.SetSessionPresent(false)
-		// 从当前connectMessage初始话该session
+		// 从当前connectMessage初始化该session
 		if err = svc.sess.Init(req); err != nil {
 			return err
 		}

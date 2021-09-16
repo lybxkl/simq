@@ -58,18 +58,35 @@ func (s *SessionRepo) StoreSession(ctx context.Context, clientId string, session
 	return nil
 }
 
+// ClearSession todo 事务
 func (s *SessionRepo) ClearSession(ctx context.Context, clientId string, clearOfflineMsg bool) error {
 	defer func() {
 		logger.Logger.Infof("【ClearSession ==X】%s, clearOfflineMsg: %v", clientId, clearOfflineMsg)
 	}()
-	// todo 事务
 	if clearOfflineMsg {
 		err := s.ClearOfflineMsgs(ctx, clientId)
 		if err != nil {
 			return err
 		}
+		// 清理过程消息
+		err = s.ReleaseAllOutflowMsg(ctx, clientId)
+		if err != nil {
+			return err
+		}
+		err = s.ReleaseAllInflowMsg(ctx, clientId)
+		if err != nil {
+			return err
+		}
+		err = s.ReleaseAllOutflowSecMsg(ctx, clientId)
+		if err != nil {
+			return err
+		}
 	}
-	err := s.c.Delete(ctx, "si_session", orm2.Select{"_id": clientId})
+	err := s.ClearSubscriptions(ctx, clientId)
+	if err != nil {
+		return err
+	}
+	err = s.c.Delete(ctx, "si_session", orm2.Select{"_id": clientId})
 	if err != nil {
 		return err
 	}
@@ -120,13 +137,20 @@ func (s *SessionRepo) CacheInflowMsg(ctx context.Context, clientId string, messa
 	}()
 	return s.c.Save(ctx, "si_inflow", "", voToPo(clientId, message.(*messagev5.PublishMessage)))
 }
-
+func (s *SessionRepo) ReleaseAllInflowMsg(ctx context.Context, clientId string) error {
+	defer func() {
+		logger.Logger.Infof("【ReleaseAllInflowMsg ==X】%s ", clientId)
+	}()
+	filter := orm2.Select{"client_id": clientId}
+	return s.c.Delete(ctx, "si_inflow", filter)
+}
 func (s *SessionRepo) ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error) {
 	defer func() {
 		logger.Logger.Infof("【ReleaseInflowMsg ==X】%s, pk_id: %v", clientId, pkId)
 	}()
 	ms := &po2.Message{}
-	err := s.c.GetAndDelete(ctx, "si_inflow", orm2.Select{"client_id": clientId, "pk_id": pkId}, ms)
+	filter := orm2.Select{"client_id": clientId, "pk_id": pkId}
+	err := s.c.GetAndDelete(ctx, "si_inflow", filter, ms)
 	if err != nil {
 		return nil, err
 	}
@@ -171,13 +195,24 @@ func (s *SessionRepo) GetAllOutflowMsg(ctx context.Context, clientId string) (t 
 	}
 	return ret, nil
 }
-
+func (s *SessionRepo) ReleaseAllOutflowMsg(ctx context.Context, clientId string) error {
+	defer func() {
+		logger.Logger.Infof("【ReleaseAllOutflowMsg ==X】%s", clientId)
+	}()
+	filter := orm2.Select{"client_id": clientId}
+	err := s.c.Delete(ctx, "si_outflow", filter)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (s *SessionRepo) ReleaseOutflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error) {
 	defer func() {
 		logger.Logger.Infof("【ReleaseOutflowMsg ==X】%s, pk_id: %v", clientId, pkId)
 	}()
 	ms := &po2.Message{}
-	err := s.c.GetAndDelete(ctx, "si_outflow", orm2.Select{"client_id": clientId, "pk_id": pkId}, ms)
+	filter := orm2.Select{"client_id": clientId, "pk_id": pkId}
+	err := s.c.GetAndDelete(ctx, "si_outflow", filter, ms)
 	if err != nil {
 		return nil, err
 	}
@@ -210,12 +245,19 @@ func (s *SessionRepo) GetAllOutflowSecMsg(ctx context.Context, clientId string) 
 	}
 	return ret, nil
 }
-
+func (s *SessionRepo) ReleaseAllOutflowSecMsg(ctx context.Context, clientId string) error {
+	defer func() {
+		logger.Logger.Infof("【ReleaseAllOutflowSecMsg ==X】%s", clientId)
+	}()
+	filter := orm2.Select{"client_id": clientId}
+	return s.c.Delete(ctx, "si_outflowsec", filter)
+}
 func (s *SessionRepo) ReleaseOutflowSecMsgId(ctx context.Context, clientId string, pkId uint16) error {
 	defer func() {
 		logger.Logger.Infof("【ReleaseOutflowSecMsgId ==X】%s, pk_id: %v", clientId, pkId)
 	}()
-	return s.c.Delete(ctx, "si_outflowsec", orm2.Select{"client_id": clientId, "pk_id": pkId})
+	filter := orm2.Select{"client_id": clientId, "pk_id": pkId}
+	return s.c.Delete(ctx, "si_outflowsec", filter)
 }
 
 func (s *SessionRepo) StoreOfflineMsg(ctx context.Context, clientId string, message messagev5.Message) error {

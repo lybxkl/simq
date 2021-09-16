@@ -6,6 +6,8 @@ type Ackqueue interface {
 	Wait(msg messagev5.Message, onComplete interface{}) error
 	Ack(msg messagev5.Message) error
 	Acked() []Ackmsg
+	Size() int64
+	Len() int
 }
 
 type Ackmsg struct {
