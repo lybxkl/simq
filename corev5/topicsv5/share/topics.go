@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 )
 
@@ -39,9 +40,9 @@ var (
 
 // TopicsProvider
 type ShareTopicsProvider interface {
-	Subscribe(topic, shareName []byte, qos byte, subscriber interface{}) (byte, error)
+	Subscribe(shareName []byte, sub topicsv5.Sub, subscriber interface{}) (byte, error)
 	Unsubscribe(topic, shareName []byte, subscriber interface{}) error
-	Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
+	Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error
 	AllSubInfo() (map[string][]string, error) // 获取所有的共享订阅，k: 主题，v: 该主题的所有共享组
 	Retain(msg *messagev5.PublishMessage, shareName []byte) error
 	Retained(topic, shareName []byte, msgs *[]*messagev5.PublishMessage) error
@@ -88,8 +89,8 @@ func NewManager(providerName string) (*Manager, error) {
 	return &Manager{p: p}, nil
 }
 
-func (this *Manager) Subscribe(topic, shareName []byte, qos byte, subscriber interface{}) (byte, error) {
-	return this.p.Subscribe(topic, shareName, qos, subscriber)
+func (this *Manager) Subscribe(shareName []byte, sub topicsv5.Sub, subscriber interface{}) (byte, error) {
+	return this.p.Subscribe(shareName, sub, subscriber)
 }
 
 func (this *Manager) AllSubInfo() (map[string][]string, error) {
@@ -100,7 +101,7 @@ func (this *Manager) Unsubscribe(topic, shareName []byte, subscriber interface{}
 	return this.p.Unsubscribe(topic, shareName, subscriber)
 }
 
-func (this *Manager) Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *Manager) Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error {
 	return this.p.Subscribers(topic, shareName, qos, subs, qoss)
 }
 

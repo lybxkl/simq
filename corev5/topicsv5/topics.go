@@ -44,9 +44,17 @@ var (
 	providers = make(map[string]TopicsProvider)
 )
 
+type Sub struct {
+	Topic             []byte
+	Qos               byte
+	NoLocal           bool
+	RetainAsPublished bool
+	RetainHandling    messagev5.RetainHandling
+}
+
 // TopicsProvider
 type TopicsProvider interface {
-	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
+	Subscribe(sub Sub, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error
 	// svc 表示是服务端下发的数据，系统主题消息
 	// shareName 为空表示不需要发送任何共享消息，不为空表示只需要发送当前shareName下的订阅者
@@ -56,7 +64,7 @@ type TopicsProvider interface {
 	// if shareName == "" && onlyShare == true  ===>> 表示获取当前主题shareName的所有共享组每个的组的一个订阅者，不需要所有非共享组的订阅者们
 	// if onlyShare == false && shareName != "" ===>> 获取当前主题的共享组名为shareName的订阅者一个与所有非共享组订阅者们
 	// if onlyShare == true && shareName != ""  ===>> 仅仅获取主题的共享组名为shareName的订阅者一个
-	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte, svc bool, shareName string, onlyShare bool) error
+	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]Sub, svc bool, shareName string, onlyShare bool) error
 	AllSubInfo() (map[string][]string, error) // 获取所有的共享订阅，k: 主题，v: 该主题的所有共享组
 	Retain(msg *messagev5.PublishMessage) error
 	Retained(topic []byte, msgs *[]*messagev5.PublishMessage) error
@@ -103,8 +111,8 @@ func NewManager(providerName string) (*Manager, error) {
 	return &Manager{p: p}, nil
 }
 
-func (this *Manager) Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error) {
-	return this.p.Subscribe(topic, qos, subscriber)
+func (this *Manager) Subscribe(sub Sub, subscriber interface{}) (byte, error) {
+	return this.p.Subscribe(sub, subscriber)
 }
 
 func (this *Manager) Unsubscribe(topic []byte, subscriber interface{}) error {
@@ -115,7 +123,7 @@ func (this *Manager) Unsubscribe(topic []byte, subscriber interface{}) error {
 // if shareName == "" && onlyShare == true  ===>> 表示获取当前主题shareName的所有共享组每个的组的一个订阅者，不需要所有非共享组的订阅者们
 // if onlyShare == false && shareName != "" ===>> 获取当前主题的共享组名为shareName的订阅者一个与所有非共享组订阅者们
 // if onlyShare == true && shareName != ""  ===>> 仅仅获取主题的共享组名为shareName的订阅者一个
-func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte, svc bool, shareName string, onlyShare bool) error {
+func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]Sub, svc bool, shareName string, onlyShare bool) error {
 	return this.p.Subscribers(topic, qos, subs, qoss, svc, shareName, onlyShare)
 }
 

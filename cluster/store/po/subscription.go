@@ -5,7 +5,7 @@ type Subscription struct {
 	Qos             uint8  `bson:"qos"`
 	Topic           string `bson:"topic,index"`
 	SubId           uint32 `bson:"sub_id"` // 订阅标识符
-	Local           bool   `bson:"local"`
+	NoLocal         bool   `bson:"no_local"`
 	RetainAsPublish bool   `bson:"retain_as_publish"`
 	RetainHandling  uint8  `bson:"retain_handling"`
 }

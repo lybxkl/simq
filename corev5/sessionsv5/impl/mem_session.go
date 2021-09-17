@@ -5,6 +5,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"sync"
 )
 
@@ -60,7 +61,7 @@ type session struct {
 
 	// topics stores all the topis for this session/client
 	//主题存储此会话/客户机的所有topics
-	topics map[string]byte
+	topics map[string]topicsv5.Sub
 
 	// Initialized?
 	initted bool
@@ -105,7 +106,7 @@ func (this *session) InitSample(msg *messagev5.ConnectMessage, sessionStore stor
 		this.will.SetRetain(this.cmsg.WillRetain())
 	}
 
-	this.topics = make(map[string]byte, 1)
+	this.topics = make(map[string]topicsv5.Sub, 1)
 
 	this.id = string(msg.ClientId())
 	this.pub1ack = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, false)
@@ -116,7 +117,7 @@ func (this *session) InitSample(msg *messagev5.ConnectMessage, sessionStore stor
 	this.pingack = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false)
 
 	for i := 0; i < len(topics); i++ {
-		this.topics[topics[i].Topic] = topics[i].Qos
+		this.topics[string(topics[i].Topic)] = topicsv5.Sub(topics[i])
 	}
 
 	this.status = sessionsv5.ONLINE
@@ -153,7 +154,7 @@ func (this *session) Init(msg *messagev5.ConnectMessage, topics ...sessionsv5.Se
 		this.will.SetRetain(this.cmsg.WillRetain())
 	}
 
-	this.topics = make(map[string]byte, 1)
+	this.topics = make(map[string]topicsv5.Sub, 1)
 
 	this.id = string(msg.ClientId())
 
@@ -165,7 +166,7 @@ func (this *session) Init(msg *messagev5.ConnectMessage, topics ...sessionsv5.Se
 	this.pingack = newAckqueue(defaultQueueSize >> 4)
 
 	for i := 0; i < len(topics); i++ {
-		this.topics[topics[i].Topic] = topics[i].Qos
+		this.topics[string(topics[i].Topic)] = topicsv5.Sub(topics[i])
 	}
 
 	this.status = sessionsv5.ONLINE
@@ -195,7 +196,7 @@ func (this *session) Update(msg *messagev5.ConnectMessage) error {
 	return nil
 }
 
-func (this *session) AddTopic(topic string, qos byte) error {
+func (this *session) AddTopic(sub topicsv5.Sub) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
@@ -203,7 +204,7 @@ func (this *session) AddTopic(topic string, qos byte) error {
 		return fmt.Errorf("session not yet initialized")
 	}
 
-	this.topics[topic] = qos
+	this.topics[string(sub.Topic)] = sub
 
 	return nil
 }
@@ -220,26 +221,34 @@ func (this *session) RemoveTopic(topic string) error {
 
 	return nil
 }
-
-func (this *session) Topics() ([]string, []byte, error) {
+func (this *session) SubOption(topic []byte) topicsv5.Sub {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+	return this.topics[string(topic)]
+}
+func (this *session) Topics() ([]topicsv5.Sub, error) {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	if !this.initted {
-		return nil, nil, fmt.Errorf("session not yet initialized")
+		return nil, fmt.Errorf("session not yet initialized")
 	}
 
 	var (
-		topics []string
-		qoss   []byte
+		subs []topicsv5.Sub
 	)
 
-	for k, v := range this.topics {
-		topics = append(topics, k)
-		qoss = append(qoss, v)
+	for _, v := range this.topics {
+		subs = append(subs, topicsv5.Sub{
+			Topic:             v.Topic,
+			Qos:               v.Qos,
+			NoLocal:           v.NoLocal,
+			RetainAsPublished: v.RetainAsPublished,
+			RetainHandling:    v.RetainHandling,
+		})
 	}
 
-	return topics, qoss, nil
+	return subs, nil
 }
 
 func (this *session) ID() string {
@@ -378,7 +387,13 @@ func (this *session) SetSub(sub *messagev5.SubscribeMessage) {
 	tp := sub.Topics()
 	qos := sub.Qos()
 	for i := 0; i < len(tp); i++ {
-		_ = this.AddTopic(string(tp[i]), qos[i])
+		_ = this.AddTopic(topicsv5.Sub{
+			Topic:             tp[i],
+			Qos:               qos[i],
+			NoLocal:           sub.TopicNoLocal(tp[i]),
+			RetainAsPublished: sub.TopicRetainAsPublished(tp[i]),
+			RetainHandling:    sub.TopicRetainHandling(tp[i]),
+		})
 	}
 }
 func (this *session) SetStore(_ store.SessionStore, _ store.MessageStore) {

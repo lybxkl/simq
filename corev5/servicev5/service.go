@@ -17,7 +17,8 @@ import (
 type (
 	//完成的回调方法
 	OnCompleteFunc func(msg, ack messagev5.Message, err error) error
-	OnPublishFunc  func(msg *messagev5.PublishMessage) error
+	// 发布的func类型 sender表示当前发送消息的客户端是哪个，shareMsg=true表示是共享消息，不能被Local 操作
+	OnPublishFunc func(msg *messagev5.PublishMessage, sender string, shareMsg bool) error
 )
 
 type stat struct {
@@ -165,7 +166,15 @@ func (this *service) start() error {
 	if !this.client {
 		// Creat the onPublishFunc so it can be used for published messages
 		// 这个是发送给订阅者的，是每个订阅者都有一份的方法
-		this.onpub = func(msg *messagev5.PublishMessage) error {
+		this.onpub = func(msg *messagev5.PublishMessage, sender string, shareMsg bool) error {
+			b := this.sess.SubOption(msg.Topic())
+			if !shareMsg && b.NoLocal && this.cid() == sender {
+				logger.Logger.Debugf("no send  NoLocal option msg")
+				return nil
+			}
+			if !b.RetainAsPublished { //为1，表示向此订阅转发应用消息时保持消息被发布时设置的保留（RETAIN）标志
+				msg.SetRetain(false)
+			}
 			if msg.QoS() > 0 {
 				pid := atomic.AddUint32(&pkid, 1) // FIXME 这里只是简单的处理pkid
 				if pid > max {
@@ -185,12 +194,18 @@ func (this *service) start() error {
 		}
 		// If this is a recovered session, then add any topicsv5 it subscribed before
 		//如果这是一个恢复的会话，那么添加它之前订阅的任何主题
-		tpc, qoss, err := this.sess.Topics()
+		tpc, err := this.sess.Topics()
 		if err != nil {
 			return err
 		} else {
-			for i, t := range tpc {
-				this.topicsMgr.Subscribe([]byte(t), qoss[i], &this.onpub)
+			for _, t := range tpc {
+				this.topicsMgr.Subscribe(topicsv5.Sub{
+					Topic:             t.Topic,
+					Qos:               t.Qos,
+					NoLocal:           t.NoLocal,
+					RetainAsPublished: t.RetainAsPublished,
+					RetainHandling:    t.RetainHandling,
+				}, &this.onpub)
 			}
 		}
 	}
@@ -220,7 +235,7 @@ func (this *service) start() error {
 	if !this.client {
 		offline := this.sess.OfflineMsg()   // TODO 发送获取到的离线消息
 		for i := 0; i < len(offline); i++ { // 依次处理离线消息
-			_ = this.onpub(offline[i].(*messagev5.PublishMessage))
+			_ = this.onpub(offline[i].(*messagev5.PublishMessage), "", false)
 		}
 		// FIXME 是否主动发送未完成确认的过程消息，还是等客户端操作
 	}
@@ -270,12 +285,12 @@ func (this *service) stop() {
 	// Unsubscribe from all the topicsv5 for this client, only for the server side though
 	// 取消订阅该客户机的所有主题，但只针对服务器端
 	if !this.client && this.sess != nil {
-		tpc, _, err := this.sess.Topics()
+		tpc, err := this.sess.Topics()
 		if err != nil {
 			logger.Logger.Errorf("(%s/%d): %v", this.cid(), this.id, err)
 		} else {
 			for _, t := range tpc {
-				if err := this.topicsMgr.Unsubscribe([]byte(t), &this.onpub); err != nil {
+				if err := this.topicsMgr.Unsubscribe(t.Topic, &this.onpub); err != nil {
 					logger.Logger.Errorf("(%s): Error unsubscribing topic %q: %v", this.cid(), t, err)
 				}
 			}
@@ -395,8 +410,25 @@ func (this *service) subscribe(msg *messagev5.SubscribeMessage, onComplete OnCom
 			if c == messagev5.QosFailure {
 				err2 = fmt.Errorf("Failed to subscribe to '%s'\n%v", string(t), err2)
 			} else {
-				this.sess.AddTopic(string(t), c)
-				_, err := this.topicsMgr.Subscribe(t, c, &onPublish)
+				tp1 := t
+				err := this.sess.AddTopic(topicsv5.Sub{
+					Topic:             tp1,
+					Qos:               c,
+					NoLocal:           sub.TopicNoLocal(t),
+					RetainAsPublished: sub.TopicRetainAsPublished(t),
+					RetainHandling:    sub.TopicRetainHandling(t),
+				})
+				if err != nil {
+					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)
+				}
+				tp := t
+				_, err = this.topicsMgr.Subscribe(topicsv5.Sub{
+					Topic:             tp,
+					Qos:               c,
+					NoLocal:           sub.TopicNoLocal(t),
+					RetainAsPublished: sub.TopicRetainAsPublished(t),
+					RetainHandling:    sub.TopicRetainHandling(t),
+				}, &onPublish)
 				if err != nil {
 					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)
 				}

@@ -5,6 +5,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"time"
 )
@@ -138,9 +139,9 @@ func (d *dbSession) Update(msg *messagev5.ConnectMessage) error {
 	return nil
 }
 
-func (d *dbSession) AddTopic(topic string, qos byte) error {
+func (d *dbSession) AddTopic(subs topicsv5.Sub) error {
 	sub := messagev5.NewSubscribeMessage()
-	err := sub.AddTopic([]byte(topic), qos)
+	err := sub.AddTopicAll(subs.Topic, subs.Qos, subs.NoLocal, subs.RetainAsPublished, byte(subs.RetainHandling))
 	if err != nil {
 		return err
 	}
@@ -149,7 +150,7 @@ func (d *dbSession) AddTopic(topic string, qos byte) error {
 	if err != nil {
 		return err
 	}
-	_ = d.memSession.AddTopic(topic, qos)
+	_ = d.memSession.AddTopic(subs)
 	return nil
 }
 
@@ -163,10 +164,12 @@ func (d *dbSession) RemoveTopic(topic string) error {
 	return nil
 }
 
-func (d *dbSession) Topics() ([]string, []byte, error) {
+func (d *dbSession) Topics() ([]topicsv5.Sub, error) {
 	return d.memSession.Topics()
 }
-
+func (d *dbSession) SubOption(topic []byte) topicsv5.Sub {
+	return d.memSession.SubOption(topic)
+}
 func (d *dbSession) ID() string {
 	return d.memSession.ID()
 }

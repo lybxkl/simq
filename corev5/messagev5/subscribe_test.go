@@ -16,13 +16,13 @@ func TestDecodeSub(t *testing.T) {
 
 	sub.AddTopic([]byte("/a/b/#/c"), 1)
 	require.Equal(t, 1, len(sub.Topics()), "Error adding topic.")
-	sub.SetTopicLocal([]byte("/a/b/#/c"), true)
+	sub.SetTopicNoLocal([]byte("/a/b/#/c"), true)
 	require.False(t, sub.TopicExists([]byte("a/b")), "Topic should not exist.")
 
 	sub.RemoveTopic([]byte("/a/b/#/c"))
 	require.False(t, sub.TopicExists([]byte("/a/b/#/c")), "Topic should not exist.")
 	sub.AddTopic([]byte("/a/b/#/c"), 1)
-	sub.SetTopicLocal([]byte("/a/b/#/c"), true)
+	sub.SetTopicNoLocal([]byte("/a/b/#/c"), true)
 	sub.SetTopicRetainAsPublished([]byte("/a/b/#/c"), true)
 	sub.SetTopicRetainHandling([]byte("/a/b/#/c"), NoSendRetain)
 

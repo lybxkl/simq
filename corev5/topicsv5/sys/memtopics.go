@@ -4,6 +4,7 @@ package sys
 import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"reflect"
 	"sync"
@@ -54,9 +55,9 @@ func NewMemProvider() *memTopics {
 	}
 }
 
-func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte, error) {
-	if !messagev5.ValidQos(qos) {
-		return messagev5.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
+func (this *memTopics) Subscribe(subs topicsv5.Sub, sub interface{}) (byte, error) {
+	if !messagev5.ValidQos(subs.Qos) {
+		return messagev5.QosFailure, fmt.Errorf("Invalid QoS %d", subs.Qos)
 	}
 
 	if sub == nil {
@@ -66,15 +67,15 @@ func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte,
 	this.smu.Lock()
 	defer this.smu.Unlock()
 
-	if qos > MaxQosAllowed_redis {
-		qos = MaxQosAllowed_redis
+	if subs.Qos > MaxQosAllowed_redis {
+		subs.Qos = MaxQosAllowed_redis
 	}
 
-	if err := this.sroot.sinsert(topic, qos, sub); err != nil {
+	if err := this.sroot.sinsert(subs, sub); err != nil {
 		return messagev5.QosFailure, err
 	}
 
-	return qos, nil
+	return subs.Qos, nil
 }
 
 func (this *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
@@ -85,7 +86,7 @@ func (this *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
 }
 
 // Returned values will be invalidated by the next Subscribers call
-func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error {
 	if !messagev5.ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -142,23 +143,23 @@ func newRSNode() *rSnode {
 	}
 }
 
-func (this *rSnode) sinsert(topic []byte, qos byte, sub interface{}) error {
+func (this *rSnode) sinsert(subs topicsv5.Sub, sub interface{}) error {
 	// If there's no more topic levels, that means we are at the matching snode
 	// to insert the subscriber. So let's see if there's such subscriber,
 	// if so, update it. Otherwise insert it.
-	if len(topic) == 0 {
+	if len(subs.Topic) == 0 {
 		// Let's see if the subscriber is already on the list. If yes, update
 		// QoS and then return.
 		for i := range this.subs {
 			if equal(this.subs[i], sub) {
-				this.qos[i] = qos
+				this.qos[i] = subs.Qos
 				return nil
 			}
 		}
 
 		// Otherwise add.
 		this.subs = append(this.subs, sub)
-		this.qos = append(this.qos, qos)
+		this.qos = append(this.qos, subs.Qos)
 
 		return nil
 	}
@@ -167,7 +168,7 @@ func (this *rSnode) sinsert(topic []byte, qos byte, sub interface{}) error {
 	// recursively call it's insert().
 
 	// ntl = next topic level
-	ntl, rem, err := nextRTopicLevel(topic)
+	ntl, rem, err := nextRTopicLevel(subs.Topic)
 	if err != nil {
 		return err
 	}
@@ -180,8 +181,8 @@ func (this *rSnode) sinsert(topic []byte, qos byte, sub interface{}) error {
 		n = newRSNode()
 		this.rsnodes[level] = n
 	}
-
-	return n.sinsert(rem, qos, sub)
+	subs.Topic = rem
+	return n.sinsert(subs, sub)
 }
 
 // This remove implementation ignores the QoS, as long as the subscriber
@@ -245,7 +246,7 @@ func (this *rSnode) sremove(topic []byte, sub interface{}) error {
 // with no wildcards (publish topic), it returns a list of subscribers that subscribes
 // to the topic. For each of the level names, it's a match
 // - if there are subscribers to '#', then all the subscribers are added to result set
-func (this *rSnode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *rSnode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error {
 	// If the topic is empty, it means we are at the final matching snode. If so,
 	// let's find the subscribers that match the qos and append them to the list.
 	if len(topic) == 0 {
@@ -495,13 +496,13 @@ func nextRTopicLevel(topic []byte) ([]byte, []byte, error) {
 // due to the QoS granted is lower than the published messagev5 QoS. For example,
 // if the client is granted only QoS 0, and the publish messagev5 is QoS 1, then this
 // client is not to be send the published messagev5.
-func (this *rSnode) matchQos(qos byte, subs *[]interface{}, qoss *[]byte) {
+func (this *rSnode) matchQos(qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) {
 	for i, sub := range this.subs {
 		// If the published QoS is higher than the subscriber QoS, then we skip the
 		// subscriber. Otherwise, add to the list.
 		if qos <= this.qos[i] {
 			*subs = append(*subs, sub)
-			*qoss = append(*qoss, qos)
+			*qoss = append(*qoss, topicsv5.Sub{Qos: qos})
 		}
 	}
 }

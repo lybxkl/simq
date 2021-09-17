@@ -2,20 +2,19 @@ package sessionsv5
 
 import (
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 )
 
-type SessionInitTopic struct {
-	Topic string
-	Qos   byte
-}
+type SessionInitTopic topicsv5.Sub
 type Session interface {
 	Init(msg *messagev5.ConnectMessage, topics ...SessionInitTopic) error
 	Update(msg *messagev5.ConnectMessage) error
 	OfflineMsg() []messagev5.Message
 
-	AddTopic(topic string, qos byte) error
+	AddTopic(sub topicsv5.Sub) error
 	RemoveTopic(topic string) error
-	Topics() ([]string, []byte, error)
+	Topics() ([]topicsv5.Sub, error)
+	SubOption(topic []byte) topicsv5.Sub // 获取主题的订阅选项
 
 	ID() string  // 客户端id
 	IDs() []byte // 客户端id 字节类型的

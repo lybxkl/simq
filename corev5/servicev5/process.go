@@ -6,6 +6,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 
 	"io"
@@ -332,14 +333,32 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 
 	topics := msg.Topics()
 	qos := msg.Qos()
+
 	this.rmsgs = this.rmsgs[0:0]
 
 	for i, t := range topics {
-		rqos, err := this.topicsMgr.Subscribe(t, qos[i], &this.onpub)
+		noLocal := msg.TopicNoLocal(t)
+		retainAsPublished := msg.TopicRetainAsPublished(t)
+		retainHandling := msg.TopicRetainHandling(t)
+		tp := t
+		rqos, err := this.topicsMgr.Subscribe(topicsv5.Sub{
+			Topic:             tp,
+			Qos:               qos[i],
+			NoLocal:           noLocal,
+			RetainAsPublished: retainAsPublished,
+			RetainHandling:    retainHandling,
+		}, &this.onpub)
 		if err != nil {
 			return err
 		}
-		this.sess.AddTopic(string(t), qos[i])
+		tp2 := t
+		err = this.sess.AddTopic(topicsv5.Sub{
+			Topic:             tp2,
+			Qos:               qos[i],
+			NoLocal:           noLocal,
+			RetainAsPublished: retainAsPublished,
+			RetainHandling:    retainHandling,
+		})
 
 		retcodes = append(retcodes, rqos)
 
@@ -347,8 +366,38 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 		// subscription to stop, just let it go.
 		//是的，我没有检查错误。如果有错误，我们不想
 		//订阅要停止，就放手吧。
-		this.topicsMgr.Retained(t, &this.rmsgs)
-		logger.Logger.Debugf("(%s) topic = %s, retained count = %d", this.cid(), t, len(this.rmsgs))
+		if retainHandling == messagev5.NoSendRetain {
+			continue
+		} else if retainHandling == messagev5.CanSendRetain {
+			_ = this.topicsMgr.Retained(t, &this.rmsgs)
+			logger.Logger.Debugf("(%s) topic = %s, retained count = %d", this.cid(), t, len(this.rmsgs))
+		} else if retainHandling == messagev5.NoExistSubSendRetain {
+			// 已存在订阅的情况下不发送保留消息是很有用的，比如重连完成时客户端不确定订阅是否在之前的会话连接中被创建。
+			oldTp, er := this.sess.Topics()
+			if er != nil {
+				return er
+			}
+			existThisTopic := false
+			for jk := 0; jk < len(oldTp); jk++ {
+				if len(oldTp[jk].Topic) != len(tp) {
+					continue
+				}
+				otp := oldTp[jk].Topic
+				for jj := 0; jj < len(otp); jj++ {
+					if otp[jj] != tp[jj] {
+						goto END
+					}
+				}
+				// 存在就不发送了
+				existThisTopic = true
+				break
+			END:
+			}
+			if !existThisTopic {
+				_ = this.topicsMgr.Retained(t, &this.rmsgs)
+				logger.Logger.Debugf("(%s) topic = %s, retained count = %d", this.cid(), t, len(this.rmsgs))
+			}
+		}
 
 		/**
 		* 可以在这里向其它集群节点发送添加主题消息
@@ -467,7 +516,7 @@ func (this *service) onPublish(msg1 *messagev5.PublishMessage) error {
 	_, _ = msg1.Encode(b)                   // 这里没有选择直接拿msg内的buf
 	tmpMsg := messagev5.NewPublishMessage() // 必须重新弄一个，防止被下面改动qos引起bug
 	_, _ = tmpMsg.Decode(b)
-	this.sendShareToCluster(tmpMsg)
+	this.sendShareToCluster(tmpMsg) // todo 共享订阅时把非本地选项设为1将造成协议错误
 	this.sendCluster(tmpMsg)
 
 	// 发送非共享订阅主题, 这里面会改动qos
@@ -566,7 +615,7 @@ func (this *service) ClusterInToPubSys(msg1 *messagev5.PublishMessage) error {
 func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, onlyShare bool) error {
 	var (
 		subs []interface{}
-		qoss []byte
+		qoss []topicsv5.Sub
 	)
 
 	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, shareName, onlyShare)
@@ -582,8 +631,8 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
-				err = (*fn)(msg)
+				_ = msg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
+				err = (*fn)(msg, this.cid(), onlyShare)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}
@@ -597,7 +646,7 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
 	var (
 		subs []interface{}
-		qoss []byte
+		qoss []topicsv5.Sub
 	)
 	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, "", true)
 	if err != nil {
@@ -612,8 +661,8 @@ func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
-				err = (*fn)(msg)
+				_ = msg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
+				err = (*fn)(msg, this.cid(), true)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}
@@ -627,7 +676,7 @@ func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
 func (this *service) pubFnSys(msg *messagev5.PublishMessage) error {
 	var (
 		subs []interface{}
-		qoss []byte
+		qoss []topicsv5.Sub
 	)
 	err := this.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, true, "", false)
 	if err != nil {
@@ -642,8 +691,8 @@ func (this *service) pubFnSys(msg *messagev5.PublishMessage) error {
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(qoss[i]) // 设置为该发的qos级别
-				err = (*fn)(msg)
+				_ = msg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
+				err = (*fn)(msg, this.cid(), false)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}

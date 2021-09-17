@@ -24,7 +24,7 @@ type SubscribeMessage struct {
 	qos    []byte // 订阅选项的第0和1比特代表最大服务质量字段
 
 	/**
-	非本地（No Local）和发布保留（Retain As Published）订阅选项在客户端把消息发送给其他服务端的情况下，可以被用来实现桥接。
+	非本地（NoLocal）和发布保留（Retain As Published）订阅选项在客户端把消息发送给其他服务端的情况下，可以被用来实现桥接。
 
 	已存在订阅的情况下不发送保留消息是很有用的，比如重连完成时客户端不确定订阅是否在之前的会话连接中被创建
 
@@ -37,7 +37,7 @@ type SubscribeMessage struct {
 	// 订阅选项的第2比特表示非本地（No Local）选项。
 	//	值为1，表示应用消息不能被转发给发布此消息的客户端。
 	// 共享订阅时把非本地选项设为1将造成协议错误
-	local []byte
+	noLocal []byte
 	// 订阅选项的第3比特表示发布保留（Retain As Published）选项。
 	//   值为1，表示向此订阅转发应用消息时保持消息被发布时设置的保留（RETAIN）标志。
 	//   值为0，表示向此订阅转发应用消息时把保留标志设置为0。当订阅建立之后，发送保留消息时保留标志设置为1。
@@ -100,8 +100,8 @@ func (this SubscribeMessage) String() string {
 	msgstr = fmt.Sprintf("%s, PropertiesLen=%v, Subscription Identifier=%v, User Properties=%v", msgstr, this.PropertiesLen(), this.subscriptionIdentifier, this.UserProperty())
 
 	for i, t := range this.topics {
-		msgstr = fmt.Sprintf("%s, Topic[%d]=%q，Qos：%d，Local：%d，Retain As Publish：%d，RetainHandling：%d",
-			msgstr, i, string(t), this.qos[i], this.local[i], this.retainAsPub[i], this.retainHandling[i])
+		msgstr = fmt.Sprintf("%s, Topic[%d]=%q，Qos：%d，noLocal：%d，Retain As Publish：%d，RetainHandling：%d",
+			msgstr, i, string(t), this.qos[i], this.noLocal[i], this.retainAsPub[i], this.retainHandling[i])
 	}
 
 	return msgstr
@@ -137,14 +137,14 @@ func (this *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
 
 	this.topics = append(this.topics, topic)
 	this.qos = append(this.qos, qos)
-	this.local = append(this.local, 0)
+	this.noLocal = append(this.noLocal, 0)
 	this.retainAsPub = append(this.retainAsPub, 0)
 	this.retainHandling = append(this.retainHandling, 0)
 	this.dirty = true
 
 	return nil
 }
-func (this *SubscribeMessage) AddTopicAll(topic []byte, qos byte, local, retainAsPub bool, retainHandling byte) error {
+func (this *SubscribeMessage) AddTopicAll(topic []byte, qos byte, noLocal, retainAsPub bool, retainHandling byte) error {
 	if !ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -170,10 +170,10 @@ func (this *SubscribeMessage) AddTopicAll(topic []byte, qos byte, local, retainA
 
 	this.topics = append(this.topics, topic)
 	this.qos = append(this.qos, qos)
-	if local {
-		this.local = append(this.local, 1)
+	if noLocal {
+		this.noLocal = append(this.noLocal, 1)
 	} else {
-		this.local = append(this.local, 0)
+		this.noLocal = append(this.noLocal, 0)
 	}
 	if retainAsPub {
 		this.retainAsPub = append(this.retainAsPub, 1)
@@ -204,7 +204,7 @@ func (this *SubscribeMessage) RemoveTopic(topic []byte) {
 	if found {
 		this.topics = append(this.topics[:i], this.topics[i+1:]...)
 		this.qos = append(this.qos[:i], this.qos[i+1:]...)
-		this.local = append(this.local[:i], this.local[i+1:]...)
+		this.noLocal = append(this.noLocal[:i], this.noLocal[i+1:]...)
 		this.retainAsPub = append(this.retainAsPub[:i], this.retainAsPub[i+1:]...)
 		this.retainHandling = append(this.retainHandling[:i], this.retainHandling[i+1:]...)
 	}
@@ -234,21 +234,21 @@ func (this *SubscribeMessage) TopicQos(topic []byte) byte {
 
 	return QosFailure
 }
-func (this *SubscribeMessage) TopicLocal(topic []byte) bool {
+func (this *SubscribeMessage) TopicNoLocal(topic []byte) bool {
 	for i, t := range this.topics {
 		if bytes.Equal(t, topic) {
-			return this.local[i] > 0
+			return this.noLocal[i] > 0
 		}
 	}
 	return false
 }
-func (this *SubscribeMessage) SetTopicLocal(topic []byte, local bool) {
+func (this *SubscribeMessage) SetTopicNoLocal(topic []byte, noLocal bool) {
 	for i, t := range this.topics {
 		if bytes.Equal(t, topic) {
-			if local {
-				this.local[i] = 1
+			if noLocal {
+				this.noLocal[i] = 1
 			} else {
-				this.local[i] = 0
+				this.noLocal[i] = 0
 			}
 			this.dirty = true
 			return
@@ -381,7 +381,7 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 		if src[total]&3 == 3 {
 			return 0, ProtocolError
 		}
-		this.local = append(this.local, (src[total]&4)>>2)
+		this.noLocal = append(this.noLocal, (src[total]&4)>>2)
 		this.retainAsPub = append(this.retainAsPub, (src[total]&8)>>3)
 		this.retainHandling = append(this.retainHandling, (src[total]&48)>>4)
 		if (src[total]&48)>>4 == 3 {
@@ -473,7 +473,7 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 		// 订阅选项
 		subOp := byte(0)
 		subOp |= this.qos[i]
-		subOp |= this.local[i] << 2
+		subOp |= this.noLocal[i] << 2
 		subOp |= this.retainAsPub[i] << 3
 		subOp |= this.retainHandling[i] << 4
 		dst[total] = subOp

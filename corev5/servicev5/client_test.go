@@ -116,7 +116,7 @@ func TestExampleClientSub(t *testing.T) {
 			fmt.Println(ack)
 		}
 		return nil
-	}, func(msg *messagev5.PublishMessage) error {
+	}, func(msg *messagev5.PublishMessage, sender string, shareMsg bool) error {
 		fmt.Println("===<<<>>>", msg.String())
 		return nil
 	})

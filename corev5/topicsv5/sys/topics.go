@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 )
 
@@ -39,9 +40,9 @@ var (
 
 // TopicsProvider
 type SysTopicsProvider interface {
-	Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error)
+	Subscribe(subs topicsv5.Sub, subscriber interface{}) (byte, error)
 	Unsubscribe(topic []byte, subscriber interface{}) error
-	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error
+	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error
 	Retain(msg *messagev5.PublishMessage) error
 	Retained(topic []byte, msgs *[]*messagev5.PublishMessage) error
 	Close() error
@@ -87,15 +88,15 @@ func NewManager(providerName string) (*Manager, error) {
 	return &Manager{p: p}, nil
 }
 
-func (this *Manager) Subscribe(topic []byte, qos byte, subscriber interface{}) (byte, error) {
-	return this.p.Subscribe(topic, qos, subscriber)
+func (this *Manager) Subscribe(subs topicsv5.Sub, subscriber interface{}) (byte, error) {
+	return this.p.Subscribe(subs, subscriber)
 }
 
 func (this *Manager) Unsubscribe(topic []byte, subscriber interface{}) error {
 	return this.p.Unsubscribe(topic, subscriber)
 }
 
-func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *Manager) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error {
 	return this.p.Subscribers(topic, qos, subs, qoss)
 }
 

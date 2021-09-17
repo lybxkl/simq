@@ -100,9 +100,9 @@ func (this *memTopics) SetStore(_ store.SessionStore, messageStore store.Message
 }
 
 //订阅主题
-func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte, error) {
-	if !messagev5.ValidQos(qos) {
-		return messagev5.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
+func (this *memTopics) Subscribe(subs topicsv5.Sub, sub interface{}) (byte, error) {
+	if !messagev5.ValidQos(subs.Qos) {
+		return messagev5.QosFailure, fmt.Errorf("Invalid QoS %d", subs.Qos)
 	}
 
 	if sub == nil {
@@ -112,16 +112,17 @@ func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte,
 	this.smu.Lock()
 	defer this.smu.Unlock()
 
-	if qos > MaxQosAllowed {
-		qos = MaxQosAllowed
+	if subs.Qos > MaxQosAllowed {
+		subs.Qos = MaxQosAllowed
 	}
-	if len(topic) > len(sysByte) && deepSysEqual(topic) {
-		return this.sys.Subscribe(topic[len(sysByte):], qos, sub)
+	if len(subs.Topic) > len(sysByte) && deepSysEqual(subs.Topic) {
+		subs.Topic = subs.Topic[len(sysByte):]
+		return this.sys.Subscribe(subs, sub)
 	}
-	if len(topic) > len(shareByte) && deepEqual(topic) {
+	if len(subs.Topic) > len(shareByte) && deepEqual(subs.Topic) {
 		var index = len(shareByte)
 		// 找到共享主题名称
-		for i, b := range topic[len(shareByte):] {
+		for i, b := range subs.Topic[len(shareByte):] {
 			if b == '/' {
 				index += i
 				break
@@ -133,17 +134,19 @@ func (this *memTopics) Subscribe(topic []byte, qos byte, sub interface{}) (byte,
 		if index == len(shareByte) {
 			return messagev5.QosFailure, fmt.Errorf("Share Topic Subscriber no have {ShareName}/")
 		}
-		if len(topic) >= 2+index && topic[index] == '/' {
+		if len(subs.Topic) >= 2+index && subs.Topic[index] == '/' {
 			//shareName := string(topic[len(shareByte) : index])
 			// TODO 注册共享订阅到redis
 			//redis.SubShare(string(topic[index+1:]), string(topic[len(shareByte):index]), nodeName)
-			return this.share.Subscribe(topic[index+1:], topic[len(shareByte):index], qos, sub)
+			shareName := subs.Topic[len(shareByte):index]
+			subs.Topic = subs.Topic[index+1:]
+			return this.share.Subscribe(shareName, subs, sub)
 		}
 	}
-	if err := this.sroot.sinsert(topic, qos, sub); err != nil {
+	if err := this.sroot.sinsert(subs, sub); err != nil {
 		return messagev5.QosFailure, err
 	}
-	return qos, nil
+	return subs.Qos, nil
 }
 
 func (this *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
@@ -180,7 +183,7 @@ func (this *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
 //返回的值将在下一次订阅者调用时失效
 // svc==true表示这是当前系统或者其它集群节点的系统消息，svc==false表示是客户端或者集群其它节点发来的普通共享、非共享消息
 // needShare != ""表示是否需要获取当前服务节点下共享组名为shareName的一个共享订阅节点
-func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte, svc bool, shareName string, onlyShare bool) error {
+func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub, svc bool, shareName string, onlyShare bool) error {
 	if !messagev5.ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -261,7 +264,7 @@ type snode struct {
 	// If this is the end of the topic string, then add subscribers here
 	//如果这是主题字符串的结尾，那么在这里添加订阅者
 	subs []interface{}
-	qos  []byte
+	qos  []topicsv5.Sub
 
 	// Otherwise add the next topic level here
 	snodes map[string]*snode
@@ -273,21 +276,21 @@ func newSNode() *snode {
 	}
 }
 
-func (this *snode) sinsert(topic []byte, qos byte, sub interface{}) error {
+func (this *snode) sinsert(subs topicsv5.Sub, sub interface{}) error {
 	// If there's no more topic levels, that means we are at the matching snode
 	// to insert the subscriber. So let's see if there's such subscriber,
 	// if so, update it. Otherwise insert it.
 	//如果没有更多的主题级别，这意味着我们在匹配的snode
 	//插入订阅。让我们看看是否有这样的订阅者，
 	//如果有，更新它。否则插入它。
-	if len(topic) == 0 {
+	if len(subs.Topic) == 0 {
 		// Let's see if the subscriber is already on the list. If yes, update
 		// QoS and then return.
 		//让我们看看用户是否已经在名单上了。如果是的,更新
 		// QoS，然后返回。
 		for i := range this.subs { // 重复订阅，可更新qos
 			if equal(this.subs[i], sub) {
-				this.qos[i] = qos
+				this.qos[i] = subs
 				return nil
 			}
 		}
@@ -295,7 +298,7 @@ func (this *snode) sinsert(topic []byte, qos byte, sub interface{}) error {
 		// Otherwise add.
 		//否则添加。
 		this.subs = append(this.subs, sub)
-		this.qos = append(this.qos, qos)
+		this.qos = append(this.qos, subs)
 
 		return nil
 	}
@@ -307,7 +310,7 @@ func (this *snode) sinsert(topic []byte, qos byte, sub interface{}) error {
 
 	// ntl = next topic level
 	// ntl =下一个主题级别
-	ntl, rem, err := nextTopicLevel(topic)
+	ntl, rem, err := nextTopicLevel(subs.Topic)
 	if err != nil {
 		return err
 	}
@@ -320,8 +323,8 @@ func (this *snode) sinsert(topic []byte, qos byte, sub interface{}) error {
 		n = newSNode()
 		this.snodes[level] = n
 	}
-
-	return n.sinsert(rem, qos, sub)
+	subs.Topic = rem
+	return n.sinsert(subs, sub)
 }
 
 // This remove implementation ignores the QoS, as long as the subscriber
@@ -420,7 +423,7 @@ func (this *snode) sremove(topic []byte, sub interface{}) error {
 //• “sport/+/player1”是有效的.
 //• “/finance”匹配“+/+”和“/+”, 但是不匹配“+”.
 
-func (this *snode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *snode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error {
 	// If the topic is empty, it means we are at the final matching snode. If so,
 	// let's find the subscribers that match the qos and append them to the list.
 	//如果主题是空的，这意味着我们到达了最后一个匹配的snode。如果是这样,
@@ -715,7 +718,7 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 //由于授予的QoS低于发布消息的QoS。例如,
 //如果只授予客户端QoS 0，且发布消息为QoS 1，则为
 //客户端不能发送已发布的消息。
-func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]byte) {
+func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) {
 	for i, sub := range this.subs {
 		// If the published QoS is higher than the subscriber QoS, then we skip the
 		// subscriber. Otherwise, add to the list.
@@ -726,8 +729,14 @@ func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]byte) {
 		//	*qoss = append(*qoss, qos)
 		//}
 		// TODO 修改为取二者最小值qos
-		if qos <= this.qos[i] {
-			*qoss = append(*qoss, qos)
+		if qos <= this.qos[i].Qos {
+			*qoss = append(*qoss, topicsv5.Sub{
+				Topic:             this.qos[i].Topic,
+				Qos:               qos,
+				NoLocal:           this.qos[i].NoLocal,
+				RetainAsPublished: this.qos[i].RetainAsPublished,
+				RetainHandling:    this.qos[i].RetainHandling,
+			})
 		} else {
 			*qoss = append(*qoss, this.qos[i])
 		}

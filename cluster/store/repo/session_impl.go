@@ -328,7 +328,7 @@ func voToPoSub(clientId string, sub *messagev5.SubscribeMessage) ([]map[string]i
 			Qos:             qos[i],
 			Topic:           tp,
 			SubId:           sub.SubscriptionIdentifier(),
-			Local:           sub.TopicLocal(top[i]),
+			NoLocal:         sub.TopicNoLocal(top[i]),
 			RetainAsPublish: sub.TopicRetainAsPublished(top[i]),
 			RetainHandling:  uint8(sub.TopicRetainHandling(top[i])),
 		})
@@ -357,6 +357,6 @@ func poToVoSession(session po2.Session) sessionsv5.Session {
 // 这里可以批量转为一条sub消息
 func poToVoSub(subscription po2.Subscription) *messagev5.SubscribeMessage {
 	sub := messagev5.NewSubscribeMessage()
-	_ = sub.AddTopicAll([]byte(subscription.Topic), subscription.Qos, subscription.Local, subscription.RetainAsPublish, subscription.RetainHandling)
+	_ = sub.AddTopicAll([]byte(subscription.Topic), subscription.Qos, subscription.NoLocal, subscription.RetainAsPublish, subscription.RetainHandling)
 	return sub
 }

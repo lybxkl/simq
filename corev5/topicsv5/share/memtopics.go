@@ -4,6 +4,7 @@ package share
 import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"math/rand"
 	"reflect"
@@ -51,9 +52,9 @@ func NewMemProvider() *memTopics {
 }
 
 //订阅主题
-func (this *memTopics) Subscribe(topic, shareName []byte, qos byte, sub interface{}) (byte, error) {
-	if !messagev5.ValidQos(qos) {
-		return messagev5.QosFailure, fmt.Errorf("Invalid QoS %d", qos)
+func (this *memTopics) Subscribe(shareName []byte, subs topicsv5.Sub, sub interface{}) (byte, error) {
+	if !messagev5.ValidQos(subs.Qos) {
+		return messagev5.QosFailure, fmt.Errorf("Invalid QoS %d", subs.Qos)
 	}
 
 	if sub == nil {
@@ -63,14 +64,14 @@ func (this *memTopics) Subscribe(topic, shareName []byte, qos byte, sub interfac
 	this.smu.Lock()
 	defer this.smu.Unlock()
 
-	if qos > MaxQosAllowed {
-		qos = MaxQosAllowed
+	if subs.Qos > MaxQosAllowed {
+		subs.Qos = MaxQosAllowed
 	}
-	if err := this.sroot.sinsert(topic, shareName, qos, sub); err != nil {
+	if err := this.sroot.sinsert(shareName, subs, sub); err != nil {
 		return messagev5.QosFailure, err
 	}
 
-	return qos, nil
+	return subs.Qos, nil
 }
 
 func (this *memTopics) Unsubscribe(topic, shareName []byte, sub interface{}) error {
@@ -82,7 +83,7 @@ func (this *memTopics) Unsubscribe(topic, shareName []byte, sub interface{}) err
 
 // Returned values will be invalidated by the next Subscribers call
 //返回的值将在下一次订阅者调用时失效
-func (this *memTopics) Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *memTopics) Subscribers(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error {
 	if !messagev5.ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -157,26 +158,26 @@ func newSNode() *snode {
 	}
 }
 
-func (this *snode) sinsert(topic, shareName []byte, qos byte, sub interface{}) error {
+func (this *snode) sinsert(shareName []byte, subs topicsv5.Sub, sub interface{}) error {
 	// If there's no more topic levels, that means we are at the matching snode
 	// to insert the subscriber. So let's see if there's such subscriber,
 	// if so, update it. Otherwise insert it.
 	//如果没有更多的主题级别，这意味着我们在匹配的snode
 	//插入订阅。让我们看看是否有这样的订阅者，
 	//如果有，更新它。否则插入它。
-	if len(topic) == 0 {
+	if len(subs.Topic) == 0 {
 		sn := string(shareName)
 		if v, ok := this.shares[sn]; ok {
 			//让我们看看用户是否已经在名单上了。如果是的,更新
 			// QoS，然后返回。
 			for i := range v.subs { // 重复订阅，可更新qos
 				if equal(v.subs[i], sub) {
-					v.qos[i] = qos
+					v.qos[i] = subs.Qos
 					return nil
 				}
 			}
 			v.subs = append(v.subs, sub)
-			v.qos = append(v.qos, qos)
+			v.qos = append(v.qos, subs.Qos)
 			return nil
 		}
 		// Otherwise add.
@@ -185,7 +186,7 @@ func (this *snode) sinsert(topic, shareName []byte, qos byte, sub interface{}) e
 			qos:  make([]byte, 0),
 		}
 		sin.subs = append(sin.subs, sub)
-		sin.qos = append(sin.qos, qos)
+		sin.qos = append(sin.qos, subs.Qos)
 		this.shares[sn] = sin
 
 		return nil
@@ -198,7 +199,7 @@ func (this *snode) sinsert(topic, shareName []byte, qos byte, sub interface{}) e
 
 	// ntl = next topic level
 	// ntl =下一个主题级别
-	ntl, rem, err := nextTopicLevel(topic)
+	ntl, rem, err := nextTopicLevel(subs.Topic)
 	if err != nil {
 		return err
 	}
@@ -211,8 +212,8 @@ func (this *snode) sinsert(topic, shareName []byte, qos byte, sub interface{}) e
 		n = newSNode()
 		this.snodes[level] = n
 	}
-
-	return n.sinsert(rem, shareName, qos, sub)
+	subs.Topic = rem
+	return n.sinsert(shareName, subs, sub)
 }
 
 // This remove implementation ignores the QoS, as long as the subscriber
@@ -325,7 +326,7 @@ func (this *snode) sremove(topic, shareName []byte, sub interface{}) error {
 //• “sport/+/player1”是有效的.
 //• “/finance”匹配“+/+”和“/+”, 但是不匹配“+”.
 
-func (this *snode) smatch(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]byte) error {
+func (this *snode) smatch(topic, shareName []byte, qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub) error {
 	// If the topic is empty, it means we are at the final matching snode. If so,
 	// let's find the subscribers that match the qos and append them to the list.
 	//如果主题是空的，这意味着我们到达了最后一个匹配的snode。如果是这样,
@@ -629,7 +630,7 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 //由于授予的QoS低于发布消息的QoS。例如,
 //如果只授予客户端QoS 0，且发布消息为QoS 1，则为
 //客户端不能发送已发布的消息。
-func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]byte, shareName []byte) {
+func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub, shareName []byte) {
 	if len(shareName) == 0 {
 		for _, sub := range this.shares {
 			if len(sub.subs) == 0 {
@@ -639,9 +640,9 @@ func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]byte, shareNa
 			i := rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(sub.subs))
 			// TODO 修改为取二者最小值qos
 			if qos <= sub.qos[i] {
-				*qoss = append(*qoss, qos)
+				*qoss = append(*qoss, topicsv5.Sub{Qos: qos})
 			} else {
-				*qoss = append(*qoss, sub.qos[i])
+				*qoss = append(*qoss, topicsv5.Sub{Qos: sub.qos[i]})
 			}
 			*subs = append(*subs, sub.subs[i])
 		}
@@ -655,9 +656,9 @@ func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]byte, shareNa
 		i := rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(sub.subs))
 		// TODO 修改为取二者最小值qos
 		if qos <= sub.qos[i] {
-			*qoss = append(*qoss, qos)
+			*qoss = append(*qoss, topicsv5.Sub{Qos: qos})
 		} else {
-			*qoss = append(*qoss, sub.qos[i])
+			*qoss = append(*qoss, topicsv5.Sub{Qos: sub.qos[i]})
 		}
 		*subs = append(*subs, sub.subs[i])
 	}
