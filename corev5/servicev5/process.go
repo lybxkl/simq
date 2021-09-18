@@ -1,6 +1,7 @@
 package servicev5
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
@@ -166,9 +167,26 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 		this.processAcked(this.sess.Pingack())
 
 	case *messagev5.DisconnectMessage:
-		// For DISCONNECT messagev5, we should quit
-		// 主动断开连接，不需要发送will消息，这里直接设置为false，外面处理就不会发送will了
-		this.sess.Cmsg().SetWillFlag(false)
+		logger.Logger.Debugf("client %v disconnect reason code: %s", this.cid(), msg.ReasonCode())
+		// 0x04 包含遗嘱消息的断开  客户端希望断开但也需要服务端发布它的遗嘱消息。
+		if msg.ReasonCode() != messagev5.DisconnectionIncludesWill {
+			this.sess.Cmsg().SetWillFlag(false)
+		}
+		// 判断是否需要重新设置session过期时间
+		if msg.SessionExpiryInterval() > 0 {
+			if this.sess.Cmsg().SessionExpiryInterval() == 0 {
+				// 如果CONNECT报文中的会话过期间隔为0，则客户端在DISCONNECT报文中设置非0会话过期间隔将造成协议错误（Protocol Error）
+				// 如果服务端收到这种非0会话过期间隔，则不会将其视为有效的DISCONNECT报文。
+				// TODO  服务端使用包含原因码为0x82（协议错误）的DISCONNECT报文
+				return errDisconnect // 这里暂时还是简单处理
+			}
+			// TODO 需要更新过期间隔
+			this.sess.Cmsg().SetSessionExpiryInterval(msg.SessionExpiryInterval())
+			err := this.SessionStore.StoreSession(context.Background(), this.cid(), this.sess)
+			if err != nil {
+				return err
+			}
+		}
 		return errDisconnect
 
 	default:
