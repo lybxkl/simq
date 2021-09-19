@@ -182,6 +182,9 @@ func (this *service) start() error {
 				}
 				msg.SetPacketId(uint16(pid))
 			}
+			if b.SubIdentifier > 0 {
+				msg.SetSubscriptionIdentifier(b.SubIdentifier) // 订阅标识符
+			}
 			if err := this.publish(msg, func(msg, ack messagev5.Message, err error) error {
 				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
 				return nil
@@ -205,6 +208,7 @@ func (this *service) start() error {
 					NoLocal:           t.NoLocal,
 					RetainAsPublished: t.RetainAsPublished,
 					RetainHandling:    t.RetainHandling,
+					SubIdentifier:     t.SubIdentifier,
 				}, &this.onpub)
 			}
 		}
@@ -417,6 +421,7 @@ func (this *service) subscribe(msg *messagev5.SubscribeMessage, onComplete OnCom
 					NoLocal:           sub.TopicNoLocal(t),
 					RetainAsPublished: sub.TopicRetainAsPublished(t),
 					RetainHandling:    sub.TopicRetainHandling(t),
+					SubIdentifier:     sub.SubscriptionIdentifier(),
 				})
 				if err != nil {
 					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)
@@ -428,6 +433,7 @@ func (this *service) subscribe(msg *messagev5.SubscribeMessage, onComplete OnCom
 					NoLocal:           sub.TopicNoLocal(t),
 					RetainAsPublished: sub.TopicRetainAsPublished(t),
 					RetainHandling:    sub.TopicRetainHandling(t),
+					SubIdentifier:     sub.SubscriptionIdentifier(),
 				}, &onPublish)
 				if err != nil {
 					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)

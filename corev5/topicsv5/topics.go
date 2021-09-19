@@ -50,6 +50,7 @@ type Sub struct {
 	NoLocal           bool
 	RetainAsPublished bool
 	RetainHandling    messagev5.RetainHandling
+	SubIdentifier     uint32 // 订阅标识符
 }
 
 // TopicsProvider

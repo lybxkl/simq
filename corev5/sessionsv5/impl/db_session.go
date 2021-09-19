@@ -145,6 +145,7 @@ func (d *dbSession) AddTopic(subs topicsv5.Sub) error {
 	if err != nil {
 		return err
 	}
+	sub.SetSubscriptionIdentifier(subs.SubIdentifier)
 	ctx := context.Background()
 	err = d.sessionStore.StoreSubscription(ctx, d.memSession.ClientId(), sub)
 	if err != nil {

@@ -736,6 +736,7 @@ func (this *snode) matchQos(qos byte, subs *[]interface{}, qoss *[]topicsv5.Sub)
 				NoLocal:           this.qos[i].NoLocal,
 				RetainAsPublished: this.qos[i].RetainAsPublished,
 				RetainHandling:    this.qos[i].RetainHandling,
+				SubIdentifier:     this.qos[i].SubIdentifier,
 			})
 		} else {
 			*qoss = append(*qoss, this.qos[i])

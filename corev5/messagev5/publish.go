@@ -40,7 +40,13 @@ func NewPublishMessage() *PublishMessage {
 
 	return msg
 }
-
+func (m *PublishMessage) Copy() *PublishMessage {
+	p := NewPublishMessage()
+	cp := make([]byte, p.Len())
+	_, _ = m.Encode(cp)
+	_, _ = p.Decode(cp)
+	return p
+}
 func (this PublishMessage) String() string {
 	return fmt.Sprintf("%s, Topic=%q, Packet ID=%d, QoS=%d, Retained=%t, Dup=%t, Payload=%s, "+
 		"PropertiesLen=%d, Payload Format Indicator=%d, Message Expiry Interval=%d, Topic Alias=%v, Response Topic=%s, "+

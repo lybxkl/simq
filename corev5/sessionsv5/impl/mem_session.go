@@ -245,6 +245,7 @@ func (this *session) Topics() ([]topicsv5.Sub, error) {
 			NoLocal:           v.NoLocal,
 			RetainAsPublished: v.RetainAsPublished,
 			RetainHandling:    v.RetainHandling,
+			SubIdentifier:     v.SubIdentifier,
 		})
 	}
 
@@ -393,6 +394,7 @@ func (this *session) SetSub(sub *messagev5.SubscribeMessage) {
 			NoLocal:           sub.TopicNoLocal(tp[i]),
 			RetainAsPublished: sub.TopicRetainAsPublished(tp[i]),
 			RetainHandling:    sub.TopicRetainHandling(tp[i]),
+			SubIdentifier:     sub.SubscriptionIdentifier(),
 		})
 	}
 }

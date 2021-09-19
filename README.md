@@ -33,7 +33,7 @@ golang mqtt服务器，集群版【设计中】
 
 8. Request/Response 模式 ---（客户端处理）
 
-9. 订阅标识符
+9. ~~订阅标识符~~
 
 10. ~~订阅选项 NoLocal、Retain As Publish、Retain Handling处理~~
     

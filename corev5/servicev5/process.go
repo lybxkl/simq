@@ -365,6 +365,7 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 			NoLocal:           noLocal,
 			RetainAsPublished: retainAsPublished,
 			RetainHandling:    retainHandling,
+			SubIdentifier:     msg.SubscriptionIdentifier(),
 		}, &this.onpub)
 		if err != nil {
 			return err
@@ -376,6 +377,7 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 			NoLocal:           noLocal,
 			RetainAsPublished: retainAsPublished,
 			RetainHandling:    retainHandling,
+			SubIdentifier:     msg.SubscriptionIdentifier(),
 		})
 
 		retcodes = append(retcodes, rqos)
@@ -643,14 +645,19 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 	}
 	msg.SetRetain(false)
 	logger.Logger.Debugf("(%s) Publishing to topic %s and %s subscribers：%v", this.cid(), msg.Topic(), shareName, len(subs))
+	b := make([]byte, msg.Len())
+	_, _ = msg.Encode(b)
+
 	for i, s := range subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
-				_ = msg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
-				err = (*fn)(msg, this.cid(), onlyShare)
+				tmpMsg := messagev5.NewPublishMessage() // 必须重新弄一个，防止被下面改动qos引起bug
+				_, _ = tmpMsg.Decode(b)
+				_ = tmpMsg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
+				err = (*fn)(tmpMsg, this.cid(), onlyShare)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}
