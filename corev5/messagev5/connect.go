@@ -1238,6 +1238,18 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				return total, ProtocolError
 			}
 		}
+		// TODO 此 if 是为了兼容MQTTX的连接包
+		if total < len(src) && src[total] == LoadFormatDescription { // 载荷格式指示
+			total++
+			this.payloadFormatIndicator = src[total]
+			total++
+			if this.payloadFormatIndicator != 0x00 && this.payloadFormatIndicator != 0x01 {
+				return total, ProtocolError
+			}
+			if total < len(src) && src[total] == LoadFormatDescription {
+				return total, ProtocolError
+			}
+		}
 		if total < len(src) && src[total] == ResponseTopic { // 响应主题的存在将遗嘱消息（Will Message）标识为一个请求报文
 			total++
 			this.responseTopic, n, err = readLPBytes(src[total:])
