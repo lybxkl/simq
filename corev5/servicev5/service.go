@@ -18,7 +18,7 @@ type (
 	//完成的回调方法
 	OnCompleteFunc func(msg, ack messagev5.Message, err error) error
 	// 发布的func类型 sender表示当前发送消息的客户端是哪个，shareMsg=true表示是共享消息，不能被Local 操作
-	OnPublishFunc func(msg *messagev5.PublishMessage, sender string, shareMsg bool) error
+	OnPublishFunc func(msg *messagev5.PublishMessage, sub topicsv5.Sub, sender string, shareMsg bool) error
 )
 
 type stat struct {
@@ -166,13 +166,12 @@ func (this *service) start() error {
 	if !this.client {
 		// Creat the onPublishFunc so it can be used for published messages
 		// 这个是发送给订阅者的，是每个订阅者都有一份的方法
-		this.onpub = func(msg *messagev5.PublishMessage, sender string, shareMsg bool) error {
-			b := this.sess.SubOption(msg.Topic())
-			if !shareMsg && b.NoLocal && this.cid() == sender {
+		this.onpub = func(msg *messagev5.PublishMessage, sub topicsv5.Sub, sender string, shareMsg bool) error {
+			if !shareMsg && sub.NoLocal && this.cid() == sender {
 				logger.Logger.Debugf("no send  NoLocal option msg")
 				return nil
 			}
-			if !b.RetainAsPublished { //为1，表示向此订阅转发应用消息时保持消息被发布时设置的保留（RETAIN）标志
+			if !sub.RetainAsPublished { //为1，表示向此订阅转发应用消息时保持消息被发布时设置的保留（RETAIN）标志
 				msg.SetRetain(false)
 			}
 			if msg.QoS() > 0 {
@@ -182,8 +181,11 @@ func (this *service) start() error {
 				}
 				msg.SetPacketId(uint16(pid))
 			}
-			if b.SubIdentifier > 0 {
-				msg.SetSubscriptionIdentifier(b.SubIdentifier) // 订阅标识符
+			if sub.SubIdentifier > 0 {
+				msg.SetSubscriptionIdentifier(sub.SubIdentifier) // 订阅标识符
+			}
+			if alice, exist := this.sess.GetTopicAlice(msg.Topic()); exist {
+				msg.SetNilTopicAndAlias(alice) // 直接替换主题为空了，用主题别名来表示
 			}
 			if err := this.publish(msg, func(msg, ack messagev5.Message, err error) error {
 				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
@@ -239,7 +241,8 @@ func (this *service) start() error {
 	if !this.client {
 		offline := this.sess.OfflineMsg()   // TODO 发送获取到的离线消息
 		for i := 0; i < len(offline); i++ { // 依次处理离线消息
-			_ = this.onpub(offline[i].(*messagev5.PublishMessage), "", false)
+			// FIXME topicsv5.Sub 获取
+			_ = this.onpub(offline[i].(*messagev5.PublishMessage), topicsv5.Sub{}, "", false)
 		}
 		// FIXME 是否主动发送未完成确认的过程消息，还是等客户端操作
 	}

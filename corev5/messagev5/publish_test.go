@@ -43,6 +43,34 @@ func TestPubDecode(t *testing.T) {
 	pub2.dbuf = nil
 	fmt.Println(reflect.DeepEqual(pub, pub2))
 }
+func TestPubNoTopicTest(t *testing.T) {
+	pub := NewPublishMessage()
+	pub.SetQoS(0x01)
+	pub.SetPacketId(123)
+	pub.SetPayload([]byte("11"))
+	//pub.SetTopic([]byte("11"))
+	pub.SetTopicAlias(100)
+	fmt.Printf("%+v\n", pub)
+	b := make([]byte, pub.Len())
+	n, err := pub.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(b[:n])
+	fmt.Println(len(b[:n]))
+	pub2 := NewPublishMessage()
+	pub2.Decode(b[:n])
+	fmt.Printf("%+v\n", pub2)
+	n, err = pub2.Encode(b)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(b[:n])
+	fmt.Println(len(b[:n]))
+	pub2.dirty = true
+	pub2.dbuf = nil
+	fmt.Println(reflect.DeepEqual(pub, pub2))
+}
 func TestPublishMessageHeaderFields(t *testing.T) {
 	msg := NewPublishMessage()
 	msg.mtypeflags[0] |= 11

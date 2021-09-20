@@ -48,10 +48,10 @@ func (m *PublishMessage) Copy() *PublishMessage {
 	return p
 }
 func (this PublishMessage) String() string {
-	return fmt.Sprintf("%s, Topic=%q, Packet ID=%d, QoS=%d, Retained=%t, Dup=%t, Payload=%s, "+
+	return fmt.Sprintf("%s, Topic=%q, QoS=%d, Retained=%t, Dup=%t, Payload=%s, "+
 		"PropertiesLen=%d, Payload Format Indicator=%d, Message Expiry Interval=%d, Topic Alias=%v, Response Topic=%s, "+
 		"Correlation Data=%s, User Property=%s, Subscription Identifier=%v, Content Type=%s",
-		this.header, this.topic, this.packetId, this.QoS(), this.Retain(), this.Dup(), this.payload,
+		this.header, this.topic, this.QoS(), this.Retain(), this.Dup(), this.payload,
 		this.propertiesLen, this.payloadFormatIndicator, this.messageExpiryInterval, this.topicAlias, this.responseTopic,
 		this.correlationData, this.userProperty, this.subscriptionIdentifier, this.contentType)
 }
@@ -90,7 +90,11 @@ func (this *PublishMessage) SetTopicAlias(topicAlias uint16) {
 	this.topicAlias = topicAlias
 	this.dirty = true
 }
-
+func (this *PublishMessage) SetNilTopicAndAlias(alias uint16) {
+	this.topicAlias = alias
+	this.topic = nil
+	this.dirty = true
+}
 func (this *PublishMessage) ResponseTopic() []byte {
 	return this.responseTopic
 }
@@ -255,10 +259,6 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 		return total, err
 	}
 
-	if !ValidTopic(this.topic) {
-		return total, fmt.Errorf("publish/Decode: Invalid topic name (%s). Must not be empty or contain wildcard characters", string(this.topic))
-	}
-
 	// The packet identifier field is only present in the PUBLISH packets where the
 	// QoS level is 1 or 2
 	if this.QoS() != 0 {
@@ -296,6 +296,11 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 		total += 2
 		if this.topicAlias == 0 || (total < len(src) && src[total] == ThemeAlias) {
 			return 0, ProtocolError
+		}
+	}
+	if this.topicAlias == 0 { // 没有主题别名才验证topic
+		if !ValidTopic(this.topic) {
+			return total, fmt.Errorf("publish/Decode: Invalid topic name (%s). Must not be empty or contain wildcard characters", string(this.topic))
 		}
 	}
 	if total < len(src) && src[total] == ResponseTopic { // 响应主题
@@ -379,8 +384,8 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 
 		return copy(dst, this.dbuf), nil
 	}
-	if len(this.topic) == 0 {
-		return 0, fmt.Errorf("publish/Encode: Topic name is empty.")
+	if len(this.topic) == 0 && this.topicAlias == 0 {
+		return 0, fmt.Errorf("publish/Encode: Topic name is empty, and topic alice <= 0.")
 	}
 
 	if len(this.payload) == 0 {

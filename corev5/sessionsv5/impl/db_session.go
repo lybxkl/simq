@@ -138,7 +138,15 @@ func (d *dbSession) Update(msg *messagev5.ConnectMessage) error {
 	_ = d.memSession.Update(msg)
 	return nil
 }
-
+func (this *dbSession) AddTopicAlice(topic []byte, alice uint16) {
+	this.memSession.AddTopicAlice(topic, alice)
+}
+func (this *dbSession) GetAliceTopic(alice uint16) ([]byte, bool) {
+	return this.memSession.GetAliceTopic(alice)
+}
+func (this *dbSession) GetTopicAlice(topic []byte) (uint16, bool) {
+	return this.memSession.GetTopicAlice(topic)
+}
 func (d *dbSession) AddTopic(subs topicsv5.Sub) error {
 	sub := messagev5.NewSubscribeMessage()
 	err := sub.AddTopicAll(subs.Topic, subs.Qos, subs.NoLocal, subs.RetainAsPublished, byte(subs.RetainHandling))

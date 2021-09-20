@@ -37,7 +37,7 @@ golang mqtt服务器，集群版【设计中】
 
 10. ~~订阅选项 NoLocal、Retain As Publish、Retain Handling处理~~
     
-11. 主题别名(Topic Alias)处理
+11. ~~主题别名(Topic Alias)处理~~
 
 12. 流控
 

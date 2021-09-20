@@ -53,7 +53,6 @@ type Client struct {
 //需要与MQTT连接消息一起提供。
 func (this *Client) Connect(uri string, msg *messagev5.ConnectMessage) (err error) {
 	this.checkConfiguration()
-
 	if msg == nil {
 		return fmt.Errorf("msg is nil")
 	}
@@ -202,7 +201,14 @@ redirect:
 //当收到PUBACK时调用onComplete。对于QOS 2消息，onComplete是
 //在收到PUBCOMP消息后调用。
 func (this *Client) Publish(msg *messagev5.PublishMessage, onComplete OnCompleteFunc) error {
-	return this.svc.publish(msg, onComplete)
+	oc := func(msg, ack messagev5.Message, err error) error {
+		m1 := msg.(*messagev5.PublishMessage)
+		if len(m1.Topic()) > 0 && m1.TopicAlias() > 0 {
+			this.svc.sess.AddTopicAlice(m1.Topic(), m1.TopicAlias())
+		}
+		return onComplete(msg, ack, err)
+	}
+	return this.svc.publish(msg, oc)
 }
 
 // Subscribe sends a single SUBSCRIBE messagev5 to the server. The SUBSCRIBE messagev5

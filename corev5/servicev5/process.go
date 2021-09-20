@@ -301,6 +301,29 @@ func (this *service) processAcked(ackq sessionsv5.Ackqueue) {
 	}
 }
 
+// 入消息的主题别名处理 第一阶段 验证
+func (this *service) topicAliceIn(msg *messagev5.PublishMessage) error {
+	if msg.TopicAlias() > 0 && len(msg.Topic()) == 0 {
+		if tp, ok := this.sess.GetAliceTopic(msg.TopicAlias()); ok {
+			_ = msg.SetTopic(tp)
+			logger.Logger.Debugf("%v set topic by alice ==> topic：%v alice：%v", this.cid(), tp, msg.TopicAlias())
+		} else {
+			return errors.New("protocol error")
+		}
+	} else if msg.TopicAlias() > this.sess.TopicAliasMax() {
+		return errors.New("protocol error")
+	} else if msg.TopicAlias() > 0 && len(msg.Topic()) > 0 {
+		// 需要保存主题别名，只会与当前连接保存生命一致
+		if this.sess.TopicAliasMax() < msg.TopicAlias() {
+			return errors.New("topic alias is not allowed or too large")
+		}
+		this.sess.AddTopicAlice(msg.Topic(), msg.TopicAlias())
+		logger.Logger.Debugf("%v save topic alice ==> topic：%v alice：%v", this.cid(), msg.Topic(), msg.TopicAlias())
+		msg.SetTopicAlias(0)
+	}
+	return nil
+}
+
 // For PUBLISH messagev5, we should figure out what QoS it is and process accordingly
 // If QoS == 0, we should just take the next step, no ack required
 // If QoS == 1, we should send back PUBACK, then take the next step
@@ -310,7 +333,9 @@ func (this *service) processAcked(ackq sessionsv5.Ackqueue) {
 //如果QoS == 1，我们应该返回PUBACK，然后进行下一步
 //如果QoS == 2，我们需要将其放入ack队列中，发送回PUBREC
 func (this *service) processPublish(msg *messagev5.PublishMessage) error {
-
+	if err := this.topicAliceIn(msg); err != nil {
+		return err
+	}
 	switch msg.QoS() {
 	case messagev5.QosExactlyOnce:
 		this.sess.Pub2in().Wait(msg, nil)
@@ -657,7 +682,7 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 				tmpMsg := messagev5.NewPublishMessage() // 必须重新弄一个，防止被下面改动qos引起bug
 				_, _ = tmpMsg.Decode(b)
 				_ = tmpMsg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
-				err = (*fn)(tmpMsg, this.cid(), onlyShare)
+				err = (*fn)(tmpMsg, qoss[i], this.cid(), onlyShare)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}
@@ -687,7 +712,7 @@ func (this *service) pubFnPlus(msg *messagev5.PublishMessage) error {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
 				_ = msg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
-				err = (*fn)(msg, this.cid(), true)
+				err = (*fn)(msg, qoss[i], this.cid(), true)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}
@@ -717,7 +742,7 @@ func (this *service) pubFnSys(msg *messagev5.PublishMessage) error {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
 				_ = msg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别
-				err = (*fn)(msg, this.cid(), false)
+				err = (*fn)(msg, qoss[i], this.cid(), false)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}

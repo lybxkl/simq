@@ -12,6 +12,10 @@ type Session interface {
 	OfflineMsg() []messagev5.Message
 
 	AddTopic(sub topicsv5.Sub) error
+	AddTopicAlice(topic []byte, alice uint16)
+	GetTopicAlice(topic []byte) (uint16, bool)
+	GetAliceTopic(alice uint16) ([]byte, bool)
+
 	RemoveTopic(topic string) error
 	Topics() ([]topicsv5.Sub, error)
 	SubOption(topic []byte) topicsv5.Sub // 获取主题的订阅选项
