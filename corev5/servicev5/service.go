@@ -130,8 +130,11 @@ type service struct {
 	//应该发布到连接另一端的客户端。所以我们
 	//将调用publish()发送消息。
 	onpub   OnPublishFunc
-	inStat  stat // 输入的记录
-	outStat stat // 输出的记录
+	inStat  stat  // 输入的记录
+	outStat stat  // 输出的记录
+	sign    *Sign // 信号
+	quota   int64 // 配额
+	limit   int
 
 	intmp  []byte
 	outtmp []byte
@@ -162,11 +165,17 @@ func (this *service) start() error {
 	}
 	var pkid uint32 = 1
 	var max uint32 = math.MaxUint16 * 4 / 5
+
+	this.sign = NewSign(this.quota, this.limit)
 	// If this is a server
 	if !this.client {
 		// Creat the onPublishFunc so it can be used for published messages
 		// 这个是发送给订阅者的，是每个订阅者都有一份的方法
 		this.onpub = func(msg *messagev5.PublishMessage, sub topicsv5.Sub, sender string, shareMsg bool) error {
+			if msg.QoS() > 0 && !this.sign.ReqQuota() {
+				// 超过配额
+				return nil
+			}
 			if !shareMsg && sub.NoLocal && this.cid() == sender {
 				logger.Logger.Debugf("no send  NoLocal option msg")
 				return nil

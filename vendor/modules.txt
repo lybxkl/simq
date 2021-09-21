@@ -6,6 +6,9 @@ github.com/StackExchange/wmi
 # github.com/apache/dubbo-getty v1.4.5
 ## explicit
 github.com/apache/dubbo-getty
+# github.com/bsm/ratelimit v2.0.0+incompatible
+## explicit
+github.com/bsm/ratelimit
 # github.com/buguang01/util v1.1.14
 ## explicit
 github.com/buguang01/util
@@ -48,7 +51,8 @@ github.com/gorilla/websocket
 github.com/jinzhu/inflection
 # github.com/jinzhu/now v1.1.2
 github.com/jinzhu/now
-# github.com/klauspost/compress v1.9.5
+# github.com/klauspost/compress v1.10.7
+## explicit
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
 github.com/klauspost/compress/snappy
@@ -121,6 +125,7 @@ go.mongodb.org/mongo-driver/x/mongo/driver/topology
 go.mongodb.org/mongo-driver/x/mongo/driver/uuid
 go.mongodb.org/mongo-driver/x/mongo/driver/wiremessage
 # go.uber.org/atomic v1.7.0
+## explicit
 go.uber.org/atomic
 # go.uber.org/multierr v1.6.0
 go.uber.org/multierr

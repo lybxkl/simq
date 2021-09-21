@@ -9,6 +9,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
+	"net"
 
 	"io"
 	"reflect"
@@ -37,7 +38,6 @@ func (this *service) processor() {
 	this.wgStarted.Done()
 
 	for {
-		// 1. Find out what messagev5 is next and the size of the messagev5
 		//了解接下来是什么消息以及消息的大小
 		mtype, total, err := this.peekMessageSize()
 		if err != nil {
@@ -59,7 +59,6 @@ func (this *service) processor() {
 
 		this.inStat.increment(int64(n))
 
-		// 5. Process the read messagev5
 		//处理读消息
 		err = this.processIncoming(msg)
 		if err != nil {
@@ -70,7 +69,6 @@ func (this *service) processor() {
 			}
 		}
 
-		// 7. We should commit the bytes in the buffer so we can move on
 		// 我们应该提交缓冲区中的字节，这样我们才能继续
 		_, err = this.in.ReadCommit(total)
 		if err != nil {
@@ -80,18 +78,55 @@ func (this *service) processor() {
 			return
 		}
 
-		// 7. Check to see if done is closed, if so, exit
 		// 检查done是否关闭，如果关闭，退出
 		if this.isDone() && this.in.Len() == 0 {
 			return
 		}
 
-		if this.inStat.msgs%100000 == 0 {
-			logger.Logger.Warn(fmt.Sprintf("(%s) Going to process messagev5 %d", this.cid(), this.inStat.msgs))
+		// 流控处理
+		if e := this.streamController(); e != nil {
+			logger.Logger.Warn(e)
+			return
 		}
 	}
 }
 
+// 流控
+func (this *service) streamController() error {
+	// 监控流量
+	if this.inStat.msgs%100000 == 0 {
+		logger.Logger.Warn(fmt.Sprintf("(%s) Going to process messagev5 %d", this.cid(), this.inStat.msgs))
+	}
+	if this.sign.BeyondQuota() {
+		_, _ = this.sendBeyondQuota()
+		return fmt.Errorf("(%s) Beyond quota", this.cid())
+	}
+	if this.sign.Limit() {
+		_, _ = this.sendTooManyMessages()
+		return fmt.Errorf("(%s) limit req", this.cid())
+	}
+	return nil
+}
+func (this *service) sendBeyondQuota() (int, error) {
+	dis := messagev5.NewDisconnectMessage()
+	dis.SetReasonCode(messagev5.BeyondQuota)
+	return this.sendByConn(dis)
+}
+func (this *service) sendTooManyMessages() (int, error) {
+	dis := messagev5.NewDisconnectMessage()
+	dis.SetReasonCode(messagev5.TooManyMessages)
+	return this.sendByConn(dis)
+}
+
+// sendByConn 直接从conn连接发送数据
+func (this *service) sendByConn(msg messagev5.Message) (int, error) {
+	b := make([]byte, msg.Len())
+	_, err := msg.Encode(b)
+	if err != nil {
+		return 0, err
+	}
+	return this.conn.(net.Conn).Write(b)
+}
 func (this *service) processIncoming(msg messagev5.Message) error {
 	var err error = nil
 
@@ -104,11 +139,18 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 		err = this.processPublish(msg)
 
 	case *messagev5.PubackMessage:
+		this.sign.AddQuota() // 增加配额
+		fmt.Println(this.sign)
 		// For PUBACK messagev5, it means QoS 1, we should send to ack queue
-		this.sess.Pub1ack().Ack(msg)
+		if err = this.sess.Pub1ack().Ack(msg); err != nil {
+			break
+		}
 		this.processAcked(this.sess.Pub1ack())
-
 	case *messagev5.PubrecMessage:
+		if msg.ReasonCode() > messagev5.QosFailure {
+			this.sign.AddQuota()
+		}
+
 		// For PUBREC messagev5, it means QoS 2, we should send to ack queue, and send back PUBREL
 		if err = this.sess.Pub2out().Ack(msg); err != nil {
 			break
@@ -131,13 +173,14 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 		_, err = this.writeMessage(resp)
 
 	case *messagev5.PubcompMessage:
+		this.sign.AddQuota() // 增加配额
+
 		// For PUBCOMP messagev5, it means QoS 2, we should send to ack queue
 		if err = this.sess.Pub2out().Ack(msg); err != nil {
 			break
 		}
 
 		this.processAcked(this.sess.Pub2out())
-
 	case *messagev5.SubscribeMessage:
 		// For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
 		//对于订阅消息，我们应该添加订阅者，然后发送回SUBACK

@@ -39,7 +39,7 @@ golang mqtt服务器，集群版【设计中】
     
 11. ~~主题别名(Topic Alias)处理~~
 
-12. 流控
+12. ~~流控~~
 
 13. Receive Maximum 属性
 
@@ -47,7 +47,7 @@ golang mqtt服务器，集群版【设计中】
 
 15. Maximum Packet Size处理
 
-16. 遗嘱延迟发生处理
+16. 遗嘱延迟发送处理
     
 17. ...
 

@@ -84,16 +84,18 @@ func TestExampleClient(t *testing.T) {
 
 	// Publishes to the server by sending the messagev5
 	fmt.Println("====== >>> Publish")
-	err = c.Publish(pubmsg, func(msg, ack messagev5.Message, err error) error {
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println("\n=====> Publish Complete")
-			fmt.Println(ack)
-		}
-		return nil
-	})
-	require.NoError(t, err)
+	for i := 0; i < 100; i++ {
+		err = c.Publish(pubmsg, func(msg, ack messagev5.Message, err error) error {
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Println("\n=====> Publish Complete")
+				fmt.Println(ack)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+	}
 
 	time.Sleep(100 * time.Millisecond)
 	pubmsg.SetNilTopicAndAlias(10)

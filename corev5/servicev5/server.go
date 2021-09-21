@@ -536,6 +536,11 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	svc.inStat.increment(int64(req.Len()))
 	svc.outStat.increment(int64(resp.Len()))
 
+	// 设置配额和limiter
+	// TODO 简单设置测试
+	svc.quota = 100 // 此配额需要持久化
+	svc.limit = 100 // 限速，每秒100次请求
+
 	if err := svc.start(); err != nil {
 		svc.stop()
 		return nil, err

@@ -52,7 +52,9 @@ func (this *service) receiver() {
 		}
 
 		this.wgStopped.Done()
-
+		if this.sign.TooManyMessages() {
+			logger.Logger.Debugf("TooManyMessages stop in buf, client : %v", this.cid())
+		}
 		logger.Logger.Debugf("(%s) Stopping receiver", this.cid())
 	}()
 
@@ -114,7 +116,9 @@ func (this *service) sender() {
 		}
 
 		this.wgStopped.Done()
-
+		if this.sign.TooManyMessages() && this.out.Len() == 0 {
+			logger.Logger.Debugf("BeyondQuota or TooManyMessages stop out buf, client : %v", this.cid())
+		}
 		logger.Logger.Debugf("(%s) Stopping sender", this.cid())
 	}()
 
@@ -130,7 +134,6 @@ func (this *service) sender() {
 		}
 		for {
 			_, err := this.out.WriteTo(r)
-
 			if err != nil {
 				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
 					logger.Logger.Warnf("<<(%s)>> 写超时关闭：%v", this.cid(), er)

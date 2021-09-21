@@ -19,7 +19,7 @@ const (
 	 *  Increasing memory usage improves compression ratio
 	 *  Reduced memory usage can improve speed, due to cache effect
 	 *  Recommended max value is 14, for 16KB, which nicely fits into Intel x86 L1 cache */
-	maxMemoryUsage = 11
+	maxMemoryUsage = tablelogAbsoluteMax + 2
 
 	maxTableLog    = maxMemoryUsage - 2
 	maxTablesize   = 1 << maxTableLog
@@ -118,7 +118,7 @@ func (s *fseDecoder) readNCount(b *byteReader, maxSymbol uint16) error {
 
 		if int32(bitStream)&(threshold-1) < max {
 			count = int32(bitStream) & (threshold - 1)
-			if debug && nbBits < 1 {
+			if debugAsserts && nbBits < 1 {
 				panic("nbBits underflow")
 			}
 			bitCount += nbBits - 1
