@@ -14,9 +14,9 @@ var (
 )
 
 var (
-	defaultBufferSize     int64 = 1024 * 256 //comment.DefaultBufferSize
-	defaultReadBlockSize  int64 = 1024       //comment.DefaultReadBlockSize
-	defaultWriteBlockSize int64 = 1024       //comment.DefaultWriteBlockSize
+	defaultBufferSize     int64 = 1024 << 2 //comment.DefaultBufferSize
+	defaultReadBlockSize  int64 = 1024      //comment.DefaultReadBlockSize
+	defaultWriteBlockSize int64 = 1024      //comment.DefaultWriteBlockSize
 )
 
 type sequence struct {

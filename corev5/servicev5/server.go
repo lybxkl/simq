@@ -431,74 +431,9 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	// 版本
 	logger.Logger.Debugf("client mqtt version :%v", req.Version())
 
-	// 增强认证
-	authMethod := req.AuthMethod() // 第一次的增强认证方法
-	if len(authMethod) > 0 {
-		authData := req.AuthData()
-		auVerify, ok := this.authPlusAllows[string(authMethod)]
-		if !ok {
-			dis := messagev5.NewDisconnectMessage()
-			dis.SetReasonCode(messagev5.InvalidAuthenticationMethod)
-			err = writeMessage(conn, dis)
-			return nil, err
-		}
-	AC:
-		authContinueData, continueAuth, err := auVerify.Verify(authData)
-		if err != nil {
-			dis := messagev5.NewDisconnectMessage()
-			dis.SetReasonCode(messagev5.UnAuthorized)
-			dis.SetReasonStr([]byte(err.Error()))
-			err = writeMessage(conn, dis)
-			return nil, err
-		}
-		if continueAuth {
-			au := messagev5.NewAuthMessage()
-			au.SetReasonCode(messagev5.ContinueAuthentication)
-			au.SetAuthMethod(authMethod)
-			au.SetAuthData(authContinueData)
-			err = writeMessage(conn, au)
-			if err != nil {
-				return nil, err
-			}
-			msg, err := getAuthMessageOrOther(conn) // 后续的auth
-			if err != nil {
-				return nil, err
-			}
-			switch msg.Type() {
-			case messagev5.DISCONNECT: // 增强认证过程中断开连接
-				return nil, nil
-			case messagev5.AUTH:
-				auMsg := msg.(*messagev5.AuthMessage)
-				if !reflect.DeepEqual(auMsg.AuthMethod(), authMethod) {
-					ds := messagev5.NewDisconnectMessage()
-					ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
-					ds.SetReasonStr([]byte("auth method is different from last time"))
-					err = writeMessage(conn, ds)
-					if err != nil {
-						return nil, err
-					}
-					return nil, errors.New("authplus: the authentication method is different from last time.")
-				}
-				authData = auMsg.AuthData()
-				goto AC // 需要继续认证
-			default:
-				return nil, errors.New(fmt.Sprintf("unSupport deal msg %s", msg))
-			}
-		} else {
-			// 成功
-			resp.SetReasonCode(messagev5.Success)
-			resp.SetAuthMethod(authMethod)
-			logger.Logger.Infof("增强认证成功：%s", req.ClientId())
-		}
-	} else {
-		if err = this.authMgr.Authenticate(string(req.Username()), string(req.Password())); err != nil {
-			//登陆失败日志，断开连接
-			resp.SetReasonCode(messagev5.UserNameOrPasswordIsIncorrect)
-			resp.SetSessionPresent(false)
-			err = writeMessage(conn, resp)
-			return nil, err
-		}
-		logger.Logger.Infof("普通认证成功：%s", req.ClientId())
+	// 认证
+	if e := this.auth(conn, resp, req); e != nil {
+		return nil, e
 	}
 
 	if req.KeepAlive() == 0 {
@@ -529,19 +464,13 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 
 	resp.SetReasonCode(messagev5.Success)
 
-	if err = writeMessage(c, resp); err != nil {
-		return nil, err
-	}
-
 	svc.inStat.increment(int64(req.Len()))
-	svc.outStat.increment(int64(resp.Len()))
-
 	// 设置配额和limiter
 	// TODO 简单设置测试
-	svc.quota = 100 // 此配额需要持久化
-	svc.limit = 100 // 限速，每秒100次请求
+	svc.quota = 0 // 此配额需要持久化
+	svc.limit = 0 // 限速，每秒100次请求
 
-	if err := svc.start(); err != nil {
+	if err := svc.start(resp); err != nil {
 		svc.stop()
 		return nil, err
 	}
@@ -553,6 +482,75 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	logger.Logger.Debugf("(%s) server/handleConnection: Connection established.", svc.cid())
 
 	return svc, nil
+}
+func (this *Server) auth(conn net.Conn, resp *messagev5.ConnackMessage, req *messagev5.ConnectMessage) error {
+	// 增强认证
+	authMethod := req.AuthMethod() // 第一次的增强认证方法
+	if len(authMethod) > 0 {
+		authData := req.AuthData()
+		auVerify, ok := this.authPlusAllows[string(authMethod)]
+		if !ok {
+			dis := messagev5.NewDisconnectMessage()
+			dis.SetReasonCode(messagev5.InvalidAuthenticationMethod)
+			return writeMessage(conn, dis)
+		}
+	AC:
+		authContinueData, continueAuth, err := auVerify.Verify(authData)
+		if err != nil {
+			dis := messagev5.NewDisconnectMessage()
+			dis.SetReasonCode(messagev5.UnAuthorized)
+			dis.SetReasonStr([]byte(err.Error()))
+			return writeMessage(conn, dis)
+		}
+		if continueAuth {
+			au := messagev5.NewAuthMessage()
+			au.SetReasonCode(messagev5.ContinueAuthentication)
+			au.SetAuthMethod(authMethod)
+			au.SetAuthData(authContinueData)
+			err = writeMessage(conn, au)
+			if err != nil {
+				return err
+			}
+			msg, err := getAuthMessageOrOther(conn) // 后续的auth
+			if err != nil {
+				return err
+			}
+			switch msg.Type() {
+			case messagev5.DISCONNECT: // 增强认证过程中断开连接
+				return errors.New("disconnect in auth")
+			case messagev5.AUTH:
+				auMsg := msg.(*messagev5.AuthMessage)
+				if !reflect.DeepEqual(auMsg.AuthMethod(), authMethod) {
+					ds := messagev5.NewDisconnectMessage()
+					ds.SetReasonCode(messagev5.InvalidAuthenticationMethod)
+					ds.SetReasonStr([]byte("auth method is different from last time"))
+					err = writeMessage(conn, ds)
+					if err != nil {
+						return err
+					}
+					return errors.New("authplus: the authentication method is different from last time.")
+				}
+				authData = auMsg.AuthData()
+				goto AC // 需要继续认证
+			default:
+				return errors.New(fmt.Sprintf("unSupport deal msg %s", msg))
+			}
+		} else {
+			// 成功
+			resp.SetReasonCode(messagev5.Success)
+			resp.SetAuthMethod(authMethod)
+			logger.Logger.Infof("增强认证成功：%s", req.ClientId())
+		}
+	} else {
+		if err := this.authMgr.Authenticate(string(req.Username()), string(req.Password())); err != nil {
+			//登陆失败日志，断开连接
+			resp.SetReasonCode(messagev5.UserNameOrPasswordIsIncorrect)
+			resp.SetSessionPresent(false)
+			return writeMessage(conn, resp)
+		}
+		logger.Logger.Infof("普通认证成功：%s", req.ClientId())
+	}
+	return nil
 }
 func (this *Server) checkConfiguration() error {
 	var err error

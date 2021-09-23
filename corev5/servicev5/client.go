@@ -179,7 +179,7 @@ redirect:
 		return err
 	}
 
-	if err := this.svc.start(); err != nil {
+	if err := this.svc.start(nil); err != nil {
 		this.svc.stop()
 		return err
 	}

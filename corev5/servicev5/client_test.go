@@ -15,6 +15,7 @@ import (
 
 var once sync.Once
 
+// 设置环境变量 "SI_CFG_PATH" = "F:\\Go_pro\\src\\si-mqtt\\config"
 func TestExampleClient(t *testing.T) {
 	clientId := "surgemq"
 
@@ -44,18 +45,9 @@ func TestExampleClient(t *testing.T) {
 	// Connects to the remote server at 127.0.0.1 port 1883
 	err := c.Connect("tcp://127.0.0.1:1883", msg)
 	require.NoError(t, err)
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(2 * time.Second)
 
 	// Creates a new PUBLISH messagev5 with the appropriate contents for publishing
-	pubmsg := messagev5.NewPublishMessage()
-	pubmsg.SetTopic([]byte("abc"))
-	pubmsg.SetPayload([]byte("1234567890"))
-	pubmsg.SetQoS(1)
-	pubmsg.SetTopicAlias(10)
-
-	if pubmsg.QoS() > 0 {
-		pubmsg.SetPacketId(uint16(atomic.AddUint32(&pkid, 1)))
-	}
 
 	submsg := messagev5.NewSubscribeMessage()
 	submsg.AddTopic([]byte("abc/#"), 1)
@@ -80,11 +72,20 @@ func TestExampleClient(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(5 * time.Second)
 
 	// Publishes to the server by sending the messagev5
 	fmt.Println("====== >>> Publish")
 	for i := 0; i < 100; i++ {
+		pubmsg := messagev5.NewPublishMessage()
+		pubmsg.SetTopic([]byte("abc"))
+		pubmsg.SetPayload([]byte("1234567890"))
+		pubmsg.SetQoS(1)
+		//pubmsg.SetTopicAlias(10)
+
+		if pubmsg.QoS() > 0 {
+			pubmsg.SetPacketId(uint16(atomic.AddUint32(&pkid, 1)))
+		}
 		err = c.Publish(pubmsg, func(msg, ack messagev5.Message, err error) error {
 			if err != nil {
 				fmt.Println(err)
@@ -98,7 +99,15 @@ func TestExampleClient(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	pubmsg.SetNilTopicAndAlias(10)
+	pubmsg := messagev5.NewPublishMessage()
+	pubmsg.SetTopic([]byte("abc"))
+	pubmsg.SetPayload([]byte("1234567890"))
+	pubmsg.SetQoS(1)
+	//pubmsg.SetTopicAlias(10)
+	//pubmsg.SetNilTopicAndAlias(10)
+	if pubmsg.QoS() > 0 {
+		pubmsg.SetPacketId(uint16(atomic.AddUint32(&pkid, 1)))
+	}
 	fmt.Println("====== >>> Publish")
 	err = c.Publish(pubmsg, func(msg, ack messagev5.Message, err error) error {
 		if err != nil {
@@ -112,7 +121,7 @@ func TestExampleClient(t *testing.T) {
 	require.NoError(t, err)
 
 	// Disconnects from the server
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 	fmt.Println("\n====== >>> Disconnect")
 	c.Disconnect()
 	time.Sleep(100 * time.Millisecond)

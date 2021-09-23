@@ -149,7 +149,7 @@ type service struct {
 	EventStore   store.EventStore
 }
 
-func (this *service) start() error {
+func (this *service) start(resp *messagev5.ConnackMessage) error {
 	var err error
 	this.ccid = fmt.Sprintf("%d/%s", this.id, this.sess.IDs())
 	// Create the incoming ring buffer
@@ -223,6 +223,13 @@ func (this *service) start() error {
 				}, &this.onpub)
 			}
 		}
+	}
+
+	if resp != nil {
+		if err = writeMessage(this.conn, resp); err != nil {
+			return err
+		}
+		this.outStat.increment(int64(resp.Len()))
 	}
 
 	// Processor is responsible for reading messages out of the buffer and processing
@@ -426,25 +433,27 @@ func (this *service) subscribe(msg *messagev5.SubscribeMessage, onComplete OnCom
 			if c == messagev5.QosFailure {
 				err2 = fmt.Errorf("Failed to subscribe to '%s'\n%v", string(t), err2)
 			} else {
-				tp1 := t
-				err := this.sess.AddTopic(topicsv5.Sub{
+				tp1 := make([]byte, len(t))
+				copy(tp1, t)
+				err = this.sess.AddTopic(topicsv5.Sub{
 					Topic:             tp1,
 					Qos:               c,
-					NoLocal:           sub.TopicNoLocal(t),
-					RetainAsPublished: sub.TopicRetainAsPublished(t),
-					RetainHandling:    sub.TopicRetainHandling(t),
+					NoLocal:           sub.TopicNoLocal(tp1),
+					RetainAsPublished: sub.TopicRetainAsPublished(tp1),
+					RetainHandling:    sub.TopicRetainHandling(tp1),
 					SubIdentifier:     sub.SubscriptionIdentifier(),
 				})
 				if err != nil {
 					err2 = fmt.Errorf("Failed to subscribe to '%s' (%v)\n%v", string(t), err, err2)
 				}
-				tp := t
+				tp := make([]byte, len(t))
+				copy(tp, t)
 				_, err = this.topicsMgr.Subscribe(topicsv5.Sub{
 					Topic:             tp,
 					Qos:               c,
-					NoLocal:           sub.TopicNoLocal(t),
-					RetainAsPublished: sub.TopicRetainAsPublished(t),
-					RetainHandling:    sub.TopicRetainHandling(t),
+					NoLocal:           sub.TopicNoLocal(tp),
+					RetainAsPublished: sub.TopicRetainAsPublished(tp),
+					RetainHandling:    sub.TopicRetainHandling(tp),
 					SubIdentifier:     sub.SubscriptionIdentifier(),
 				}, &onPublish)
 				if err != nil {

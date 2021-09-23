@@ -109,7 +109,7 @@ func (this *session) InitSample(msg *messagev5.ConnectMessage, sessionStore stor
 		this.will.SetRetain(this.cmsg.WillRetain())
 	}
 
-	this.topics = make(map[string]*topicsv5.Sub, 1)
+	this.topics = make(map[string]*topicsv5.Sub)
 	this.topicAlice = make(map[uint16][]byte)
 	this.topicAliceRe = make(map[string]uint16)
 
@@ -160,7 +160,7 @@ func (this *session) Init(msg *messagev5.ConnectMessage, topics ...sessionsv5.Se
 		this.will.SetRetain(this.cmsg.WillRetain())
 	}
 
-	this.topics = make(map[string]*topicsv5.Sub, 1)
+	this.topics = make(map[string]*topicsv5.Sub)
 	this.topicAlice = make(map[uint16][]byte)
 	this.topicAliceRe = make(map[string]uint16)
 
@@ -270,14 +270,7 @@ func (this *session) Topics() ([]topicsv5.Sub, error) {
 	)
 
 	for _, v := range this.topics {
-		subs = append(subs, topicsv5.Sub{
-			Topic:             v.Topic,
-			Qos:               v.Qos,
-			NoLocal:           v.NoLocal,
-			RetainAsPublished: v.RetainAsPublished,
-			RetainHandling:    v.RetainHandling,
-			SubIdentifier:     v.SubIdentifier,
-		})
+		subs = append(subs, *v)
 	}
 
 	return subs, nil

@@ -140,7 +140,6 @@ func (this *service) processIncoming(msg messagev5.Message) error {
 
 	case *messagev5.PubackMessage:
 		this.sign.AddQuota() // 增加配额
-		fmt.Println(this.sign)
 		// For PUBACK messagev5, it means QoS 1, we should send to ack queue
 		if err = this.sess.Pub1ack().Ack(msg); err != nil {
 			break
@@ -426,28 +425,21 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 		noLocal := msg.TopicNoLocal(t)
 		retainAsPublished := msg.TopicRetainAsPublished(t)
 		retainHandling := msg.TopicRetainHandling(t)
-		tp := t
-		rqos, err := this.topicsMgr.Subscribe(topicsv5.Sub{
+		tp := make([]byte, len(t))
+		copy(tp, t) // 必须copy
+		sub := topicsv5.Sub{
 			Topic:             tp,
 			Qos:               qos[i],
 			NoLocal:           noLocal,
 			RetainAsPublished: retainAsPublished,
 			RetainHandling:    retainHandling,
 			SubIdentifier:     msg.SubscriptionIdentifier(),
-		}, &this.onpub)
+		}
+		rqos, err := this.topicsMgr.Subscribe(sub, &this.onpub)
 		if err != nil {
 			return err
 		}
-		tp2 := t
-		err = this.sess.AddTopic(topicsv5.Sub{
-			Topic:             tp2,
-			Qos:               qos[i],
-			NoLocal:           noLocal,
-			RetainAsPublished: retainAsPublished,
-			RetainHandling:    retainHandling,
-			SubIdentifier:     msg.SubscriptionIdentifier(),
-		})
-
+		err = this.sess.AddTopic(sub)
 		retcodes = append(retcodes, rqos)
 
 		// yeah I am not checking errors here. If there's an error we don't want the
@@ -503,7 +495,7 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 
 	this.processToCluster(topics, msg)
 	for _, rm := range this.rmsgs {
-		// TODO
+		// 下面不用担心因为又重新设置为old qos而有问题，因为在内部ackqueue都已经encode了
 		old := rm.QoS()
 		// 这里也做了调整
 		if rm.QoS() > qos[0] {

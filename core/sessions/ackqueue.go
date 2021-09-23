@@ -1,9 +1,9 @@
 package sessions
 
 import (
-	"gitee.com/Ljolan/si-mqtt/core/message"
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/core/message"
 	"math"
 	"sync"
 )
@@ -224,7 +224,7 @@ func (this *Ackqueue) SetCluserTag(pktid uint16) bool {
 	v := this.ring[this.emap[pktid]]
 	v.State = MQ_TAG_CLU
 	this.ring[this.emap[pktid]] = v
-	fmt.Println(this.ring[this.emap[pktid]])
+	// fmt.Println(this.ring[this.emap[pktid]])
 	return true
 }
 
@@ -242,7 +242,7 @@ func (this *Ackqueue) Acked02() []ackmsg {
 
 FORNOTEMPTY:
 	for !this.empty() {
-		fmt.Printf("head:%v\n：%v\n", this.head, this.ring[this.head].State)
+		// fmt.Printf("head:%v\n：%v\n", this.head, this.ring[this.head].State)
 		switch this.ring[this.head].State {
 		case MQ_TAG_CLU:
 			this.ackdone = append(this.ackdone, this.ring[this.head])

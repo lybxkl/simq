@@ -88,7 +88,6 @@ type Sign struct {
 	quota           int64 // 初始配额
 	currQuota       int64 // 当前可使用配额
 	limit           int
-	stopChan        chan struct{}
 }
 
 func NewSign(quota int64, limit int) *Sign {
