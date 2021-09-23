@@ -124,11 +124,11 @@ func EncodeCMsg(msg WrapCMsg) ([]byte, error) {
 		}
 	}
 	if cmsg.msg != nil {
-		n, err := cmsg.msg.Encode(b[total:])
+		_, err := cmsg.msg.Encode(b[total:])
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(n)
+		//fmt.Println(n)
 	}
 	return b, nil
 }
