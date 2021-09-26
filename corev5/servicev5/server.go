@@ -264,8 +264,8 @@ func (this *Server) RunClusterComp() {
 		this.AddCloser(colong.InitClusterTaskPool(int(cfg.Cluster.TaskClusterPoolSize)))
 		this.AddCloser(InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize)))
 
-		// colong.UpdateLogger(logger.Logger) // 可以替换为通用日志
-		colong.SetLoggerLevelInfo() // 设置集群服务的日志等级
+		colong.UpdateLogger(logger.Logger) // 可以替换为通用日志
+		//colong.SetLoggerLevelInfo() // 设置集群服务的日志等级
 
 		staticDisc := make(map[string]cluster.Node)
 		for _, v := range cfg.Cluster.StaticNodeList {
