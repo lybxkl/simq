@@ -81,7 +81,7 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 		return total, err
 	}
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = src[total : total+2]
+	this.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
 
 	this.propertyLen, n, err = lbDecode(src[total:])
@@ -125,7 +125,7 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 	if l == 0 {
 		return total, ProtocolError
 	}
-	this.reasonCodes = src[total : total+l]
+	this.reasonCodes = CopyLen(src[total:total+l], l)
 	total += len(this.reasonCodes)
 
 	for _, code := range this.reasonCodes {

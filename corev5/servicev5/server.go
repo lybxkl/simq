@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
-	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/client"
-	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp/server"
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
 	"gitee.com/Ljolan/si-mqtt/cluster/store/repo"
 	"gitee.com/Ljolan/si-mqtt/config"
@@ -146,7 +144,7 @@ type Server struct {
 	configOnce sync.Once
 
 	ClusterDiscover   cluster.NodeDiscover
-	ClusterServer     *server.Server
+	ClusterServer     *colong.Server
 	ClusterClient     *sync.Map // name --> *client.Client
 	ShareTopicMapNode cluster.ShareTopicMapNode
 
@@ -282,13 +280,13 @@ func (this *Server) RunClusterComp() {
 		this.ClusterDiscover = cluster.NewStaticNodeDiscover(staticDisc)
 		this.ShareTopicMapNode = cluster.NewShareMap()
 		svc := this.NewService() // 单独service用来处理集群来的消息
-		this.ClusterServer = server.RunClusterServer(cfg.Cluster.ClusterName,
+		this.ClusterServer = colong.RunClusterServer(cfg.Cluster.ClusterName,
 			cfg.Cluster.ClusterHost+":"+strconv.Itoa(cfg.Cluster.ClusterPort),
 			svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode)
 		this.ClusterClient = &sync.Map{}
 		for name, node := range this.ClusterDiscover.GetNodeMap() {
-			go this.ClusterClient.Store(name, client.RunClient(cfg.Cluster.ClusterName, name, node.Addr,
-				1, true, 1000))
+			go this.ClusterClient.Store(name, colong.RunClient(cfg.Cluster.ClusterName, name, node.Addr,
+				100, true, 10000))
 		}
 	}
 }

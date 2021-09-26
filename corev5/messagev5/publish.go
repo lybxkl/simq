@@ -263,7 +263,8 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 	// QoS level is 1 or 2
 	if this.QoS() != 0 {
 		//this.packetId = binary.BigEndian.Uint16(src[total:])
-		this.packetId = src[total : total+2]
+
+		this.packetId = CopyLen(src[total:total+2], 2) //src[total : total+2]
 		total += 2
 	}
 
@@ -368,7 +369,7 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 	}
 	// === 载荷 ===
 	l := int(this.remlen) - (total - hn)
-	this.payload = src[total : total+l]
+	this.payload = CopyLen(src[total:total+l], l)
 	total += len(this.payload)
 
 	this.dirty = false

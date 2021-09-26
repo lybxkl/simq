@@ -34,7 +34,7 @@ func (s *SessionRepo) Stop(ctx context.Context) error {
 
 func (s *SessionRepo) GetSession(ctx context.Context, clientId string) (sessionsv5.Session, error) {
 	defer func() {
-		logger.Logger.Infof("【GetSession <==】%s", clientId)
+		logger.Logger.Debugf("【GetSession <==】%s", clientId)
 	}()
 	data := make([]po2.Session, 0)
 	err := s.c.Get(ctx, "si_session", orm2.Select{"_id": clientId}, &data)
@@ -46,7 +46,7 @@ func (s *SessionRepo) GetSession(ctx context.Context, clientId string) (sessions
 
 func (s *SessionRepo) StoreSession(ctx context.Context, clientId string, session sessionsv5.Session) error {
 	defer func() {
-		logger.Logger.Infof("【StoreSession ==>】%s", clientId)
+		logger.Logger.Debugf("【StoreSession ==>】%s", clientId)
 	}()
 	err := s.c.Save(ctx, "si_session", clientId, voToPoSession(clientId, session))
 	if err != nil {
@@ -61,7 +61,7 @@ func (s *SessionRepo) StoreSession(ctx context.Context, clientId string, session
 // ClearSession todo 事务
 func (s *SessionRepo) ClearSession(ctx context.Context, clientId string, clearOfflineMsg bool) error {
 	defer func() {
-		logger.Logger.Infof("【ClearSession ==X】%s, clearOfflineMsg: %v", clientId, clearOfflineMsg)
+		logger.Logger.Debugf("【ClearSession ==X】%s, clearOfflineMsg: %v", clientId, clearOfflineMsg)
 	}()
 	if clearOfflineMsg {
 		err := s.ClearOfflineMsgs(ctx, clientId)
@@ -95,7 +95,7 @@ func (s *SessionRepo) ClearSession(ctx context.Context, clientId string, clearOf
 
 func (s *SessionRepo) StoreSubscription(ctx context.Context, clientId string, subscription *messagev5.SubscribeMessage) error {
 	defer func() {
-		logger.Logger.Infof("【StoreSubscription ==>】%s", clientId)
+		logger.Logger.Debugf("【StoreSubscription ==>】%s", clientId)
 	}()
 	sc, sub := voToPoSub(clientId, subscription)
 	return s.c.SaveMany(ctx, "si_sub", sc, sub)
@@ -103,21 +103,21 @@ func (s *SessionRepo) StoreSubscription(ctx context.Context, clientId string, su
 
 func (s *SessionRepo) DelSubscription(ctx context.Context, clientId, topic string) error {
 	defer func() {
-		logger.Logger.Infof("【DelSubscription ==X】%s, topic: %v", clientId, topic)
+		logger.Logger.Debugf("【DelSubscription ==X】%s, topic: %v", clientId, topic)
 	}()
 	return s.c.Delete(ctx, "si_sub", orm2.Select{"client_id": clientId, "topic": topic})
 }
 
 func (s *SessionRepo) ClearSubscriptions(ctx context.Context, clientId string) error {
 	defer func() {
-		logger.Logger.Infof("【ClearSubscriptions ==X】%s", clientId)
+		logger.Logger.Debugf("【ClearSubscriptions ==X】%s", clientId)
 	}()
 	return s.c.Delete(ctx, "si_sub", orm2.Select{"client_id": clientId})
 }
 
 func (s *SessionRepo) GetSubscriptions(ctx context.Context, clientId string) ([]*messagev5.SubscribeMessage, error) {
 	defer func() {
-		logger.Logger.Infof("【GetSubscriptions <==】%s", clientId)
+		logger.Logger.Debugf("【GetSubscriptions <==】%s", clientId)
 	}()
 	data := make([]po2.Subscription, 0)
 	err := s.c.Get(ctx, "si_sub", orm2.Select{"client_id": clientId}, &data)
@@ -133,20 +133,20 @@ func (s *SessionRepo) GetSubscriptions(ctx context.Context, clientId string) ([]
 
 func (s *SessionRepo) CacheInflowMsg(ctx context.Context, clientId string, message messagev5.Message) error {
 	defer func() {
-		logger.Logger.Infof("【CacheInflowMsg ==>】%s", clientId)
+		logger.Logger.Debugf("【CacheInflowMsg ==>】%s", clientId)
 	}()
 	return s.c.Save(ctx, "si_inflow", "", voToPo(clientId, message.(*messagev5.PublishMessage)))
 }
 func (s *SessionRepo) ReleaseAllInflowMsg(ctx context.Context, clientId string) error {
 	defer func() {
-		logger.Logger.Infof("【ReleaseAllInflowMsg ==X】%s ", clientId)
+		logger.Logger.Debugf("【ReleaseAllInflowMsg ==X】%s ", clientId)
 	}()
 	filter := orm2.Select{"client_id": clientId}
 	return s.c.Delete(ctx, "si_inflow", filter)
 }
 func (s *SessionRepo) ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error) {
 	defer func() {
-		logger.Logger.Infof("【ReleaseInflowMsg ==X】%s, pk_id: %v", clientId, pkId)
+		logger.Logger.Debugf("【ReleaseInflowMsg ==X】%s, pk_id: %v", clientId, pkId)
 	}()
 	ms := &po2.Message{}
 	filter := orm2.Select{"client_id": clientId, "pk_id": pkId}
@@ -159,7 +159,7 @@ func (s *SessionRepo) ReleaseInflowMsg(ctx context.Context, clientId string, pkI
 
 func (s *SessionRepo) GetAllInflowMsg(ctx context.Context, clientId string) (t []messagev5.Message, e error) {
 	defer func() {
-		logger.Logger.Infof("【GetAllInflowMsg <==】%s, size: %v", clientId, len(t))
+		logger.Logger.Debugf("【GetAllInflowMsg <==】%s, size: %v", clientId, len(t))
 	}()
 	data := make([]po2.Message, 0)
 	err := s.c.Get(ctx, "si_inflow", orm2.Select{"client_id": clientId}, &data)
@@ -175,14 +175,14 @@ func (s *SessionRepo) GetAllInflowMsg(ctx context.Context, clientId string) (t [
 
 func (s *SessionRepo) CacheOutflowMsg(ctx context.Context, clientId string, message messagev5.Message) error {
 	defer func() {
-		logger.Logger.Infof("【CacheOutflowMsg ==>】%s", clientId)
+		logger.Logger.Debugf("【CacheOutflowMsg ==>】%s", clientId)
 	}()
 	return s.c.Save(ctx, "si_outflow", "", voToPo(clientId, message.(*messagev5.PublishMessage)))
 }
 
 func (s *SessionRepo) GetAllOutflowMsg(ctx context.Context, clientId string) (t []messagev5.Message, e error) {
 	defer func() {
-		logger.Logger.Infof("【GetAllOutflowMsg <==】%s, size: %v", clientId, len(t))
+		logger.Logger.Debugf("【GetAllOutflowMsg <==】%s, size: %v", clientId, len(t))
 	}()
 	data := make([]po2.Message, 0)
 	err := s.c.Get(ctx, "si_outflow", orm2.Select{"client_id": clientId}, &data)
@@ -197,7 +197,7 @@ func (s *SessionRepo) GetAllOutflowMsg(ctx context.Context, clientId string) (t 
 }
 func (s *SessionRepo) ReleaseAllOutflowMsg(ctx context.Context, clientId string) error {
 	defer func() {
-		logger.Logger.Infof("【ReleaseAllOutflowMsg ==X】%s", clientId)
+		logger.Logger.Debugf("【ReleaseAllOutflowMsg ==X】%s", clientId)
 	}()
 	filter := orm2.Select{"client_id": clientId}
 	err := s.c.Delete(ctx, "si_outflow", filter)
@@ -208,7 +208,7 @@ func (s *SessionRepo) ReleaseAllOutflowMsg(ctx context.Context, clientId string)
 }
 func (s *SessionRepo) ReleaseOutflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error) {
 	defer func() {
-		logger.Logger.Infof("【ReleaseOutflowMsg ==X】%s, pk_id: %v", clientId, pkId)
+		logger.Logger.Debugf("【ReleaseOutflowMsg ==X】%s, pk_id: %v", clientId, pkId)
 	}()
 	ms := &po2.Message{}
 	filter := orm2.Select{"client_id": clientId, "pk_id": pkId}
@@ -221,7 +221,7 @@ func (s *SessionRepo) ReleaseOutflowMsg(ctx context.Context, clientId string, pk
 
 func (s *SessionRepo) CacheOutflowSecMsgId(ctx context.Context, clientId string, pkId uint16) error {
 	defer func() {
-		logger.Logger.Infof("【CacheOutflowSecMsgId ==>】%s, pk_id: %v", clientId, pkId)
+		logger.Logger.Debugf("【CacheOutflowSecMsgId ==>】%s, pk_id: %v", clientId, pkId)
 	}()
 	return s.c.Save(ctx, "si_outflowsec", "", po2.MessagePk{
 		ClientId: clientId,
@@ -232,7 +232,7 @@ func (s *SessionRepo) CacheOutflowSecMsgId(ctx context.Context, clientId string,
 
 func (s *SessionRepo) GetAllOutflowSecMsg(ctx context.Context, clientId string) (t []uint16, e error) {
 	defer func() {
-		logger.Logger.Infof("【GetAllOutflowSecMsg <==】%s, size: %v", clientId, len(t))
+		logger.Logger.Debugf("【GetAllOutflowSecMsg <==】%s, size: %v", clientId, len(t))
 	}()
 	data := make([]po2.MessagePk, 0)
 	err := s.c.Get(ctx, "si_outflowsec", orm2.Select{"client_id": clientId}, &data)
@@ -247,14 +247,14 @@ func (s *SessionRepo) GetAllOutflowSecMsg(ctx context.Context, clientId string) 
 }
 func (s *SessionRepo) ReleaseAllOutflowSecMsg(ctx context.Context, clientId string) error {
 	defer func() {
-		logger.Logger.Infof("【ReleaseAllOutflowSecMsg ==X】%s", clientId)
+		logger.Logger.Debugf("【ReleaseAllOutflowSecMsg ==X】%s", clientId)
 	}()
 	filter := orm2.Select{"client_id": clientId}
 	return s.c.Delete(ctx, "si_outflowsec", filter)
 }
 func (s *SessionRepo) ReleaseOutflowSecMsgId(ctx context.Context, clientId string, pkId uint16) error {
 	defer func() {
-		logger.Logger.Infof("【ReleaseOutflowSecMsgId ==X】%s, pk_id: %v", clientId, pkId)
+		logger.Logger.Debugf("【ReleaseOutflowSecMsgId ==X】%s, pk_id: %v", clientId, pkId)
 	}()
 	filter := orm2.Select{"client_id": clientId, "pk_id": pkId}
 	return s.c.Delete(ctx, "si_outflowsec", filter)
@@ -262,7 +262,7 @@ func (s *SessionRepo) ReleaseOutflowSecMsgId(ctx context.Context, clientId strin
 
 func (s *SessionRepo) StoreOfflineMsg(ctx context.Context, clientId string, message messagev5.Message) error {
 	defer func() {
-		logger.Logger.Infof("【StoreOfflineMsg ==>】%s", clientId)
+		logger.Logger.Debugf("【StoreOfflineMsg ==>】%s", clientId)
 	}()
 	msg := voToPo(clientId, message.(*messagev5.PublishMessage))
 	msg.MsgId = utils.Generate()
@@ -272,7 +272,7 @@ func (s *SessionRepo) StoreOfflineMsg(ctx context.Context, clientId string, mess
 // 返回离线消息，和对应的消息id
 func (s *SessionRepo) GetAllOfflineMsg(ctx context.Context, clientId string) (t []messagev5.Message, mi []string, e error) {
 	defer func() {
-		logger.Logger.Infof("【GetAllOfflineMsg <==】%s, size: %v", clientId, len(t))
+		logger.Logger.Debugf("【GetAllOfflineMsg <==】%s, size: %v", clientId, len(t))
 	}()
 	data := make([]po2.Message, 0)
 	err := s.c.Get(ctx, "si_offline", orm2.Select{"client_id": clientId}, &data)
@@ -290,14 +290,14 @@ func (s *SessionRepo) GetAllOfflineMsg(ctx context.Context, clientId string) (t 
 
 func (s *SessionRepo) ClearOfflineMsgs(ctx context.Context, clientId string) error {
 	defer func() {
-		logger.Logger.Infof("【ClearOfflineMsgs ==X】%s", clientId)
+		logger.Logger.Debugf("【ClearOfflineMsgs ==X】%s", clientId)
 	}()
 	return s.c.Delete(ctx, "si_offline", orm2.Select{"client_id": clientId})
 }
 
 func (s *SessionRepo) ClearOfflineMsgById(ctx context.Context, clientId string, msgIds []string) error {
 	defer func() {
-		logger.Logger.Infof("【ClearOfflineMsgById ==X】%s, msgIds：%v", clientId, msgIds)
+		logger.Logger.Debugf("【ClearOfflineMsgById ==X】%s, msgIds：%v", clientId, msgIds)
 	}()
 	return s.c.Delete(ctx, "si_offline", orm2.Select{"client_id": clientId, "msg_id": orm2.Select{"$in": msgIds}})
 }

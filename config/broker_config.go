@@ -8,12 +8,17 @@ import (
 	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	utils2 "gitee.com/Ljolan/si-mqtt/utils"
 	"github.com/BurntSushi/toml"
+	"os"
 )
 
 var cfg SIConfig
 
 func init() {
-	if _, err := toml.DecodeFile(utils2.GetConfigPath(utils2.GetCurrentDirectory(), "config2.toml"), &cfg); err != nil {
+	name := "config.toml"
+	if n := os.Getenv("CFG_NAME"); n != "" {
+		name = n
+	}
+	if _, err := toml.DecodeFile(utils2.GetConfigPath(utils2.GetCurrentDirectory(), name), &cfg); err != nil {
 		panic(err)
 	}
 	fmt.Println(cfg.String())

@@ -9,9 +9,8 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
-	"net"
-
 	"io"
+	"net"
 	"reflect"
 )
 
@@ -705,8 +704,6 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 	}
 	msg.SetRetain(false)
 	logger.Logger.Debugf("(%s) Publishing to topic %s and %s subscribers：%v", this.cid(), msg.Topic(), shareName, len(subs))
-	b := make([]byte, msg.Len())
-	_, _ = msg.Encode(b)
 
 	for i, s := range subs {
 		if s != nil {
@@ -714,6 +711,8 @@ func (this *service) pubFn(msg *messagev5.PublishMessage, shareName string, only
 			if !ok {
 				return fmt.Errorf("Invalid onPublish Function")
 			} else {
+				b := make([]byte, msg.Len())
+				_, _ = msg.Encode(b)
 				tmpMsg := messagev5.NewPublishMessage() // 必须重新弄一个，防止被下面改动qos引起bug
 				_, _ = tmpMsg.Decode(b)
 				_ = tmpMsg.SetQoS(qoss[i].Qos) // 设置为该发的qos级别

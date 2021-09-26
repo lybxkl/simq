@@ -2,13 +2,14 @@ package colong
 
 import (
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
-	getty "github.com/apache/dubbo-getty"
 	"sync"
 )
 
-var sessionsSync sync.Map
+var (
+	sessionsSync = &sync.Map{}
+)
 
-func AddSession(name string, session getty.Session) {
+func AddSession(name string, session *Client) {
 	sessionsSync.Store(name, session)
 }
 func RemoveSession(name string) {
@@ -62,20 +63,25 @@ func SendMsgToCluster(msg messagev5.Message, shareName, targetNode string, allSu
 					return
 				}
 			}
-			_, er := serv.(getty.Session).WriteBytes(b)
-			if er != nil {
-				log.Warnf("send msg to cluster node: %s/%s: encode msg error : msg: %+v,err:%v",
-					targetNode, serv.(getty.Session).RemoteAddr(), msg, er)
-				if oneNodeSendFailFunc != nil {
-					oneNodeSendFailFunc(targetNode, msg)
+			if s, ok := serv.(*Client).Pop(); !ok {
+				log.Warnf("get client session error, node %v send share name : %v", targetNode, shareName)
+			} else {
+				_, er := s.WriteBytes(b)
+				defer serv.(*Client).Put(s)
+				if er != nil {
+					log.Warnf("send msg to cluster node: %s/%s: encode msg error : msg: %+v,err:%v",
+						targetNode, s.RemoteAddr(), msg, er)
+					if oneNodeSendFailFunc != nil {
+						oneNodeSendFailFunc(targetNode, msg)
+					}
+					return
 				}
-				return
-			}
-			if oneNodeSendSucFunc != nil {
-				oneNodeSendSucFunc(targetNode, msg)
-			}
-			if allSuccess != nil {
-				allSuccess(msg)
+				if oneNodeSendSucFunc != nil {
+					oneNodeSendSucFunc(targetNode, msg)
+				}
+				if allSuccess != nil {
+					allSuccess(msg)
+				}
 			}
 		} else if shareName != "" { // 没有这个节点，但是必须发送共享消息
 			// TODO 重新选择节点发送该共享组名下的 共享消息
@@ -92,18 +98,28 @@ func SendMsgToCluster(msg messagev5.Message, shareName, targetNode string, allSu
 		return
 	}
 	sessionsSync.Range(func(k, value interface{}) bool {
-		_, er := value.(getty.Session).WriteBytes(b)
-		if er != nil {
-			log.Warnf("send msg to cluster node: %s/%s: encode msg error : msg: %+v,err:%v",
-				k, value.(getty.Session).RemoteAddr(), msg, er)
-			if oneNodeSendFailFunc != nil {
-				oneNodeSendFailFunc(k.(string), msg)
+		defer func() {
+			if e := recover(); e != nil {
+				println(e)
 			}
-			sucTag = false
-			return true // 不能返回false,不然这次range会停止
-		}
-		if oneNodeSendSucFunc != nil {
-			oneNodeSendSucFunc(k.(string), msg)
+		}()
+		if s, ok := value.(*Client).Pop(); !ok {
+			log.Warnf("client close, node %v send share name : %v", targetNode, shareName)
+		} else {
+			_, er := s.WriteBytes(b)
+			defer value.(*Client).Put(s)
+			if er != nil {
+				log.Warnf("send msg to cluster node: %s/%s: encode msg error : msg: %+v,err:%v",
+					k, s.RemoteAddr(), msg, er)
+				if oneNodeSendFailFunc != nil {
+					oneNodeSendFailFunc(k.(string), msg)
+				}
+				sucTag = false
+				return true // 不能返回false,不然这次range会停止
+			}
+			if oneNodeSendSucFunc != nil {
+				oneNodeSendSucFunc(k.(string), msg)
+			}
 		}
 		return true
 	})

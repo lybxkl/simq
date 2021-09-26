@@ -30,8 +30,9 @@ func UpdateLogger(lg getty.Logger) {
 var (
 	pingresp      []byte
 	ack           []byte
-	cs            sync.Map
+	cs            = &sync.Map{} // nodename --> sync.Map( remoteaddr --> session)
 	Cname         = "name"
+	CremoteIp     = "remote"
 	Caddr         = "addr"
 	sharePrefix   = []byte("$share/")
 	taskGPool     *ants.Pool
@@ -51,12 +52,12 @@ func submit(f func()) {
 	dealAntsErr(taskGPool.Submit(f))
 }
 func InitClusterTaskPool(poolSize int) (close io.Closer) {
-	if poolSize < 100 {
-		poolSize = 100
+	if poolSize < 1000 {
+		poolSize = 1000
 	}
 	taskGPool, _ = ants.NewPool(poolSize, ants.WithPanicHandler(func(i interface{}) {
 		fmt.Println("协程池处理错误：", i)
-	}), ants.WithMaxBlockingTasks(poolSize*2))
+	}), ants.WithMaxBlockingTasks(poolSize*10))
 	taskGPoolSize = poolSize
 	return &closer{}
 }
@@ -75,10 +76,11 @@ func dealAntsErr(err error) {
 	if errors.Is(err, ants.ErrPoolClosed) {
 		fmt.Println("协程池错误：", err.Error())
 		taskGPool.Reboot()
-	}
-	if errors.Is(err, ants.ErrPoolOverload) {
-		fmt.Println("协程池超载：", err.Error())
+	} else if errors.Is(err, ants.ErrPoolOverload) {
+		fmt.Println("协程池超载,进行扩容：", err.Error())
+		// TODO 需要缩
 		taskGPool.Tune(int(float64(taskGPoolSize) * 1.25))
+	} else {
+		fmt.Println("线程池处理异常：", err)
 	}
-	fmt.Println("线程池处理异常：", err)
 }

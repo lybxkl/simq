@@ -323,7 +323,7 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 	}
 
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = src[total : total+2]
+	this.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
 	var n int
 	this.propertiesLen, n, err = lbDecode(src[total:])

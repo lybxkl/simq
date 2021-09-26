@@ -24,7 +24,7 @@ func (this *PubrecMessage) Decode(src []byte) (int, error) {
 		return total, err
 	}
 	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = src[total : total+2]
+	this.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
 	if this.RemainingLength() == 2 {
 		this.reasonCode = Success

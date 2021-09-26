@@ -28,17 +28,17 @@ func TestPingreqMessageEncode(t *testing.T) {
 	}
 
 	msg := NewPingreqMessage()
-	fmt.Println(msg.Len())
+
 	dst := make([]byte, msg.Len())
 	n, err := msg.Encode(dst)
-
+	fmt.Println(n)
 	require.NoError(t, err, "Error decoding message.")
 	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 	require.Equal(t, msgBytes, dst, "Error decoding message.")
 
 	msg2 := NewPingreqMessage()
 	n, err = msg2.Decode(dst)
-
+	fmt.Println(n)
 	require.NoError(t, err, "Error decoding message.")
 	require.Equal(t, len(msgBytes), n, "Error decoding message.")
 	require.Equal(t, PINGREQ, msg.Type(), "Error decoding message.")

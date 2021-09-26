@@ -26,6 +26,7 @@ const (
 	StatusCMsg   // 状态消息，可以通知其发慢点
 	CloseSession // 通知集群删除某个session，断开某个client连接
 
+	END
 	Tag byte = 0x01 // CMsgType中的tag字段为1时，第二个字节必须是此标志，第0位为1表示后面还有tag，为0表示后面没有tag了，为msg了
 )
 
@@ -135,13 +136,13 @@ func EncodeCMsg(msg WrapCMsg) ([]byte, error) {
 
 // DecodeCMsg 从消息体中解码包装的Msg，第二个返回值表示此处读取到的位置
 func DecodeCMsg(b []byte) (WrapCMsg, int, error) {
-	if len(b) < 2 {
-		return nil, len(b), nil
+	if len(b) <= 2 {
+		return nil, 0, nil
 	}
 	var total int
 	cmsgtype := CMsgType(b[0] >> 4)
 	total++
-	if cmsgtype <= 0 || cmsgtype > StatusCMsg {
+	if cmsgtype <= 0 || cmsgtype >= END {
 		return nil, total, errors.New("wrap msg type unSupport")
 	}
 	share := b[0]&8 == 8
@@ -164,41 +165,67 @@ func DecodeCMsg(b []byte) (WrapCMsg, int, error) {
 					break
 				}
 			} else {
-				return nil, 0, errors.New("protocol error")
+				return nil, total, errors.New("protocol error")
 			}
 		}
 	}
 	if b[0]&4 == 4 { // 有msg
-		data := b[total:]
-		dataLen := len(data)
+		start := total
+		dataLen := len(b[total:])
 		if dataLen == 0 {
 			return nil, 0, nil
 		}
-		mtype := messagev5.MessageType(data[0] >> 4)
+		cnt := 2
+		for {
+			// If we have read 5 bytes and still not done, then there's a problem.
+			//如果我们已经读取了5个字节，但是仍然没有完成，那么就有一个问题。
+			if cnt > 5 {
+				// 剩余长度的第4个字节设置了延续位
+				return nil, 0, nil
+			}
+			//如果没有返回足够的字节，则继续，直到有足够的字节。
+			if len(b[total:]) < cnt {
+				return nil, 0, nil
+			}
+			//如果获得了足够的字节，则检查最后一个字节，看看是否延续
+			// 如果是，则增加cnt并继续窥视
+			if b[cnt+total-1] >= 0x80 {
+				cnt++
+			} else {
+				break
+			}
+		}
 
-		msglen, n, err := lbDecode(data[1:])
+		tmpn := 0
+		mtype := messagev5.MessageType(b[total] >> 4)
+		tmpn++
+
+		msglen, n, err := lbDecode(b[total+tmpn:])
+		tmpn += n
 		if err != nil {
-			return nil, 0, err
+			return nil, total + tmpn, err
 		}
 
 		//获取消息的剩余长度
-		remlen := len(data[n:])
+		remlen := len(b[total+tmpn:])
 		if remlen < int(msglen) {
-			return nil, remlen + n, nil
+			return nil, 0, nil
 		}
 
 		//消息的总长度
-		total2 := n + 1 + int(msglen)
+		//total2 := int(msglen) + n +1
 
 		msg, err := mtype.New()
 		if err != nil {
-			return nil, total + total2, err
+			return nil, total + tmpn, err
 		}
-		n, err = msg.Decode(data)
-		if err != nil {
-			return nil, n + total, err
-		}
+		bnew := make([]byte, int(msglen)+n+1)
+		copy(bnew, b[start:]) // 需要copy
+		n, err = msg.Decode(bnew)
 		total += n
+		if err != nil {
+			return nil, total, err
+		}
 		cmsg.msg = msg
 	}
 	return cmsg, total, nil

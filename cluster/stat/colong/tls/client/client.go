@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
-	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tcp"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/tls"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/util"
 	"path/filepath"
@@ -63,7 +62,7 @@ func main() {
 
 // NewHelloClientSession use for init client session
 func NewHelloClientSession(session getty.Session) (err error) {
-	colong.SetSessionOnOpen(tcp.EventListener, func(name string, session getty.Session) {
+	colong.SetSessionOnOpen(colong.EventListener, func(name string, session getty.Session) {
 		colong.Sessions = append(colong.Sessions, session)
 	})
 	err = tls.InitialSession(session)

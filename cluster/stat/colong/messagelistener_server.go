@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -52,12 +53,21 @@ func (h *serverMessageHandler) OnOpen(session getty.Session) error {
 
 func (h *serverMessageHandler) OnError(session getty.Session, err error) {
 	log.Infof("OnError session{%s} got error{%v}, will be closed.", session.Stat(), err)
-	cs.Delete(session.GetAttribute(Cname))
+	rip := session.GetAttribute(CremoteIp)
+	ss, ok := cs.Load(session.GetAttribute(Cname))
+	if ok {
+		ss.(*sync.Map).Delete(rip.(string))
+	}
+	// todo 需要清理为空的
 }
 
 func (h *serverMessageHandler) OnClose(session getty.Session) {
 	log.Infof("OnClose session{%s} is closing......", session.Stat())
-	cs.Delete(session.GetAttribute(Cname))
+	rip := session.GetAttribute(CremoteIp)
+	ss, ok := cs.Load(session.GetAttribute(Cname))
+	if ok {
+		ss.(*sync.Map).Delete(rip.(string))
+	}
 }
 
 func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
@@ -90,12 +100,12 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	// TODO 消息是否需要确认？
 	switch pkg := msg.(type) {
 	case *messagev5.ConnectMessage: // 直接使用connec报文中的用户属性传递节点连接数据，简单方便
-		h.connectAuth(session, pkg)
+		//h.connectAuth(session, pkg)
 	case *messagev5.PingreqMessage:
 		submit(func() {
 			_, err := session.WriteBytes(pingresp)
 			if err != nil {
-				log.Infof("OnMessage PingreqMessage: session{%s} write bytes err: {%v}", session.Stat(), err)
+				log.Errorf("OnMessage PingreqMessage: session{%s} write bytes err: {%v}", session.Stat(), err)
 			}
 		})
 	case *messagev5.PublishMessage:
@@ -106,14 +116,14 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 				if err != nil {
 					log.Errorf("clusterInToPubShare: err %v", err)
 				} else {
-					log.Infof("收到节点：%s 发来的 共享消息：%s", cname.(string), pkg)
+					log.Debugf("收到节点：%s 发来的 共享消息：%s", cname.(string), pkg)
 				}
 			} else {
 				err := h.clusterInToPub(pkg)
 				if err != nil {
 					log.Errorf("clusterInToPub: err %v", err)
 				} else {
-					log.Infof("收到节点：%s 发来的 普通消息：%s", cname.(string), pkg)
+					log.Debugf("收到节点：%s 发来的 普通消息：%s", cname.(string), pkg)
 				}
 			}
 		})
@@ -130,7 +140,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 					if err != nil {
 						log.Errorf("%s,共享订阅节点新增失败 : %v", node, shareName, err)
 					} else {
-						log.Infof("收到节点：%s 发来的 共享订阅：topic-%s, shareName-%s", node, top, shareName)
+						log.Debugf("收到节点：%s 发来的 共享订阅：topic-%s, shareName-%s", node, top, shareName)
 					}
 				} else {
 					log.Warnf("收到非法订阅：%s", string(tpk[i]))
@@ -149,7 +159,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 					if err != nil {
 						log.Errorf("%s,共享订阅节点减少失败 : %v", node, shareName, err)
 					} else {
-						log.Infof("收到节点：%s 发来的 取消共享订阅：topic-%s, shareName-%s", node, top, shareName)
+						log.Debugf("收到节点：%s 发来的 取消共享订阅：topic-%s, shareName-%s", node, top, shareName)
 					}
 				} else {
 					log.Warnf("收到非法取消订阅：%s", string(tpk[i]))
@@ -222,15 +232,23 @@ func (this *serverMessageHandler) connectAuth(session getty.Session, pkg *messag
 		return
 	}
 	var s getty.Session
-	if sess, ok := cs.Load(clientNodeId); ok { // 重复建立连接认证 how to handle
-		s = sess.(getty.Session)
-		if s.LocalAddr() != session.LocalAddr() || s.RemoteAddr() != session.RemoteAddr() {
-			// s.Close()
+	if sessMap, ok := cs.Load(clientNodeId); ok { // 重复建立连接认证 how to handle
+		smap := sessMap.(*sync.Map)
+		if sess, ok := smap.Load(session.RemoteAddr()); ok {
+			s = sess.(getty.Session)
 		} else {
-			return
+			smap.Store(session.RemoteAddr(), session)
 		}
+	} else {
+		smap := &sync.Map{}
+		smap.Store(session.RemoteAddr(), session)
+		cs.Store(clientNodeId, smap)
 	}
-
+	if s != nil {
+		log.Warnf("remote ip session exist: %v", s.RemoteAddr())
+		s.Close()
+		return
+	}
 	_, err := session.WriteBytes(ack)
 	if err != nil {
 		log.Errorf("write connect ack error: %v", err)
@@ -238,10 +256,7 @@ func (this *serverMessageHandler) connectAuth(session getty.Session, pkg *messag
 	}
 	session.SetAttribute(Caddr, addr)
 	session.SetAttribute(Cname, clientNodeId)
-	log.Infof("%v/%v", session.GetAttribute(Cname), session.GetAttribute(Caddr))
-	cs.Store(clientNodeId, session)
-	if s != nil {
-		s.Close()
-	}
+	session.SetAttribute(CremoteIp, session.RemoteAddr())
+	log.Infof("%v/%v/%v", session.GetAttribute(Cname), session.GetAttribute(Caddr), session.GetAttribute(CremoteIp))
 	this.SetAuthOk(session, true)
 }

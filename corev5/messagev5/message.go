@@ -300,8 +300,6 @@ func (this MessageType) DefaultFlags() byte {
 // is invalid.
 func (this MessageType) New() (Message, error) {
 	switch this {
-	case RESERVED2:
-		return NewPublishMessage(), nil
 	case CONNECT:
 		return NewConnectMessage(), nil
 	case CONNACK:
@@ -383,7 +381,7 @@ func readLPBytes(buf []byte) ([]byte, int, error) {
 
 	total += n
 
-	return buf[2:total], total, nil
+	return CopyLen(buf[2:total], total-2), total, nil
 }
 
 // Write length prefixed bytes

@@ -199,8 +199,7 @@ func (this *header) decode(src []byte) (int, error) {
 
 	mtype := this.Type()
 	//mtype := MessageType(0)
-
-	this.mtypeflags = src[total : total+1]
+	this.mtypeflags = CopyLen(src[total:total+1], 1) //src[total : total+1]
 	//mtype := MessageType(src[total] >> 4)
 	if !this.Type().Valid() {
 		return total, InvalidMessage //fmt.Errorf("header/Decode: Invalid message type %d.", mtype)

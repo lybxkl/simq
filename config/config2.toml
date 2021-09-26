@@ -1,7 +1,7 @@
 serverVersion = "5.0.1"
 
 [log]
-    level = "debug"
+    level = "info"
 
 [broker]
     # broker 监听的addr
@@ -24,7 +24,7 @@ serverVersion = "5.0.1"
 
 [cluster]
     # 是否开启集群模式
-    enabled = false
+    enabled = true
     taskClusterPoolSize=1000 # 节点处理其它节点发来的消息的协程池大小
     taskServicePoolSize=1000 # 服务向其它节点发送的协程池大小
 
