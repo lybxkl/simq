@@ -37,9 +37,6 @@ func (h *messageHandler) OnOpen(session getty.Session) error {
 		session.Close()
 		return err
 	}
-	if h.SessionOnOpen != nil {
-		h.SessionOnOpen(session.GetAttribute(Cname).(string), session)
-	}
 	return nil
 }
 
@@ -67,6 +64,11 @@ func (h *messageHandler) OnMessage(session getty.Session, m interface{}) {
 		if pkg.ReasonCode() == messagev5.Success {
 			// 此时才可以发送消息
 			h.SetAuthOk(session, true)
+			if h.SessionOnOpen != nil {
+				h.SessionOnOpen(session.GetAttribute(Cname).(string), session)
+			}
+		} else {
+			session.Close()
 		}
 	}
 }

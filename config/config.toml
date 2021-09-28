@@ -50,6 +50,9 @@ serverVersion = "5.0.1"
     [[cluster.staticNodeList]]
         name="node2"
         addr= "127.0.0.1:2885"
+    [[cluster.staticNodeList]]
+        name="node3"
+        addr= "127.0.0.1:2886"
 [defaultConfig]
     [defaultConfig.connect]
         keepalive=300 # 单位s，可以作为读超时
