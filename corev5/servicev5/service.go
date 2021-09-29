@@ -141,7 +141,6 @@ type service struct {
 
 	rmsgs []*messagev5.PublishMessage
 
-	clusterClient     *sync.Map // name --> *client.Client
 	shareTopicMapNode cluster.ShareTopicMapNode
 
 	SessionStore store.SessionStore

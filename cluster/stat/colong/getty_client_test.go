@@ -6,5 +6,5 @@ import (
 )
 
 func TestRunClient(t *testing.T) {
-	util.WaitCloseSignals(RunClient("node2", "node1", "127.0.0.1:9876", 1, true, 100))
+	util.WaitCloseSignals(runClient("node2", "node1", "127.0.0.1:9876", 1, true, 100))
 }

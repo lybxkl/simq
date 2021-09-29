@@ -6,6 +6,6 @@ import (
 )
 
 func TestRunClusterServer(t *testing.T) {
-	util.WaitCloseSignals(RunClusterServer("node1", "127.0.0.1:9876",
+	util.WaitCloseSignals(RunClusterGettyServer("node1", "127.0.0.1:9876",
 		nil, nil, nil, nil))
 }

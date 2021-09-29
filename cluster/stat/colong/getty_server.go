@@ -10,20 +10,21 @@ import (
 	gxsync "github.com/dubbogo/gost/sync"
 )
 
-type Server struct {
+type server struct {
 	name string
 	s    getty.Server
 }
 
-func (this *Server) Close() {
+func (this *server) Close() {
 	this.s.Close()
 }
 
 var taskPool gxsync.GenericTaskPool
 
-func RunClusterServer(name string, addr string, clusterInToPub ClusterInToPub,
+// RunClusterGettyServer 提供集群节点连接服务
+func RunClusterGettyServer(name string, addr string, clusterInToPub ClusterInToPub,
 	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
-	shareTopicMapNode cluster.ShareTopicMapNode) *Server {
+	shareTopicMapNode cluster.ShareTopicMapNode) NodeServerFace {
 	util.SetLimit()
 
 	//util.Profiling(*pprofPort)
@@ -33,14 +34,13 @@ func RunClusterServer(name string, addr string, clusterInToPub ClusterInToPub,
 	taskPool = gxsync.NewTaskPoolSimple(10000)
 	options = append(options, getty.WithServerTaskPool(taskPool))
 
-	server := getty.NewTCPServer(options...)
+	sev := getty.NewTCPServer(options...)
 
-	go server.RunEventLoop(newHelloServerSession(name, clusterInToPub, clusterInToPubShare,
+	go sev.RunEventLoop(newHelloServerSession(name, clusterInToPub, clusterInToPubShare,
 		clusterInToPubSys, shareTopicMapNode))
-
-	return &Server{
+	return &server{
 		name: name,
-		s:    server,
+		s:    sev,
 	}
 }
 

@@ -143,9 +143,10 @@ type Server struct {
 	//指示此服务器是否已检查配置
 	configOnce sync.Once
 
-	ClusterDiscover   cluster.NodeDiscover
-	ClusterServer     *colong.Server
-	ClusterClient     *sync.Map // name --> *client.Client
+	ClusterDiscover cluster.NodeDiscover
+	ClusterServer   colong.NodeServerFace
+	ClusterClient   colong.NodeClientFace
+
 	ShareTopicMapNode cluster.ShareTopicMapNode
 
 	SessionStore store.SessionStore
@@ -279,15 +280,14 @@ func (this *Server) RunClusterComp() {
 		}
 		this.ClusterDiscover = cluster.NewStaticNodeDiscover(staticDisc)
 		this.ShareTopicMapNode = cluster.NewShareMap()
+
+		// 静态方式启动
 		svc := this.NewService() // 单独service用来处理集群来的消息
-		this.ClusterServer = colong.RunClusterServer(cfg.Cluster.ClusterName,
+		this.ClusterServer, this.ClusterClient, _ = colong.NewStaticCluster(cfg.Cluster.ClusterName,
 			cfg.Cluster.ClusterHost+":"+strconv.Itoa(cfg.Cluster.ClusterPort),
-			svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode)
-		this.ClusterClient = &sync.Map{}
-		for name, node := range this.ClusterDiscover.GetNodeMap() {
-			go this.ClusterClient.Store(name, colong.RunClient(cfg.Cluster.ClusterName, name, node.Addr,
-				100, true, 10000))
-		}
+			svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys,
+			this.ShareTopicMapNode, this.ClusterDiscover.GetNodeMap(),
+			100, true, 10000)
 	}
 }
 
@@ -452,7 +452,6 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		conn:              conn,
 		sessMgr:           this.sessMgr,
 		topicsMgr:         this.topicsMgr,
-		clusterClient:     this.ClusterClient,
 		shareTopicMapNode: this.ShareTopicMapNode,
 	}
 	err = this.getSession(svc, req, resp)

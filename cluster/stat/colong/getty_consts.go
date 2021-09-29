@@ -13,6 +13,8 @@ import (
 const (
 	CronPeriod      = 20e9
 	WritePkgTimeout = 1e8
+
+	AllNodeName = "@all" // TODO 表示所有节点都发送失败使用的名称，所以节点名称不要使用此
 )
 
 var log = getty.GetLogger()
