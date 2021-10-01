@@ -1,7 +1,8 @@
-package colong
+package static_getty
 
 import (
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/util"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	getty "github.com/apache/dubbo-getty"
@@ -26,7 +27,7 @@ func (s *staticGettyClient) Close() {
 }
 
 // RunStaticGettyNodeClients 静态节点客户端启动
-func RunStaticGettyNodeClients(nodes map[string]cluster.Node, curName string, connectNum int, taskPoolMode bool, taskPoolSize int) NodeClientFace {
+func RunStaticGettyNodeClients(nodes map[string]cluster.Node, curName string, connectNum int, taskPoolMode bool, taskPoolSize int) colong.NodeClientFace {
 	newStaticGettySend()
 	static := &staticGettyClient{
 		c: map[string]*client{},
@@ -46,7 +47,7 @@ type client struct {
 }
 
 func (this *client) Close() {
-	sender.(*staticGettySender).removeSession(this.serverName)
+	colong.GetSender().(*staticGettySender).removeSession(this.serverName)
 	this.Client.Close()
 	this.Pool.Close()
 }
@@ -73,7 +74,7 @@ func runClient(curName, serverName string, serverAddr string, connectNum int, ta
 
 	cl.Client = c
 
-	sender.(*staticGettySender).addSession(serverName, cl)
+	colong.GetSender().(*staticGettySender).addSession(serverName, cl)
 	//util.WaitCloseSignals(client)
 	//colong.RemoveSession(serverName)
 	//taskPool.Close()
@@ -97,9 +98,9 @@ func (this *client) newHelloClientSession(curName, nodeName string) func(session
 
 // NewStaticSend 静态集群发送者
 func newStaticGettySend() {
-	sender = &staticGettySender{
+	colong.SetSender(&staticGettySender{
 		sessionsSync: &sync.Map{},
-	}
+	})
 }
 
 // 静态集群发送者
@@ -108,11 +109,25 @@ type staticGettySender struct {
 }
 
 // 非数据库采用的方式，每个连接一个NodeClientFace
-func (s *staticGettySender) addSession(name string, session NodeClientFace) {
+func (s *staticGettySender) addSession(name string, session colong.NodeClientFace) {
 	s.sessionsSync.Store(name, session)
 }
 func (s *staticGettySender) removeSession(name string) {
 	_, _ = s.sessionsSync.LoadAndDelete(name)
+}
+
+// wrapperShare 发送共享主题消息
+func wrapperShare(msg messagev5.Message, shareName string) ([]byte, error) {
+	cmsg := NewWrapCMsgImpl(PubShareCMsg)
+	cmsg.SetShare(shareName, msg)
+	return EncodeCMsg(cmsg)
+}
+
+// wrapperPub 发送普通消息
+func wrapperPub(msg messagev5.Message) ([]byte, error) {
+	cmsg := NewWrapCMsgImpl(PubCMsg)
+	cmsg.SetMsg(msg)
+	return EncodeCMsg(cmsg)
 }
 
 // SendOneNode 单个发送，共享订阅

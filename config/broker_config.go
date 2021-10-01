@@ -51,8 +51,16 @@ type Broker struct {
 	WssKeyPath  string `toml:"wssKeyPath"`
 	Ca          string `toml:"ca"`
 }
+type ModelEm = string
+
+const (
+	Getty ModelEm = "getty"
+	Mongo ModelEm = "mongo"
+)
+
 type Cluster struct {
 	Enabled             bool       `toml:"enabled"`
+	Model               ModelEm    `toml:"model"`
 	TaskClusterPoolSize int32      `toml:"taskClusterPoolSize"`
 	TaskServicePoolSize int32      `toml:"taskServicePoolSize"`
 	ClusterName         string     `toml:"clusterName"`
@@ -137,6 +145,7 @@ func Configure(args []string) error {
 	fs.StringVar(&cfg.Broker.WssKeyPath, "wss-keypath", cfg.Broker.WssKeyPath, "HTTPS websocket broker private key file")
 
 	fs.BoolVar(&cfg.Cluster.Enabled, "cluster-open", cfg.Cluster.Enabled, "open cluster.")
+	fs.StringVar(&cfg.Cluster.Model, "cluster-model", cfg.Cluster.Model, "cluster startup mode.")
 	fs.StringVar(&cfg.Cluster.ClusterName, "node-name", cfg.Cluster.ClusterName, "current node name of the cluster.")
 	fs.StringVar(&cfg.Cluster.ClusterHost, "cluster-host", cfg.Cluster.ClusterHost, "cluster tcp host to listen on.")
 	fs.IntVar(&cfg.Cluster.ClusterPort, "cluster-port", cfg.Cluster.ClusterPort, "cluster tcp port to listen on.")

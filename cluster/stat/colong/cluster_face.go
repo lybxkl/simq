@@ -2,24 +2,18 @@ package colong
 
 import (
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	"gitee.com/Ljolan/si-mqtt/logger"
 )
 
 var (
 	sender Sender // 消息发送者，提供全发和单发
 )
 
-// wrapperShare 发送共享主题消息
-func wrapperShare(msg messagev5.Message, shareName string) ([]byte, error) {
-	cmsg := NewWrapCMsgImpl(PubShareCMsg)
-	cmsg.SetShare(shareName, msg)
-	return EncodeCMsg(cmsg)
+func SetSender(sd Sender) {
+	sender = sd
 }
-
-// wrapperPub 发送普通消息
-func wrapperPub(msg messagev5.Message) ([]byte, error) {
-	cmsg := NewWrapCMsgImpl(PubCMsg)
-	cmsg.SetMsg(msg)
-	return EncodeCMsg(cmsg)
+func GetSender() Sender {
+	return sender
 }
 
 // SendMsgToCluster 发送消息到集群
@@ -30,7 +24,7 @@ func SendMsgToCluster(msg messagev5.Message, shareName, targetNode string, allSu
 	oneNodeSendSucFunc func(name string, message messagev5.Message),
 	oneNodeSendFailFunc func(name string, message messagev5.Message)) {
 	if sender == nil {
-		log.Warnf("sender is nil")
+		logger.Logger.Warnf("sender is nil")
 		return
 	}
 	if targetNode != "" { // 单个发送，可能是共享消息
@@ -41,10 +35,13 @@ func SendMsgToCluster(msg messagev5.Message, shareName, targetNode string, allSu
 	sender.SendAllNode(msg, shareName, allSuccess, oneNodeSendSucFunc, oneNodeSendFailFunc)
 }
 
+// Sender 只要实现此接口就可以通过SendMsgToCluster(...)方法发送集群消息
 type Sender interface {
+	// SendOneNode 主要是用来发送共享主题消息
 	SendOneNode(msg messagev5.Message, shareName, targetNode string, allSuccess func(message messagev5.Message),
 		oneNodeSendSucFunc func(name string, message messagev5.Message),
 		oneNodeSendFailFunc func(name string, message messagev5.Message))
+	// SendAllNode 发送除共享主题消息外的消息
 	SendAllNode(msg messagev5.Message, shareName string, allSuccess func(message messagev5.Message),
 		oneNodeSendSucFunc func(name string, message messagev5.Message),
 		oneNodeSendFailFunc func(name string, message messagev5.Message))

@@ -25,6 +25,7 @@ serverVersion = "5.0.1"
 [cluster]
     # 是否开启集群模式
     enabled = true
+    model = "getty"
     taskClusterPoolSize=10000 # 节点处理其它节点发来的消息的协程池大小
     taskServicePoolSize=10000 # 服务向其它节点发送的协程池大小
 

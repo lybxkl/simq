@@ -1,4 +1,4 @@
-package colong
+package static_getty
 
 import (
 	getty "github.com/apache/dubbo-getty"

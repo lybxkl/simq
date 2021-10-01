@@ -1,4 +1,4 @@
-package colong
+package static_getty
 
 import (
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"

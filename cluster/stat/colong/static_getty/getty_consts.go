@@ -1,8 +1,10 @@
-package colong
+package static_getty
 
 import (
 	"errors"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"github.com/apache/dubbo-getty"
 	"github.com/panjf2000/ants/v2"
@@ -85,4 +87,16 @@ func dealAntsErr(err error) {
 	} else {
 		fmt.Println("线程池处理异常：", err)
 	}
+}
+
+// NewStaticCluster 构建集群服务
+func NewStaticCluster(curName string, curAddr string, clusterInToPub ClusterInToPub,
+	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
+	shareTopicMapNode cluster.ShareTopicMapNode,
+	staticNodes map[string]cluster.Node, connectNum int, taskPoolMode bool, taskPoolSize int) (colong.NodeServerFace, colong.NodeClientFace, error) {
+
+	svr := RunClusterGettyServer(curName, curAddr, clusterInToPub, clusterInToPubShare, clusterInToPubSys, shareTopicMapNode)
+	// 需要与其它节点连接成功才会成功启动
+	cli := RunStaticGettyNodeClients(staticNodes, curName, connectNum, taskPoolMode, taskPoolSize)
+	return svr, cli, nil
 }

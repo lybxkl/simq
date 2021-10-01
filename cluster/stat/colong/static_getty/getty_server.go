@@ -1,7 +1,8 @@
-package colong
+package static_getty
 
 import (
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/util"
 	getty "github.com/apache/dubbo-getty"
 )
@@ -24,7 +25,7 @@ var taskPool gxsync.GenericTaskPool
 // RunClusterGettyServer 提供集群节点连接服务
 func RunClusterGettyServer(name string, addr string, clusterInToPub ClusterInToPub,
 	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
-	shareTopicMapNode cluster.ShareTopicMapNode) NodeServerFace {
+	shareTopicMapNode cluster.ShareTopicMapNode) colong.NodeServerFace {
 	util.SetLimit()
 
 	//util.Profiling(*pprofPort)
