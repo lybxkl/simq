@@ -3,6 +3,7 @@ package static_getty
 import (
 	"errors"
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"net"
 	"strconv"
 	"strings"
@@ -15,23 +16,17 @@ import (
 	"github.com/apache/dubbo-getty"
 )
 
-type (
-	ClusterInToPub      func(msg1 *messagev5.PublishMessage) error
-	ClusterInToPubShare func(msg1 *messagev5.PublishMessage, shareName string) error
-	ClusterInToPubSys   func(msg1 *messagev5.PublishMessage) error
-)
-
 type serverMessageHandler struct {
 	SessionOnOpen func(session getty.Session)
 	inner
-	clusterInToPub      ClusterInToPub
-	clusterInToPubShare ClusterInToPubShare
-	clusterInToPubSys   ClusterInToPubSys
+	clusterInToPub      colong.ClusterInToPub
+	clusterInToPubShare colong.ClusterInToPubShare
+	clusterInToPubSys   colong.ClusterInToPubSys
 	shareTopicMapNode   cluster.ShareTopicMapNode
 }
 
-func SetPubFunc(el getty.EventListener, clusterInToPub ClusterInToPub,
-	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
+func SetPubFunc(el getty.EventListener, clusterInToPub colong.ClusterInToPub,
+	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
 	shareTopicMapNode cluster.ShareTopicMapNode) {
 	if listener, ok := el.(*serverMessageHandler); ok {
 		listener.clusterInToPubShare = clusterInToPubShare

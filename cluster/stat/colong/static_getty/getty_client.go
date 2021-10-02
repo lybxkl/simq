@@ -18,12 +18,13 @@ type staticGettyClient struct {
 	c map[string]*client
 }
 
-func (s *staticGettyClient) Close() {
+func (s *staticGettyClient) Close() error {
 	s.Lock()
 	defer s.Unlock()
 	for _, clientFace := range s.c {
 		clientFace.Close()
 	}
+	return nil
 }
 
 // RunStaticGettyNodeClients 静态节点客户端启动
@@ -46,10 +47,11 @@ type client struct {
 	*Pool
 }
 
-func (this *client) Close() {
+func (this *client) Close() error {
 	colong.GetSender().(*staticGettySender).removeSession(this.serverName)
 	this.Client.Close()
 	this.Pool.Close()
+	return nil
 }
 func runClient(curName, serverName string, serverAddr string, connectNum int, taskPoolMode bool, taskPoolSize int) *client {
 	util.SetLimit()
@@ -131,7 +133,7 @@ func wrapperPub(msg messagev5.Message) ([]byte, error) {
 }
 
 // SendOneNode 单个发送，共享订阅
-func (s *staticGettySender) SendOneNode(msg messagev5.Message, shareName, targetNode string, allSuccess func(message messagev5.Message),
+func (s *staticGettySender) SendOneNode(msg messagev5.Message, shareName, targetNode string,
 	oneNodeSendSucFunc func(name string, message messagev5.Message),
 	oneNodeSendFailFunc func(name string, message messagev5.Message)) {
 	var (
@@ -178,9 +180,6 @@ func (s *staticGettySender) SendOneNode(msg messagev5.Message, shareName, target
 			if oneNodeSendSucFunc != nil {
 				oneNodeSendSucFunc(targetNode, msg)
 			}
-			if allSuccess != nil {
-				allSuccess(msg)
-			}
 		}
 	} else if shareName != "" { // 没有这个节点，但是必须发送共享消息
 		// TODO 重新选择节点发送该共享组名下的 共享消息
@@ -188,7 +187,7 @@ func (s *staticGettySender) SendOneNode(msg messagev5.Message, shareName, target
 }
 
 // SendAllNode 发送所有的
-func (s *staticGettySender) SendAllNode(msg messagev5.Message, shareName string, allSuccess func(message messagev5.Message),
+func (s *staticGettySender) SendAllNode(msg messagev5.Message, allSuccess func(message messagev5.Message),
 	oneNodeSendSucFunc func(name string, message messagev5.Message),
 	oneNodeSendFailFunc func(name string, message messagev5.Message)) {
 	var (
@@ -201,7 +200,7 @@ func (s *staticGettySender) SendAllNode(msg messagev5.Message, shareName string,
 	if err != nil {
 		log.Warnf("wrapper pub msg error %v", err)
 		if oneNodeSendFailFunc != nil {
-			oneNodeSendFailFunc(AllNodeName, msg)
+			oneNodeSendFailFunc(colong.AllNodeName, msg)
 		}
 		return
 	}
@@ -213,10 +212,10 @@ func (s *staticGettySender) SendAllNode(msg messagev5.Message, shareName string,
 		}()
 		// FIXME 会因为一个client获取阻塞，导致后面其它节点全部都在阻塞
 		if s, ok := value.(*client).Pop(); !ok {
-			log.Warnf("client close, node %v send share name : %v", k, shareName)
+			log.Warnf("client close, node %v send fail.", k)
 		} else {
 			if s.IsClosed() {
-				log.Warnf("client session is closed , node %v send share name : %v", k, shareName)
+				log.Warnf("client session is closed , node %v send fail.", k)
 				return true
 			}
 			_, er := s.WriteBytes(b)

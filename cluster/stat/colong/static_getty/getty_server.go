@@ -16,23 +16,24 @@ type server struct {
 	s    getty.Server
 }
 
-func (this *server) Close() {
+func (this *server) Close() error {
 	this.s.Close()
+	return nil
 }
 
 var taskPool gxsync.GenericTaskPool
 
 // RunClusterGettyServer 提供集群节点连接服务
-func RunClusterGettyServer(name string, addr string, clusterInToPub ClusterInToPub,
-	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
-	shareTopicMapNode cluster.ShareTopicMapNode) colong.NodeServerFace {
+func RunClusterGettyServer(name string, addr string, clusterInToPub colong.ClusterInToPub,
+	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
+	shareTopicMapNode cluster.ShareTopicMapNode, taskPoolSize int) colong.NodeServerFace {
 	util.SetLimit()
 
 	//util.Profiling(*pprofPort)
 
 	options := []getty.ServerOption{getty.WithLocalAddress(addr)}
 
-	taskPool = gxsync.NewTaskPoolSimple(10000)
+	taskPool = gxsync.NewTaskPoolSimple(taskPoolSize)
 	options = append(options, getty.WithServerTaskPool(taskPool))
 
 	sev := getty.NewTCPServer(options...)
@@ -45,8 +46,8 @@ func RunClusterGettyServer(name string, addr string, clusterInToPub ClusterInToP
 	}
 }
 
-func newHelloServerSession(name string, clusterInToPub ClusterInToPub,
-	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
+func newHelloServerSession(name string, clusterInToPub colong.ClusterInToPub,
+	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
 	shareTopicMapNode cluster.ShareTopicMapNode) func(session getty.Session) error {
 	return func(session getty.Session) error {
 		err := InitialSessionServer(name, session, clusterInToPub, clusterInToPubShare,

@@ -2,6 +2,7 @@ package servicev5
 
 import (
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/db/mongo"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/static_getty"
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/logger"
@@ -35,5 +36,20 @@ func GettyClusterRun(this *Server, cfg *config.SIConfig) {
 		cfg.Cluster.ClusterHost+":"+strconv.Itoa(cfg.Cluster.ClusterPort),
 		svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys,
 		this.ShareTopicMapNode, this.ClusterDiscover.GetNodeMap(),
-		100, true, 10000)
+		int(cfg.Cluster.ClientConNum), true, int(cfg.Cluster.TaskServicePoolSize), int(cfg.Cluster.TaskClusterPoolSize))
+	this.AddCloser(this.ClusterServer)
+	this.AddCloser(this.ClusterClient)
+}
+
+// DBClusterRun DB方式集群
+func DBClusterRun(this *Server, cfg *config.SIConfig) {
+	this.AddCloser(InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize)))
+	this.ShareTopicMapNode = cluster.NewShareMap()
+	svc := this.NewService() // 单独service用来处理集群来的消息
+	this.ClusterServer, this.ClusterClient, _ = mongo.NewDBCluster(cfg.Cluster.ClusterName,
+		svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode,
+		int(cfg.Cluster.TaskClusterPoolSize), int64(cfg.Cluster.Period), int64(cfg.Cluster.BatchSize),
+		cfg.Cluster.MongoUrl, cfg.Cluster.MongoMinPool, cfg.Cluster.MongoMaxPool, cfg.Cluster.MongoMaxConnIdleTime)
+	this.AddCloser(this.ClusterServer)
+	this.AddCloser(this.ClusterClient)
 }

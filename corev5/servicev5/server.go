@@ -265,11 +265,13 @@ func (this *Server) RunClusterComp() {
 	switch cfg.Cluster.Model {
 	case config.Getty:
 		GettyClusterRun(this, cfg)
-		logger.Logger.Infof("cluster startup mode: \"%v\", run success", cfg.Cluster.Model)
+	case config.Mongo:
+		DBClusterRun(this, cfg)
 	default:
 		logger.Logger.Errorf("the cluster startup mode: %v is not supported", cfg.Cluster.Model)
 		return
 	}
+	logger.Logger.Infof("cluster startup mode: \"%v\", run success", cfg.Cluster.Model)
 }
 
 // 打印启动banner

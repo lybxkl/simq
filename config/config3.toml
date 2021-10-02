@@ -25,16 +25,27 @@ serverVersion = "5.0.1"
 [cluster]
     # 是否开启集群模式
     enabled = true
-    model = "getty"
+    model = "mongo"
     taskClusterPoolSize=10000 # 节点处理其它节点发来的消息的协程池大小
     taskServicePoolSize=10000 # 服务向其它节点发送的协程池大小
 
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
     clusterName = "node3"
+
+    ## 下面是Mongo集群方式配置
+    mongoUrl = "mongodb://127.0.0.1:27017"
+    mongoMinPool = 100
+    mongoMaxPool = 300
+    mongoMaxConnIdleTime = 10 ## 单位s
+    period = 30 ## 数据拉取周期，单位ms
+    batchSize = 100 ## 单次获取数据量大小
+
+    ## 下面是getty方式启动需要配置
     # 集群模式监听的IP，用来和集群中其他节点通信
     clusterHost = "127.0.0.1"
     # 集群模式监听的端口
     clusterPort = 2886
+    clientConNum = 100 ## 客户端连接数
     # 集群模式是否使用tls
     clusterTls = false
     # 服务器端证书

@@ -59,19 +59,30 @@ const (
 )
 
 type Cluster struct {
-	Enabled             bool       `toml:"enabled"`
-	Model               ModelEm    `toml:"model"`
-	TaskClusterPoolSize int32      `toml:"taskClusterPoolSize"`
-	TaskServicePoolSize int32      `toml:"taskServicePoolSize"`
-	ClusterName         string     `toml:"clusterName"`
-	ClusterHost         string     `toml:"clusterHost"`
-	ClusterPort         int        `toml:"clusterPort"`
-	ClusterTLS          bool       `toml:"clusterTls"`
-	ServerCertFile      string     `toml:"serverCertFile"`
-	ServerKeyFile       string     `toml:"serverKeyFile"`
-	ClientCertFile      string     `toml:"clientCertFile"`
-	ClientKeyFile       string     `toml:"clientKeyFile"`
-	StaticNodeList      []NodeInfo `toml:"staticNodeList"`
+	Enabled             bool    `toml:"enabled"`
+	Model               ModelEm `toml:"model"`
+	TaskClusterPoolSize int32   `toml:"taskClusterPoolSize"`
+	TaskServicePoolSize int32   `toml:"taskServicePoolSize"`
+	ClusterName         string  `toml:"clusterName"`
+
+	// mongo配置
+	MongoUrl             string `toml:"mongoUrl"`
+	MongoMinPool         uint64 `toml:"mongoMinPool"`
+	MongoMaxPool         uint64 `toml:"mongoMaxPool"`
+	MongoMaxConnIdleTime uint64 `toml:"mongoMaxConnIdleTime"`
+	Period               uint64 `toml:"period"`
+	BatchSize            uint64 `toml:"batchSize"`
+
+	// getty配置
+	ClusterHost    string     `toml:"clusterHost"`
+	ClusterPort    int        `toml:"clusterPort"`
+	ClientConNum   uint64     `toml:"clientConNum"`
+	ClusterTLS     bool       `toml:"clusterTls"`
+	ServerCertFile string     `toml:"serverCertFile"`
+	ServerKeyFile  string     `toml:"serverKeyFile"`
+	ClientCertFile string     `toml:"clientCertFile"`
+	ClientKeyFile  string     `toml:"clientKeyFile"`
+	StaticNodeList []NodeInfo `toml:"staticNodeList"`
 }
 type NodeInfo struct {
 	Name string `toml:"name"`
@@ -147,6 +158,12 @@ func Configure(args []string) error {
 	fs.BoolVar(&cfg.Cluster.Enabled, "cluster-open", cfg.Cluster.Enabled, "open cluster.")
 	fs.StringVar(&cfg.Cluster.Model, "cluster-model", cfg.Cluster.Model, "cluster startup mode.")
 	fs.StringVar(&cfg.Cluster.ClusterName, "node-name", cfg.Cluster.ClusterName, "current node name of the cluster.")
+
+	fs.StringVar(&cfg.Cluster.MongoUrl, "node-mongo-url", cfg.Cluster.MongoUrl, "node Mongo Url.")
+	fs.Uint64Var(&cfg.Cluster.MongoMinPool, "node-mongo-min-pool", cfg.Cluster.MongoMinPool, "node Mongo Min Pool.")
+	fs.Uint64Var(&cfg.Cluster.MongoMaxPool, "node-mongo-max-pool", cfg.Cluster.MongoMaxPool, "node Mongo Max Pool.")
+	fs.Uint64Var(&cfg.Cluster.MongoMaxConnIdleTime, "node-mongo-max-con-idle", cfg.Cluster.MongoMaxConnIdleTime, "node Mongo Max ConnIdleTime.")
+
 	fs.StringVar(&cfg.Cluster.ClusterHost, "cluster-host", cfg.Cluster.ClusterHost, "cluster tcp host to listen on.")
 	fs.IntVar(&cfg.Cluster.ClusterPort, "cluster-port", cfg.Cluster.ClusterPort, "cluster tcp port to listen on.")
 	fs.BoolVar(&cfg.Cluster.ClusterTLS, "cluster-tls", cfg.Cluster.ClusterTLS, "whether cluster tcp use tls")

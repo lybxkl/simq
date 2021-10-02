@@ -1,8 +1,8 @@
 package colong
 
 type NodeServerFace interface {
-	Close()
+	Close() error
 }
 type NodeClientFace interface {
-	Close()
+	Close() error
 }

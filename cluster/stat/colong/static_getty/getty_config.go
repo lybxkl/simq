@@ -3,6 +3,7 @@ package static_getty
 import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"net"
 	"time"
 )
@@ -57,8 +58,8 @@ func InitialSession(name string, session getty.Session) (err error) {
 }
 
 // InitialSessionServer 这里的name是本服务的名称，没啥用
-func InitialSessionServer(name string, session getty.Session, clusterInToPub ClusterInToPub,
-	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
+func InitialSessionServer(name string, session getty.Session, clusterInToPub colong.ClusterInToPub,
+	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
 	shareTopicMapNode cluster.ShareTopicMapNode) (err error) {
 
 	// session.SetCompressType(getty.CompressZip)

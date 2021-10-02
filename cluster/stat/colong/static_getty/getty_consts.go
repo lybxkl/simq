@@ -15,8 +15,6 @@ import (
 const (
 	CronPeriod      = 20e9
 	WritePkgTimeout = 1e8
-
-	AllNodeName = "@all" // TODO 表示所有节点都发送失败使用的名称，所以节点名称不要使用此
 )
 
 var log = getty.GetLogger()
@@ -90,12 +88,12 @@ func dealAntsErr(err error) {
 }
 
 // NewStaticCluster 构建集群服务
-func NewStaticCluster(curName string, curAddr string, clusterInToPub ClusterInToPub,
-	clusterInToPubShare ClusterInToPubShare, clusterInToPubSys ClusterInToPubSys,
+func NewStaticCluster(curName string, curAddr string, clusterInToPub colong.ClusterInToPub,
+	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
 	shareTopicMapNode cluster.ShareTopicMapNode,
-	staticNodes map[string]cluster.Node, connectNum int, taskPoolMode bool, taskPoolSize int) (colong.NodeServerFace, colong.NodeClientFace, error) {
+	staticNodes map[string]cluster.Node, connectNum int, taskPoolMode bool, taskPoolSize, serverTaskPoolSize int) (colong.NodeServerFace, colong.NodeClientFace, error) {
 
-	svr := RunClusterGettyServer(curName, curAddr, clusterInToPub, clusterInToPubShare, clusterInToPubSys, shareTopicMapNode)
+	svr := RunClusterGettyServer(curName, curAddr, clusterInToPub, clusterInToPubShare, clusterInToPubSys, shareTopicMapNode, serverTaskPoolSize)
 	// 需要与其它节点连接成功才会成功启动
 	cli := RunStaticGettyNodeClients(staticNodes, curName, connectNum, taskPoolMode, taskPoolSize)
 	return svr, cli, nil
