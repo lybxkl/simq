@@ -24,7 +24,8 @@ func NewSessionStore() store2.SessionStore {
 }
 func (s *SessionRepo) Start(ctx context.Context, config config.SIConfig) error {
 	var err error
-	s.c, err = mongoorm2.NewMongoOrm()
+	storeCfg := config.Store.Mongo
+	s.c, err = mongoorm2.NewMongoOrm(storeCfg.Source, storeCfg.MinPoolSize, storeCfg.MaxPoolSize, storeCfg.MaxConnIdleTime)
 	return err
 }
 

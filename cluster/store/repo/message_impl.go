@@ -19,7 +19,8 @@ func NewMessageStore() store2.MessageStore {
 }
 func (m *MessageRepo) Start(ctx context.Context, config config.SIConfig) error {
 	var err error
-	m.c, err = mongoorm2.NewMongoOrm()
+	storeCfg := config.Store.Mongo
+	m.c, err = mongoorm2.NewMongoOrm(storeCfg.Source, storeCfg.MinPoolSize, storeCfg.MaxPoolSize, storeCfg.MaxConnIdleTime)
 	return err
 }
 

@@ -54,8 +54,8 @@ type Broker struct {
 type ModelEm = string
 
 const (
-	Getty ModelEm = "getty"
-	Mongo ModelEm = "mongo"
+	Getty   ModelEm = "getty"
+	MongoEm ModelEm = "mongo"
 )
 
 type Cluster struct {
@@ -118,6 +118,12 @@ type Mysql struct {
 	Source   string `toml:"source"`
 	PoolSize int    `toml:"poolSize"`
 }
+type Mongo struct {
+	Source          string `toml:"source"`
+	MinPoolSize     uint64 `toml:"minPool"`
+	MaxPoolSize     uint64 `toml:"maxPool"`
+	MaxConnIdleTime uint64 `toml:"maxConnIdleTime"`
+}
 type Redis struct {
 	Source   string `toml:"source"`
 	Db       int    `toml:"db"`
@@ -125,6 +131,7 @@ type Redis struct {
 }
 type Store struct {
 	Mysql Mysql `toml:"mysql"`
+	Mongo Mongo `toml:"mongo"`
 	Redis Redis `toml:"redis"`
 }
 

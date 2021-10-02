@@ -83,6 +83,11 @@ serverVersion = "5.0.1"
         redirectIsForEver = true # 临时还是永久
         redirectOpen = false # 开关
 [store]
+    [store.mongo]
+        source = "mongodb://127.0.0.1:27017"
+        minPool = 100
+        maxPool = 300
+        maxConnIdleTime = 10 ## 单位s
     [store.mysql]
         source = ""
         poolSize=10
@@ -91,5 +96,5 @@ serverVersion = "5.0.1"
         db=1
         poolSize=10
 [pprof]
-port = 8080
-open = false
+    port = 8080
+    open = false

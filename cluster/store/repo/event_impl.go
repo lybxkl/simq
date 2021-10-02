@@ -19,7 +19,8 @@ func NewEventStore() store2.EventStore {
 }
 func (e *eventStore) Start(ctx context.Context, config config.SIConfig) error {
 	var err error
-	e.c, err = mongoorm2.NewMongoOrm()
+	storeCfg := config.Store.Mongo
+	e.c, err = mongoorm2.NewMongoOrm(storeCfg.Source, storeCfg.MinPoolSize, storeCfg.MaxPoolSize, storeCfg.MaxConnIdleTime)
 	return err
 }
 

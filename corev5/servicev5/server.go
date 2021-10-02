@@ -265,7 +265,7 @@ func (this *Server) RunClusterComp() {
 	switch cfg.Cluster.Model {
 	case config.Getty:
 		GettyClusterRun(this, cfg)
-	case config.Mongo:
+	case config.MongoEm:
 		DBClusterRun(this, cfg)
 	default:
 		logger.Logger.Errorf("the cluster startup mode: %v is not supported", cfg.Cluster.Model)

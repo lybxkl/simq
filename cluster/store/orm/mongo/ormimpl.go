@@ -7,16 +7,21 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo" //MongoDB的Go驱动包
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"time"
 )
 
 type mongoOrm struct {
 	db *mongo.Database
 }
 
-func NewMongoOrm() (orm2.SiOrm, error) {
+func NewMongoOrm(url string, minPool, maxPool, maxConnIdle uint64) (orm2.SiOrm, error) {
 	// 设置mongoDB客户端连接信息
-	param := fmt.Sprintf("mongodb://127.0.0.1:27017")
-	clientOptions := options.Client().ApplyURI(param)
+	param := fmt.Sprintf(url)
+	clientOptions := options.Client().
+		ApplyURI(param).
+		SetMinPoolSize(minPool).
+		SetMaxPoolSize(maxPool).
+		SetMaxConnIdleTime(time.Duration(maxConnIdle) * time.Second)
 
 	// 建立客户端连接
 	client, err := mongo.Connect(context.TODO(), clientOptions)
