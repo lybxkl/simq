@@ -534,45 +534,59 @@ func (this *service) processUnsubscribe(msg *messagev5.UnsubscribeMessage) error
 	return nil
 }
 
+var (
+	shareByte = []byte("$share/")
+	// reflect.DeepEqual(topic[:len(shareByte)],shareByte)
+	// 这样可以减少反射操作
+	deepEqual = func(topic []byte) bool {
+		for i, i2 := range shareByte {
+			if topic[i] != i2 {
+				return false
+			}
+		}
+		return true
+	}
+)
+
 // processToCluster 分主题发送到其它节点发送
 func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
 	if !this.clusterOpen {
 		return
 	}
-	tag := len(topics)
+	tag := 0
 	for i := 0; i < len(topics); i++ {
-		if len(topics[i]) < 10 { // $share/{shareName}/{topic} 至少长度为9，即其中shareName不能为空，topic也不能为空
-			tag--
-			continue
-		}
-		for j := 0; j < len(sharePrefix); j++ {
-			if topics[i][j] != sharePrefix[j] {
-				tag--
-				break
+		if len(topics[i]) > len(shareByte) && deepEqual(topics[i]) {
+			var index = len(shareByte)
+			// 找到共享主题名称
+			for j, b := range topics[i][len(shareByte):] {
+				if b == '/' {
+					index += j
+					break
+				} else if b == '+' || b == '#' {
+					// {ShareName} 是一个不包含 "/", "+" 以及 "#" 的字符串。
+					continue
+				}
+			}
+			if index == len(shareByte) {
+				continue
+			}
+			if len(topics[i]) >= 2+index && topics[i][index] == '/' {
+				shareName := topics[i][len(shareByte):index]
+				tp := topics[i][index+1:]
+				tag++
+				switch msg.Type() {
+				case messagev5.SUBSCRIBE:
+					// 添加本地集群共享订阅
+					this.shareTopicMapNode.AddTopicMapNode(tp, string(shareName), GetServerName())
+					logger.Logger.Debugf("添加本地集群共享订阅：%s,%s,%s", tp, string(shareName), GetServerName())
+				case messagev5.UNSUBSCRIBE:
+					// 删除本地集群共享订阅
+					this.shareTopicMapNode.RemoveTopicMapNode(tp, string(shareName), GetServerName())
+					logger.Logger.Debugf("删除本地集群共享订阅：%s,%s,%s", tp, string(shareName), GetServerName())
+				}
 			}
 		}
-		// 共享名称组
-		k := 0
-		for j := len(sharePrefix); j < len(topics[i]); j++ {
-			if topics[i][j] == '/' {
-				k = j
-				break
-			}
-		}
-		if k == len(sharePrefix) || k == len(topics[i])-1 {
-			tag--
-			continue
-		}
-		switch msg.Type() {
-		case messagev5.SUBSCRIBE:
-			// 添加本地集群共享订阅
-			this.shareTopicMapNode.AddTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
-			logger.Logger.Debugf("添加本地集群共享订阅：%s,%s,%s", topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
-		case messagev5.UNSUBSCRIBE:
-			// 删除本地集群共享订阅
-			this.shareTopicMapNode.RemoveTopicMapNode(topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
-			logger.Logger.Debugf("删除本地集群共享订阅：%s,%s,%s", topics[i][k+1:], string(topics[i][len(sharePrefix):k]), GetServerName())
-		}
+
 	}
 	if tag > 0 { // 确实是有共享主题，才发送到集群其它节点
 		this.sendCluster(msg) // 发送到其它节点，不需要qos处理的，TODO 但是需要考虑session相关问题
@@ -663,8 +677,9 @@ func (this *service) ClusterInToPub(msg1 *messagev5.PublishMessage) error {
 	return this.pubFn(msg1, "", false)
 }
 
-// 集群节点发来的共享主题消息，需要发送到特定的共享组 和 普通节点
-func (this *service) ClusterInToPubShare(msg1 *messagev5.PublishMessage, shareName string) error {
+// ClusterInToPubShare 集群节点发来的共享主题消息，需要发送到特定的共享组 onlyShare = true
+// 和 普通节点 onlyShare = false
+func (this *service) ClusterInToPubShare(msg1 *messagev5.PublishMessage, shareName string, onlyShare bool) error {
 	if !this.clusterBelong {
 		return nil
 	}
@@ -673,8 +688,8 @@ func (this *service) ClusterInToPubShare(msg1 *messagev5.PublishMessage, shareNa
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", this.cid(), err)
 		}
 	}
-	// 发送非共享订阅主题
-	return this.pubFn(msg1, shareName, false)
+	// 根据onlyShare 确定是否只发送共享订阅主题
+	return this.pubFn(msg1, shareName, onlyShare)
 }
 
 // 集群节点发来的系统主题消息

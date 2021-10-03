@@ -7,6 +7,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"sync"
+	"time"
 )
 
 const (
@@ -71,9 +72,9 @@ type session struct {
 
 	// Serialize access to this session
 	//序列化对该会话的访问锁
-	mu sync.Mutex
-
-	id string
+	mu   sync.Mutex
+	stop int8 // 2 为关闭
+	id   string
 }
 
 func NewMemSessionSampl() sessionsv5.Session {
@@ -114,12 +115,13 @@ func (this *session) InitSample(msg *messagev5.ConnectMessage, sessionStore stor
 	this.topicAliceRe = make(map[string]uint16)
 
 	this.id = string(msg.ClientId())
-	this.pub1ack = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, false)
-	this.pub2in = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, true)
-	this.pub2out = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, false)
-	this.suback = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false)
-	this.unsuback = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false)
-	this.pingack = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false)
+	this.pub1ack = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, false, true)
+	this.pub2in = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, true, false)
+	this.pub2out = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, false, true)
+	this.suback = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false, false)
+	this.unsuback = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false, false)
+	this.pingack = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false, false)
+	this.runBatch()
 
 	for i := 0; i < len(topics); i++ {
 		sb := topicsv5.Sub(topics[i])
@@ -131,6 +133,35 @@ func (this *session) InitSample(msg *messagev5.ConnectMessage, sessionStore stor
 	this.initted = true
 
 	return nil
+}
+func (this *session) runBatch() {
+	go func() {
+		b2o := this.pub2out.(batchOption)
+		b1o := this.pub1ack.(batchOption)
+		tg := 0
+		for {
+			if this.stop == 2 {
+				return
+			}
+			select {
+			case <-time.After(10 * time.Millisecond):
+				if b2o.GetNum() > 0 {
+					_ = b2o.BatchReleaseOutflowSecMsgId()
+				} else {
+					tg++
+				}
+				if b1o.GetNum() > 0 {
+					_ = b1o.BatchReleaseOutflowMsg()
+				} else {
+					tg++
+				}
+				if tg == 2 {
+					tg = 0
+					time.Sleep(5 * time.Millisecond)
+				}
+			}
+		}
+	}()
 }
 
 //Init 遗嘱和connect消息会存在每个session中，不用每次查询数据库的
@@ -201,7 +232,12 @@ func (this *session) Update(msg *messagev5.ConnectMessage) error {
 	if _, err := this.cmsg.Decode(this.cbuf); err != nil {
 		return err
 	}
-
+	this.stop = 1
+	if this.pingack != nil {
+		if _, ok := this.pingack.(*dbAckqueue); ok {
+			this.runBatch()
+		}
+	}
 	return nil
 }
 
@@ -288,6 +324,11 @@ func (this *session) Cmsg() *messagev5.ConnectMessage {
 }
 
 func (this *session) Will() *messagev5.PublishMessage {
+	if this.stop == 1 {
+		this.stop = 2
+	} else {
+		this.stop = 1
+	}
 	return this.will
 }
 

@@ -109,7 +109,7 @@ func (s *dbRcv) run(period, size int64) {
 				mg := msg[k]
 				if mg.IsSub() {
 					s.submit(func() {
-						tpk := mg.Sub.topic
+						tpk := mg.Sub.Topic
 						node := mg.Sender
 						for i := 0; i < len(tpk); i++ {
 							// 解析share name
@@ -128,7 +128,7 @@ func (s *dbRcv) run(period, size int64) {
 					})
 				} else if mg.IsUnSub() {
 					s.submit(func() {
-						tpk := mg.Sub.topic
+						tpk := mg.Sub.Topic
 						node := mg.Sender
 						for i := 0; i < len(tpk); i++ {
 							// 解析share name
@@ -148,7 +148,7 @@ func (s *dbRcv) run(period, size int64) {
 				} else if mg.IsShare() {
 					s.submit(func() {
 						msg1 := poToVo(mg.Msg)
-						err = s.clusterInToPubShare(msg1, mg.ShareName)
+						err = s.clusterInToPubShare(msg1, mg.ShareName, true)
 						if err != nil {
 							logger.Logger.Errorf("clusterInToPubShare: err %v", err)
 						} else {

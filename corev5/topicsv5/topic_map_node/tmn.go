@@ -283,6 +283,9 @@ func (this *rSnode) matchNode(shareName, nodes *[]string) {
 			break
 		}
 	}
+	if v, ok := this.rsnodes["#"]; ok {
+		v.matchNode(shareName, nodes)
+	}
 }
 
 // Returns topic level, remaining topic levels and any errors

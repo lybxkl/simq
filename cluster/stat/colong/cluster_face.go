@@ -12,7 +12,7 @@ var (
 
 type (
 	ClusterInToPub      func(msg1 *messagev5.PublishMessage) error
-	ClusterInToPubShare func(msg1 *messagev5.PublishMessage, shareName string) error
+	ClusterInToPubShare func(msg1 *messagev5.PublishMessage, shareName string, onlyShare bool) error
 	ClusterInToPubSys   func(msg1 *messagev5.PublishMessage) error
 )
 

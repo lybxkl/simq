@@ -46,9 +46,13 @@ func (this *dbSender) SendOneNode(msg messagev5.Message,
 		e = this.c.SaveUnSub(context.TODO(), "cluster_msg", msg)
 	}
 	if e != nil {
-		go oneNodeSendSucFunc(targetNode, msg)
+		if oneNodeSendSucFunc != nil {
+			go oneNodeSendSucFunc(targetNode, msg)
+		}
 	} else {
-		go oneNodeSendFailFunc(targetNode, msg)
+		if oneNodeSendFailFunc != nil {
+			go oneNodeSendFailFunc(targetNode, msg)
+		}
 	}
 }
 
@@ -66,9 +70,15 @@ func (this *dbSender) SendAllNode(msg messagev5.Message,
 		e = this.c.SaveUnSub(context.TODO(), "cluster_msg", msg)
 	}
 	if e != nil {
-		go allSuccess(msg)
-		go oneNodeSendSucFunc(colong.AllNodeName, msg)
+		if allSuccess != nil {
+			go allSuccess(msg)
+		}
+		if oneNodeSendSucFunc != nil {
+			go oneNodeSendSucFunc(colong.AllNodeName, msg)
+		}
 	} else {
-		go oneNodeSendFailFunc(colong.AllNodeName, msg)
+		if oneNodeSendFailFunc != nil {
+			go oneNodeSendFailFunc(colong.AllNodeName, msg)
+		}
 	}
 }

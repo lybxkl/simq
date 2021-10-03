@@ -52,6 +52,9 @@ type MessagePo struct {
 	Msg        *Message `bson:"msg,omitempty"`
 	Stamp      int64    `bson:"stamp,index"`
 }
+type Sub struct {
+	Topic []string `bson:"topic"`
+}
 
 func (p *MessagePo) IsPub() bool {
 	if p.Target == "" && p.SubOrUnSub == 0 && p.Msg != nil {
@@ -78,10 +81,6 @@ func (p *MessagePo) IsUnSub() bool {
 	return false
 }
 
-type Sub struct {
-	topic []string
-}
-
 func (m *mongoOrm) SaveSub(ctx context.Context, tab string, msg *messagev5.SubscribeMessage) error {
 	var (
 		sub        = &Sub{}
@@ -89,7 +88,7 @@ func (m *mongoOrm) SaveSub(ctx context.Context, tab string, msg *messagev5.Subsc
 		tps        = msg.Topics()
 	)
 	for i := 0; i < len(tps); i++ {
-		sub.topic = append(sub.topic, string(tps[i]))
+		sub.Topic = append(sub.Topic, string(tps[i]))
 	}
 	_, err := m.db.Collection(tab).InsertOne(ctx, &MessagePo{
 		Sender:     m.nodeName,
@@ -106,7 +105,7 @@ func (m *mongoOrm) SaveUnSub(ctx context.Context, tab string, msg *messagev5.Uns
 		tps        = msg.Topics()
 	)
 	for i := 0; i < len(tps); i++ {
-		sub.topic = append(sub.topic, string(tps[i]))
+		sub.Topic = append(sub.Topic, string(tps[i]))
 	}
 	_, err := m.db.Collection(tab).InsertOne(ctx, &MessagePo{
 		Sender:     m.nodeName,

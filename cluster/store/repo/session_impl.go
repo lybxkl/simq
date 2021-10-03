@@ -145,6 +145,16 @@ func (s *SessionRepo) ReleaseAllInflowMsg(ctx context.Context, clientId string) 
 	filter := orm2.Select{"client_id": clientId}
 	return s.c.Delete(ctx, "si_inflow", filter)
 }
+func (s *SessionRepo) ReleaseInflowMsgs(ctx context.Context, clientId string, pkId []uint16) error {
+	defer func() {
+		logger.Logger.Infof("【ReleaseInflowMsgs ==X】%s, pk_id: %v", clientId, pkId)
+	}()
+	err := s.c.Delete(ctx, "si_inflow", orm2.Select{"client_id": clientId, "pk_id": orm2.Select{"$in": pkId}})
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (s *SessionRepo) ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error) {
 	defer func() {
 		logger.Logger.Debugf("【ReleaseInflowMsg ==X】%s, pk_id: %v", clientId, pkId)
@@ -219,7 +229,16 @@ func (s *SessionRepo) ReleaseOutflowMsg(ctx context.Context, clientId string, pk
 	}
 	return poToVo(*ms), nil
 }
-
+func (s *SessionRepo) ReleaseOutflowMsgs(ctx context.Context, clientId string, pkId []uint16) error {
+	defer func() {
+		logger.Logger.Debugf("【ReleaseOutflowMsgs ==X】%s, pk_id: %v", clientId, pkId)
+	}()
+	err := s.c.Delete(ctx, "si_outflow", orm2.Select{"client_id": clientId, "pk_id": orm2.Select{"$in": pkId}})
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (s *SessionRepo) CacheOutflowSecMsgId(ctx context.Context, clientId string, pkId uint16) error {
 	defer func() {
 		logger.Logger.Debugf("【CacheOutflowSecMsgId ==>】%s, pk_id: %v", clientId, pkId)
@@ -259,6 +278,12 @@ func (s *SessionRepo) ReleaseOutflowSecMsgId(ctx context.Context, clientId strin
 	}()
 	filter := orm2.Select{"client_id": clientId, "pk_id": pkId}
 	return s.c.Delete(ctx, "si_outflowsec", filter)
+}
+func (s *SessionRepo) ReleaseOutflowSecMsgIds(ctx context.Context, clientId string, pkId []uint16) error {
+	defer func() {
+		logger.Logger.Debugf("【ReleaseOutflowSecMsgIds ==X】%s, pk_id: %v", clientId, pkId)
+	}()
+	return s.c.Delete(ctx, "si_outflowsec", orm2.Select{"client_id": clientId, "pk_id": orm2.Select{"$in": pkId}})
 }
 
 func (s *SessionRepo) StoreOfflineMsg(ctx context.Context, clientId string, message messagev5.Message) error {

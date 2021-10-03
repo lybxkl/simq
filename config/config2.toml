@@ -34,10 +34,10 @@ serverVersion = "5.0.1"
 
     ## 下面是Mongo集群方式配置
     mongoUrl = "mongodb://127.0.0.1:27017"
-    mongoMinPool = 100
-    mongoMaxPool = 300
+    mongoMinPool = 50
+    mongoMaxPool = 150
     mongoMaxConnIdleTime = 10 ## 单位s
-    period = 30 ## 数据拉取周期，单位ms
+    period = 20 ## 数据拉取周期，单位ms
     batchSize = 100 ## 单次获取数据量大小
 
     ## 下面是getty方式启动需要配置
@@ -85,8 +85,8 @@ serverVersion = "5.0.1"
 [store]
     [store.mongo]
         source = "mongodb://127.0.0.1:27017"
-        minPool = 100
-        maxPool = 300
+        minPool = 50
+        maxPool = 150
         maxConnIdleTime = 10 ## 单位s
     [store.mysql]
         source = ""

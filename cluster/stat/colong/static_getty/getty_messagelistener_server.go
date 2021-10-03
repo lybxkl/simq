@@ -107,7 +107,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 		// 本地发送
 		submit(func() {
 			if pkg1.Share() {
-				err := h.clusterInToPubShare(pkg, pkg1.Tag()[0])
+				err := h.clusterInToPubShare(pkg, pkg1.Tag()[0], true)
 				if err != nil {
 					log.Errorf("clusterInToPubShare: err %v", err)
 				} else {

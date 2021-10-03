@@ -22,6 +22,7 @@ type SessionStore interface {
 	 */
 	CacheInflowMsg(ctx context.Context, clientId string, message messagev5.Message) error
 	ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error)
+	ReleaseInflowMsgs(ctx context.Context, clientId string, pkId []uint16) error
 	ReleaseAllInflowMsg(ctx context.Context, clientId string) error
 	GetAllInflowMsg(ctx context.Context, clientId string) ([]messagev5.Message, error)
 
@@ -31,6 +32,7 @@ type SessionStore interface {
 	CacheOutflowMsg(ctx context.Context, client string, message messagev5.Message) error
 	GetAllOutflowMsg(ctx context.Context, clientId string) ([]messagev5.Message, error)
 	ReleaseOutflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error)
+	ReleaseOutflowMsgs(ctx context.Context, clientId string, pkId []uint16) error
 	ReleaseAllOutflowMsg(ctx context.Context, clientId string) error
 	/**
 	 * 出栈qos2第二阶段，缓存msgId
@@ -38,6 +40,7 @@ type SessionStore interface {
 	CacheOutflowSecMsgId(ctx context.Context, clientId string, pkId uint16) error
 	GetAllOutflowSecMsg(ctx context.Context, clientId string) ([]uint16, error)
 	ReleaseOutflowSecMsgId(ctx context.Context, clientId string, pkId uint16) error
+	ReleaseOutflowSecMsgIds(ctx context.Context, clientId string, pkId []uint16) error
 	ReleaseAllOutflowSecMsg(ctx context.Context, clientId string) error
 
 	// 采用离线消息方便做离线消息的限制最大数量
