@@ -37,7 +37,9 @@ serverVersion = "5.0.1"
     mongoMinPool = 50
     mongoMaxPool = 150
     mongoMaxConnIdleTime = 10 ## 单位s
-    period = 20 ## 数据拉取周期，单位ms
+    mysqlUrl = "root:root@(127.0.0.1:3306)/simq?charset=utf8mb4&parseTime=True&loc=Local"
+    mysqlMaxPool = 100
+    period = 200 ## 数据拉取周期，单位ms
     batchSize = 100 ## 单次获取数据量大小
 
     ## 下面是getty方式启动需要配置

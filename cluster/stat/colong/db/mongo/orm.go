@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"sync/atomic"
 	"time"
 )
 
 type mongoOrm struct {
 	db       *mongo.Database
-	nodeName string // 当前节点名称
-	maxStamp int64  // 时间戳
+	nodeName string             // 当前节点名称
+	maxObjId primitive.ObjectID // 时间戳
 }
 
 func newMongoOrm(nodeName, url string, minPool, maxPool, maxConnIdle uint64) (*mongoOrm, error) {
@@ -36,21 +36,32 @@ func newMongoOrm(nodeName, url string, minPool, maxPool, maxConnIdle uint64) (*m
 	fmt.Println("Connected to MongoDB!")
 
 	cli := client.Database("simq")
+
+	v := &MessagePo{}
+	op := &options.FindOneOptions{}
+	op.SetSort(bson.M{"_id": -1})
+	c := cli.Collection("cluster_msg").FindOne(context.TODO(), bson.M{}, op)
+	err = c.Decode(v)
+	if err != nil && err.Error() != "EOF" {
+		panic(err)
+	}
+	println(v.Id.String())
 	return &mongoOrm{
 		db:       cli,
 		nodeName: nodeName,
-		maxStamp: time.Now().UnixNano(),
+		maxObjId: v.Id,
 	}, nil
 }
 
 type MessagePo struct {
-	Sender     string   `bson:"sender,omitempty"`
-	Target     string   `bson:"target,omitempty"`
-	ShareName  string   `bson:"share_name,omitempty"`
-	SubOrUnSub int      `bson:"sub_or_unsub,omitempty"` // 1: sub 2: unSub
-	Sub        *Sub     `bson:"sub,omitempty"`
-	Msg        *Message `bson:"msg,omitempty"`
-	Stamp      int64    `bson:"stamp,index"`
+	Id         primitive.ObjectID `bson:"_id,omitempty"`
+	Sender     string             `bson:"sender,omitempty"`
+	Target     string             `bson:"target,omitempty"`
+	ShareName  string             `bson:"share_name,omitempty"`
+	SubOrUnSub int                `bson:"sub_or_unsub,omitempty"` // 1: sub 2: unSub
+	Sub        *Sub               `bson:"sub,omitempty"`
+	Msg        *Message           `bson:"msg,omitempty"`
+	Stamp      int64              `bson:"stamp,index"`
 }
 type Sub struct {
 	Topic []string `bson:"topic"`
@@ -136,9 +147,9 @@ func (m *mongoOrm) SaveSharePub(ctx context.Context, tab string, target, shareNa
 func (m *mongoOrm) GetBatch(ctx context.Context, tab string, size int64) ([]MessagePo, error) {
 	op := &options.FindOptions{}
 	op.SetLimit(size)
-	op.SetSort(bson.M{"stamp": -1})
+	op.SetSort(bson.M{"_id": 1})
 	filter := bson.M{}
-	filter["stamp"] = bson.M{"$gt": atomic.LoadInt64(&m.maxStamp)} // FIXME 会有丢数据问题
+	filter["_id"] = bson.M{"$gt": m.maxObjId}
 	filter["sender"] = bson.M{"$ne": m.nodeName}
 	c, e := m.db.Collection(tab).Find(ctx, filter, op)
 	if e != nil {
@@ -150,7 +161,7 @@ func (m *mongoOrm) GetBatch(ctx context.Context, tab string, size int64) ([]Mess
 		return nil, e
 	}
 	if len(r) > 0 {
-		atomic.StoreInt64(&m.maxStamp, r[0].Stamp)
+		m.maxObjId = r[len(r)-1].Id
 	}
 	return r, e
 }

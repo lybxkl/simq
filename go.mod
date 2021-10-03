@@ -10,6 +10,7 @@ require (
 	github.com/dubbogo/gost v1.11.12
 	github.com/garyburd/redigo v1.6.2
 	github.com/go-redis/redis v6.15.9+incompatible
+	github.com/jinzhu/gorm v1.9.16
 	github.com/klauspost/compress v1.10.7 // indirect
 	github.com/onsi/gomega v1.14.0 // indirect
 	github.com/panjf2000/ants/v2 v2.4.6

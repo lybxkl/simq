@@ -56,6 +56,7 @@ type ModelEm = string
 const (
 	Getty   ModelEm = "getty"
 	MongoEm ModelEm = "mongo"
+	MysqlEm ModelEm = "mysql"
 )
 
 type Cluster struct {
@@ -70,6 +71,8 @@ type Cluster struct {
 	MongoMinPool         uint64 `toml:"mongoMinPool"`
 	MongoMaxPool         uint64 `toml:"mongoMaxPool"`
 	MongoMaxConnIdleTime uint64 `toml:"mongoMaxConnIdleTime"`
+	MysqlUrl             string `toml:"mysqlUrl"`
+	MysqlMaxPool         uint64 `toml:"mysqlMaxPool"`
 	Period               uint64 `toml:"period"`
 	BatchSize            uint64 `toml:"batchSize"`
 
@@ -170,6 +173,10 @@ func Configure(args []string) error {
 	fs.Uint64Var(&cfg.Cluster.MongoMinPool, "node-mongo-min-pool", cfg.Cluster.MongoMinPool, "node Mongo Min Pool.")
 	fs.Uint64Var(&cfg.Cluster.MongoMaxPool, "node-mongo-max-pool", cfg.Cluster.MongoMaxPool, "node Mongo Max Pool.")
 	fs.Uint64Var(&cfg.Cluster.MongoMaxConnIdleTime, "node-mongo-max-con-idle", cfg.Cluster.MongoMaxConnIdleTime, "node Mongo Max ConnIdleTime.")
+	fs.StringVar(&cfg.Cluster.MysqlUrl, "node-mysql-url", cfg.Cluster.MysqlUrl, "node Mysql Url.")
+	fs.Uint64Var(&cfg.Cluster.MysqlMaxPool, "node-mysql-max-pool", cfg.Cluster.MysqlMaxPool, "node Mysql Max Pool.")
+	fs.Uint64Var(&cfg.Cluster.Period, "node-db-period", cfg.Cluster.Period, "node DB period.")
+	fs.Uint64Var(&cfg.Cluster.BatchSize, "node-db-batch-size", cfg.Cluster.BatchSize, "node DB Batch Size.")
 
 	fs.StringVar(&cfg.Cluster.ClusterHost, "cluster-host", cfg.Cluster.ClusterHost, "cluster tcp host to listen on.")
 	fs.IntVar(&cfg.Cluster.ClusterPort, "cluster-port", cfg.Cluster.ClusterPort, "cluster tcp port to listen on.")

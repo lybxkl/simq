@@ -3,6 +3,7 @@ package servicev5
 import (
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/db/mongo"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/db/mysql"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/static_getty"
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/logger"
@@ -50,6 +51,19 @@ func DBClusterRun(this *Server, cfg *config.SIConfig) {
 		svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode,
 		int(cfg.Cluster.TaskClusterPoolSize), int64(cfg.Cluster.Period), int64(cfg.Cluster.BatchSize),
 		cfg.Cluster.MongoUrl, cfg.Cluster.MongoMinPool, cfg.Cluster.MongoMaxPool, cfg.Cluster.MongoMaxConnIdleTime)
+	this.AddCloser(this.ClusterServer)
+	this.AddCloser(this.ClusterClient)
+}
+
+// DBMysqlClusterRun DB方式集群
+func DBMysqlClusterRun(this *Server, cfg *config.SIConfig) {
+	this.AddCloser(InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize)))
+	this.ShareTopicMapNode = cluster.NewShareMap()
+	svc := this.NewService() // 单独service用来处理集群来的消息
+	this.ClusterServer, this.ClusterClient, _ = mysql.NewMysqlCluster(cfg.Cluster.ClusterName,
+		svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode,
+		int(cfg.Cluster.TaskClusterPoolSize), int64(cfg.Cluster.Period), int64(cfg.Cluster.BatchSize),
+		cfg.Cluster.MysqlUrl)
 	this.AddCloser(this.ClusterServer)
 	this.AddCloser(this.ClusterClient)
 }

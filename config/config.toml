@@ -25,19 +25,21 @@ serverVersion = "5.0.1"
 [cluster]
     # 是否开启集群模式
     enabled = true
-    model = "mongo" # getty 集群启动方式，目前支持mongo和getty
+    model = "mongo" # getty 集群启动方式，目前支持mongo、mysql和getty
     taskClusterPoolSize=1000 # 节点处理其它节点发来的消息的协程池大小
     taskServicePoolSize=1000 # 服务向其它节点发送的协程池大小
 
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
     clusterName = "node2"
 
-    ## 下面是Mongo集群方式配置
+    ## 下面是Mongo,mysql集群方式配置
     mongoUrl = "mongodb://127.0.0.1:27017"
     mongoMinPool = 50
     mongoMaxPool = 150
     mongoMaxConnIdleTime = 10 ## 单位s
-    period = 20 ## 数据拉取周期，单位ms
+    mysqlUrl = "root:root@(127.0.0.1:3306)/simq?charset=utf8mb4&parseTime=True&loc=Local"
+    mysqlMaxPool = 100
+    period = 200 ## 数据拉取周期，单位ms， tips: 太小了会导致 在数据库插入数据和拉取数据的位置相近导致数据有些没拉到就跳过了, mongo难搞一点
     batchSize = 100 ## 单次获取数据量大小
     ## mongo end
 
