@@ -17,7 +17,7 @@ type mysqlOrm struct {
 	db       *gorm.DB
 }
 
-func newMysqlOrm(curName, url string) *mysqlOrm {
+func newMysqlOrm(curName, url string, maxConn int) *mysqlOrm {
 	db, err := gorm.Open("mysql", url)
 	if err != nil {
 		panic(err)
@@ -26,6 +26,20 @@ func newMysqlOrm(curName, url string) *mysqlOrm {
 	db.AutoMigrate(&Message{})
 	db.AutoMigrate(&Sub{})
 
+	maxSubId := getMaxSubId(db)
+	// TODO 需要初始化本地共享订阅数据
+
+	maxPubId := getMaxPubId(db)
+	db.DB().SetMaxOpenConns(maxConn)
+	return &mysqlOrm{
+		curName:  curName,
+		maxPubId: maxPubId,
+		maxSubId: maxSubId,
+		db:       db,
+	}
+}
+
+func getMaxSubId(db *gorm.DB) int64 {
 	sub := &Sub{}
 	d1 := db.Raw("select max(id) as idMax from sub").Select("idMax")
 	r, err := d1.Rows()
@@ -40,8 +54,10 @@ func newMysqlOrm(curName, url string) *mysqlOrm {
 		}
 		maxSubId = sub.Id
 	}
-	// TODO 需要初始化本地共享订阅数据
+	return maxSubId
+}
 
+func getMaxPubId(db *gorm.DB) int64 {
 	pub := &Message{}
 	d2 := db.Raw("select max(id) as idMax from pub").Select("idMax")
 	r1, err := d2.Rows()
@@ -56,13 +72,7 @@ func newMysqlOrm(curName, url string) *mysqlOrm {
 		}
 		maxPubId = pub.Id
 	}
-	db.DB().SetMaxOpenConns(100)
-	return &mysqlOrm{
-		curName:  curName,
-		maxPubId: maxPubId,
-		maxSubId: maxSubId,
-		db:       db,
-	}
+	return maxPubId
 }
 func (this *mysqlOrm) SaveSub(message *messagev5.SubscribeMessage) error {
 	return this.db.Save(voToPoSub(this.curName, message)).Error

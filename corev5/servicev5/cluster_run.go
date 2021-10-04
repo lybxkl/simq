@@ -42,8 +42,8 @@ func GettyClusterRun(this *Server, cfg *config.SIConfig) {
 	this.AddCloser(this.ClusterClient)
 }
 
-// DBClusterRun DB方式集群
-func DBClusterRun(this *Server, cfg *config.SIConfig) {
+// DBMongoClusterRun DB方式集群
+func DBMongoClusterRun(this *Server, cfg *config.SIConfig) {
 	this.AddCloser(InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize)))
 	this.ShareTopicMapNode = cluster.NewShareMap()
 	svc := this.NewService() // 单独service用来处理集群来的消息
@@ -63,7 +63,7 @@ func DBMysqlClusterRun(this *Server, cfg *config.SIConfig) {
 	this.ClusterServer, this.ClusterClient, _ = mysql.NewMysqlCluster(cfg.Cluster.ClusterName,
 		svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode,
 		int(cfg.Cluster.TaskClusterPoolSize), int64(cfg.Cluster.Period), int64(cfg.Cluster.BatchSize),
-		cfg.Cluster.MysqlUrl)
+		cfg.Cluster.MysqlUrl, int(cfg.Cluster.MysqlMaxPool))
 	this.AddCloser(this.ClusterServer)
 	this.AddCloser(this.ClusterClient)
 }

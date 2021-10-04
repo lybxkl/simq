@@ -266,7 +266,7 @@ func (this *Server) RunClusterComp() {
 	case config.Getty:
 		GettyClusterRun(this, cfg)
 	case config.MongoEm:
-		DBClusterRun(this, cfg)
+		DBMongoClusterRun(this, cfg)
 	case config.MysqlEm:
 		DBMysqlClusterRun(this, cfg)
 	default:

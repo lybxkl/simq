@@ -11,10 +11,10 @@ import (
 func NewMysqlCluster(curNodeName string, clusterInToPub colong.ClusterInToPub,
 	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
 	shareTopicMapNode cluster.ShareTopicMapNode, taskPoolSize int, period, size int64,
-	mysqlUrl string) (colong.NodeServerFace,
+	mysqlUrl string, maxConn int) (colong.NodeServerFace,
 	colong.NodeClientFace, error) {
-	client := NewMysqlClusterClient(curNodeName, mysqlUrl)
+	client := NewMysqlClusterClient(curNodeName, mysqlUrl, maxConn)
 	server := RunMysqlClusterServer(curNodeName, clusterInToPub, clusterInToPubShare, clusterInToPubSys,
-		shareTopicMapNode, taskPoolSize, period, size, mysqlUrl)
+		shareTopicMapNode, taskPoolSize, period, size, mysqlUrl, maxConn)
 	return client, server, nil
 }
