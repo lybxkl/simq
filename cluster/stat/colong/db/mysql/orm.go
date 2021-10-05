@@ -4,8 +4,10 @@ import (
 	"encoding/hex"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/logger"
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"gitee.com/Ljolan/si-mqtt/utils"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	glog "gorm.io/gorm/logger"
 	"strings"
 	"time"
 )
@@ -18,19 +20,26 @@ type mysqlOrm struct {
 }
 
 func newMysqlOrm(curName, url string, maxConn int) *mysqlOrm {
-	db, err := gorm.Open("mysql", url)
-	if err != nil {
-		panic(err)
+	cfg := &gorm.Config{
+		SkipDefaultTransaction: true,
+		Logger:                 glog.Default.LogMode(glog.Error),
+		PrepareStmt:            true,
+		DisableAutomaticPing:   true,
 	}
+	db, err := gorm.Open(mysql.Open(url), cfg)
+	utils.MustPanic(err)
 	// 自动迁移
-	db.AutoMigrate(&Message{})
-	db.AutoMigrate(&Sub{})
+	utils.MustPanic(db.AutoMigrate(&Message{}))
+	utils.MustPanic(db.AutoMigrate(&Sub{}))
 
 	maxSubId := getMaxSubId(db)
 	// TODO 需要初始化本地共享订阅数据
 
 	maxPubId := getMaxPubId(db)
-	db.DB().SetMaxOpenConns(maxConn)
+	sqlDB, e := db.DB()
+	utils.MustPanic(e)
+
+	sqlDB.SetMaxOpenConns(maxConn)
 	return &mysqlOrm{
 		curName:  curName,
 		maxPubId: maxPubId,
@@ -43,9 +52,7 @@ func getMaxSubId(db *gorm.DB) int64 {
 	sub := &Sub{}
 	d1 := db.Raw("select max(id) as idMax from sub").Select("idMax")
 	r, err := d1.Rows()
-	if err != nil {
-		panic(err)
-	}
+	utils.MustPanic(err)
 	maxSubId := int64(0)
 	for r.Next() {
 		err = r.Scan(&sub.Id)
@@ -61,9 +68,7 @@ func getMaxPubId(db *gorm.DB) int64 {
 	pub := &Message{}
 	d2 := db.Raw("select max(id) as idMax from pub").Select("idMax")
 	r1, err := d2.Rows()
-	if err != nil {
-		panic(err)
-	}
+	utils.MustPanic(err)
 	maxPubId := int64(0)
 	for r1.Next() {
 		err = r1.Scan(&pub.Id)

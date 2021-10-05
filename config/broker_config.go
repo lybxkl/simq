@@ -51,20 +51,27 @@ type Broker struct {
 	WssKeyPath  string `toml:"wssKeyPath"`
 	Ca          string `toml:"ca"`
 }
-type ModelEm = string
+type (
+	ClusterModelEm = string
+	StoreModel     = string
+)
 
 const (
-	Getty   ModelEm = "getty"
-	MongoEm ModelEm = "mongo"
-	MysqlEm ModelEm = "mysql"
+	MongoStore StoreModel = "mongo"
+	MysqlStore StoreModel = "mysql"
+)
+const (
+	Getty   ClusterModelEm = "getty"
+	MongoEm ClusterModelEm = "mongo"
+	MysqlEm ClusterModelEm = "mysql"
 )
 
 type Cluster struct {
-	Enabled             bool    `toml:"enabled"`
-	Model               ModelEm `toml:"model"`
-	TaskClusterPoolSize int32   `toml:"taskClusterPoolSize"`
-	TaskServicePoolSize int32   `toml:"taskServicePoolSize"`
-	ClusterName         string  `toml:"clusterName"`
+	Enabled             bool           `toml:"enabled"`
+	Model               ClusterModelEm `toml:"model"`
+	TaskClusterPoolSize int32          `toml:"taskClusterPoolSize"`
+	TaskServicePoolSize int32          `toml:"taskServicePoolSize"`
+	ClusterName         string         `toml:"clusterName"`
 
 	// mongo配置
 	MongoUrl             string `toml:"mongoUrl"`
@@ -133,9 +140,10 @@ type Redis struct {
 	PoolSize int    `toml:"poolSize"`
 }
 type Store struct {
-	Mysql Mysql `toml:"mysql"`
-	Mongo Mongo `toml:"mongo"`
-	Redis Redis `toml:"redis"`
+	Model StoreModel `toml:"model"`
+	Mysql Mysql      `toml:"mysql"`
+	Mongo Mongo      `toml:"mongo"`
+	Redis Redis      `toml:"redis"`
 }
 
 func (conf *SIConfig) String() string {

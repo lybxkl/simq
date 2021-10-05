@@ -7,7 +7,8 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
-	"gitee.com/Ljolan/si-mqtt/cluster/store/repo"
+	mongorepo "gitee.com/Ljolan/si-mqtt/cluster/store/mongoImpl/repo"
+	mysqlpo "gitee.com/Ljolan/si-mqtt/cluster/store/mysqlImpl/repo"
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/authv5/authplus"
@@ -249,13 +250,19 @@ func (this *Server) ListenAndServe(uri string) error {
 }
 
 func (this *Server) InitStore() {
-	this.SessionStore = repo.NewSessionStore()
-	this.MessageStore = repo.NewMessageStore()
-	this.EventStore = repo.NewEventStore()
+	switch this.ConFig.Store.Model {
+	case config.MongoStore:
+		this.SessionStore = mongorepo.NewSessionStore()
+		this.MessageStore = mongorepo.NewMessageStore()
+	case config.MysqlStore:
+		this.SessionStore = mysqlpo.NewSessionStore()
+		this.MessageStore = mysqlpo.NewMessageStore()
+	default:
+		panic("不支持store方式")
+	}
 	ctx := context.Background()
 	utils.MustPanic(this.SessionStore.Start(ctx, *this.ConFig))
 	utils.MustPanic(this.MessageStore.Start(ctx, *this.ConFig))
-	utils.MustPanic(this.EventStore.Start(ctx, *this.ConFig))
 }
 func (this *Server) RunClusterComp() {
 	cfg := this.ConFig

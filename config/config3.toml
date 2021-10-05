@@ -85,14 +85,15 @@ serverVersion = "5.0.1"
         redirectIsForEver = true # 临时还是永久
         redirectOpen = false # 开关
 [store]
+    model = "mysql"
     [store.mongo]
         source = "mongodb://127.0.0.1:27017"
-        minPool = 100
-        maxPool = 300
+        minPool = 50
+        maxPool = 150
         maxConnIdleTime = 10 ## 单位s
     [store.mysql]
-        source = ""
-        poolSize=10
+        source = "root:root@(127.0.0.1:3306)/simq?charset=utf8mb4&parseTime=True&loc=Local"
+        poolSize=100
     [store.redis]
         source=""
         db=1
