@@ -554,6 +554,7 @@ func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
 		return
 	}
 	tag := 0
+	shareTp := make([][]byte, 0)
 	for i := 0; i < len(topics); i++ {
 		if len(topics[i]) > len(shareByte) && deepEqual(topics[i]) {
 			var index = len(shareByte)
@@ -573,6 +574,7 @@ func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
 			if len(topics[i]) >= 2+index && topics[i][index] == '/' {
 				shareName := topics[i][len(shareByte):index]
 				tp := topics[i][index+1:]
+				shareTp = append(shareTp, topics[i])
 				tag++
 				switch msg.Type() {
 				case messagev5.SUBSCRIBE:
@@ -589,7 +591,23 @@ func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
 
 	}
 	if tag > 0 { // 确实是有共享主题，才发送到集群其它节点
-		this.sendCluster(msg) // 发送到其它节点，不需要qos处理的，TODO 但是需要考虑session相关问题
+		// 只需要发送共享订阅主题
+		var msgTo messagev5.Message
+		switch msg.Type() {
+		case messagev5.SUBSCRIBE:
+			sub := messagev5.NewSubscribeMessage()
+			for i := 0; i < len(shareTp); i++ {
+				sub.AddTopic(shareTp[i], 0)
+			}
+			msgTo = sub
+		case messagev5.UNSUBSCRIBE:
+			sub := messagev5.NewUnsubscribeMessage()
+			for i := 0; i < len(shareTp); i++ {
+				sub.AddTopic(shareTp[i])
+			}
+			msgTo = sub
+		}
+		this.sendCluster(msgTo) // 发送到其它节点，不需要qos处理的，TODO 但是需要考虑session相关问题
 	}
 }
 
