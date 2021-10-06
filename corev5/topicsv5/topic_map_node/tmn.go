@@ -26,9 +26,9 @@ func NewTopicMapNodeProvider() TopicsMapNodeProvider {
 		sroot: newRSNode(),
 	}
 }
-func (m *memTopicMapNode) Subscribe(topic []byte, shareName, node string) error {
+func (m *memTopicMapNode) Subscribe(topic []byte, shareName, node string, num uint32) error {
 	m.smu.Lock()
-	err := m.sroot.sinsert(topic, shareName, node)
+	err := m.sroot.sinsert(topic, shareName, node, num)
 	m.smu.Unlock()
 	return err
 }
@@ -57,10 +57,10 @@ type nodeWeight struct {
 	wright uint32
 }
 
-func newNodeWeight(node string) *nodeWeight {
+func newNodeWeight(node string, wright uint32) *nodeWeight {
 	return &nodeWeight{
 		node:   node,
-		wright: 1,
+		wright: wright,
 	}
 }
 
@@ -79,7 +79,7 @@ func newRSNode() *rSnode {
 	}
 }
 
-func (this *rSnode) sinsert(topic []byte, shareName, node string) error {
+func (this *rSnode) sinsert(topic []byte, shareName, node string, num uint32) error {
 
 	if len(topic) == 0 {
 		var v []*nodeWeight
@@ -87,12 +87,12 @@ func (this *rSnode) sinsert(topic []byte, shareName, node string) error {
 		if v, ok = this.tmn[shareName]; ok {
 			for i := range v {
 				if v[i].node == node {
-					v[i].wright++
+					v[i].wright += num
 					return nil
 				}
 			}
 		}
-		v = append(v, newNodeWeight(node))
+		v = append(v, newNodeWeight(node, num))
 		this.tmn[shareName] = v
 		return nil
 	}
@@ -115,7 +115,7 @@ func (this *rSnode) sinsert(topic []byte, shareName, node string) error {
 		this.rsnodes[level] = n
 	}
 
-	return n.sinsert(rem, shareName, node)
+	return n.sinsert(rem, shareName, node, num)
 }
 
 // This remove implementation ignores the QoS, as long as the subscriber

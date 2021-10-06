@@ -7,7 +7,7 @@ import (
 
 type ShareTopicMapNode interface {
 	GetShareNames(topic []byte) (map[string]string, error)
-	AddTopicMapNode(topic []byte, shareName, nodeName string) error
+	AddTopicMapNode(topic []byte, shareName, nodeName string, num uint32) error
 	RemoveTopicMapNode(topic []byte, shareName, nodeName string) error
 }
 type shareMapImpl struct {
@@ -36,8 +36,8 @@ func (s *shareMapImpl) GetShareNames(topic []byte) (map[string]string, error) {
 	return ret, nil
 }
 
-func (s *shareMapImpl) AddTopicMapNode(topic []byte, shareName, nodeName string) error {
-	return s.Subscribe(topic, shareName, nodeName)
+func (s *shareMapImpl) AddTopicMapNode(topic []byte, shareName, nodeName string, num uint32) error {
+	return s.Subscribe(topic, shareName, nodeName, num)
 }
 
 func (s *shareMapImpl) RemoveTopicMapNode(topic []byte, shareName, nodeName string) error {

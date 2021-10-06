@@ -131,7 +131,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 				// 解析share name
 				shareName, top := shareTopic(tpk[i])
 				if shareName != "" {
-					err := h.shareTopicMapNode.AddTopicMapNode(top, shareName, node)
+					err := h.shareTopicMapNode.AddTopicMapNode(top, shareName, node, 1)
 					if err != nil {
 						log.Errorf("%s,共享订阅节点新增失败 : %v", node, shareName, err)
 					} else {

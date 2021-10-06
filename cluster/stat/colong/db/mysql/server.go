@@ -187,7 +187,7 @@ func (s *dbRcv) sub(subi Sub) {
 			// 解析share name
 			shareName, top := shareTopic(tpk[j])
 			if shareName != "" {
-				err := s.shareTopicMapNode.AddTopicMapNode(top, shareName, node)
+				err := s.shareTopicMapNode.AddTopicMapNode(top, shareName, node, subi.Num+1) // 因为num是从0开始的，这里需要+1
 				if err != nil {
 					logger.Logger.Errorf("%s,共享订阅节点新增失败, shareName:%v , err: %v", node, shareName, err)
 				} else {

@@ -188,7 +188,7 @@ func (s *dbRcv) sub(mg MessagePo) {
 			// 解析share name
 			shareName, top := shareTopic([]byte(tpk[i]))
 			if shareName != "" {
-				err := s.shareTopicMapNode.AddTopicMapNode(top, shareName, node)
+				err := s.shareTopicMapNode.AddTopicMapNode(top, shareName, node, 1)
 				if err != nil {
 					logger.Logger.Errorf("%s,共享订阅节点新增失败, shareName:%v , err: %v", node, shareName, err)
 				} else {

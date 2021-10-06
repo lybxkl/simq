@@ -32,8 +32,9 @@ func newMysqlOrm(curName, url string, maxConn int) *mysqlOrm {
 	utils.MustPanic(db.AutoMigrate(&Message{}))
 	utils.MustPanic(db.AutoMigrate(&Sub{}))
 
-	maxSubId := getMaxSubId(db)
-	// TODO 需要初始化本地共享订阅数据
+	// 启动时，每次都拉取全部，因为会合并记录
+	// 就完成启动时同步集群共享订阅数据了
+	maxSubId := int64(0) // getMaxSubId(db)
 
 	maxPubId := getMaxPubId(db)
 	sqlDB, e := db.DB()
@@ -101,7 +102,7 @@ func (this *mysqlOrm) GetPubBatch(size int64) ([]Message, error) {
 			m := Message{}
 			e := b.ScanRows(r, &m)
 			if e != nil {
-				logger.Logger.Warn(err)
+				logger.Logger.Warn(e)
 			} else {
 				data = append(data, m)
 			}
@@ -122,7 +123,7 @@ func (this *mysqlOrm) GetSubBatch(size int64) ([]Sub, error) {
 			m := Sub{}
 			e := b.ScanRows(r, &m)
 			if e != nil {
-				logger.Logger.Warn(err)
+				logger.Logger.Warn(e)
 			} else {
 				data = append(data, m)
 			}
@@ -156,10 +157,11 @@ func toSub(sender string, subOrUnSub int, tps [][]byte) *Sub {
 
 type Sub struct {
 	Id         int64  `gorm:"primary_key"`
-	SubOrUnSub int    `gorm:"sub_or_unsub"` // 1: sub 2: unSub
-	Sender     string `gorm:"sender"`
-	Topic      string `gorm:"topic"` // 通过转为hex字符串拼接,号存储
-	Stamp      int64  `gorm:"stamp,index"`
+	SubOrUnSub int    `gorm:"column:sub_or_unsub"` // 1: sub 2: unSub
+	Sender     string `gorm:"column:sender;type:varchar(30)"`
+	Topic      string `gorm:"column:topic;type:varchar(80)"` // 通过转为hex字符串拼接,号存储
+	Num        uint32 `gorm:"column:num"`                    // 合并的数据，默认0表示一个，其它表示 值+1 如， 2 表示 2+1=3
+	Stamp      int64  `gorm:"column:stamp;index"`
 }
 
 func (s Sub) TableName() string {
@@ -169,25 +171,25 @@ func (s Sub) TableName() string {
 // Message 代表 pub、retain、will
 type Message struct {
 	Id        int64  `gorm:"primary_key"`
-	Sender    string `gorm:"index:sender_idx"`
-	Target    string `gorm:"target"`
-	ShareName string `gorm:"share_name"`
-	Stamp     int64  `gorm:"stamp,index"`
+	Sender    string `gorm:"column:index:sender_idx"`
+	Target    string `gorm:"column:target"`
+	ShareName string `gorm:"column:share_name"`
+	Stamp     int64  `gorm:"column:stamp;index"`
 
-	ClientId        string `gorm:"client_id"` // 客户端id
-	Mtypeflags      uint8  `gorm:"mtypeflags"`
-	Topic           string `gorm:"topic"`
-	Qos             uint8  `gorm:"qos"`
-	Payload         string `gorm:"payload"`
-	PackageId       uint16 `gorm:"pk_id"`
-	PfInd           uint8  `gorm:"pf_ind"`                              // 载荷格式指示，默认0 ， 服务端必须把接收到的应用消息中的载荷格式指示原封不动的发给所有的订阅者
-	MsgExpiry       uint32 `gorm:"msg_expiry"`                          // 消息过期间隔，没有过期间隔，则应用消息不会过期 如果消息过期间隔已过期，服务端还没开始向匹配的订阅者交付该消息，则服务端必须删除该订阅者的消息副本
-	TopicAlias      uint16 `gorm:"topic_alias"`                         // 主题别名，可以没有传，传了就不能为0，并且不能发超过connack中主题别名最大值
-	ResponseTopic   string `gorm:"response_topic"`                      // 响应主题
-	CorrelationData string `gorm:"correlation_data;type:varbinary(50)"` // 对比数据，字节类型，直接转为hex字符串存储
-	UserProperty    string `gorm:"user_property"`                       // 用户属性 , 保证顺序，通过转为hex字符串拼接,号存储
-	SubId           uint32 `gorm:"sub_id"`                              // 一个变长字节整数表示的订阅标识符 从1到268,435,455。订阅标识符的值为0将造成协议错误
-	ContentType     string `gorm:"content_type"`                        // 内容类型 UTF-8编码
+	ClientId        string `gorm:"column:client_id"` // 客户端id
+	Mtypeflags      uint8  `gorm:"column:mtypeflags"`
+	Topic           string `gorm:"column:topic"`
+	Qos             uint8  `gorm:"column:qos"`
+	Payload         string `gorm:"column:payload"`
+	PackageId       uint16 `gorm:"column:pk_id"`
+	PfInd           uint8  `gorm:"column:pf_ind"`                              // 载荷格式指示，默认0 ， 服务端必须把接收到的应用消息中的载荷格式指示原封不动的发给所有的订阅者
+	MsgExpiry       uint32 `gorm:"column:msg_expiry"`                          // 消息过期间隔，没有过期间隔，则应用消息不会过期 如果消息过期间隔已过期，服务端还没开始向匹配的订阅者交付该消息，则服务端必须删除该订阅者的消息副本
+	TopicAlias      uint16 `gorm:"column:topic_alias"`                         // 主题别名，可以没有传，传了就不能为0，并且不能发超过connack中主题别名最大值
+	ResponseTopic   string `gorm:"column:response_topic"`                      // 响应主题
+	CorrelationData string `gorm:"column:correlation_data;type:varbinary(50)"` // 对比数据，字节类型，直接转为hex字符串存储
+	UserProperty    string `gorm:"column:user_property"`                       // 用户属性 , 保证顺序，通过转为hex字符串拼接,号存储
+	SubId           uint32 `gorm:"column:sub_id"`                              // 一个变长字节整数表示的订阅标识符 从1到268,435,455。订阅标识符的值为0将造成协议错误
+	ContentType     string `gorm:"column:content_type"`                        // 内容类型 UTF-8编码
 }
 
 func (s Message) TableName() string {

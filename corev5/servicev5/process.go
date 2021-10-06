@@ -577,7 +577,7 @@ func (this *service) processToCluster(topics [][]byte, msg messagev5.Message) {
 				switch msg.Type() {
 				case messagev5.SUBSCRIBE:
 					// 添加本地集群共享订阅
-					this.shareTopicMapNode.AddTopicMapNode(tp, string(shareName), GetServerName())
+					this.shareTopicMapNode.AddTopicMapNode(tp, string(shareName), GetServerName(), 1)
 					logger.Logger.Debugf("添加本地集群共享订阅：%s,%s,%s", tp, string(shareName), GetServerName())
 				case messagev5.UNSUBSCRIBE:
 					// 删除本地集群共享订阅

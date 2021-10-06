@@ -13,6 +13,8 @@ golang mqtt服务器，集群版，目前支持DB集群和直连集群
 #### 目前支持的方案
 ##### 1. Mongo集群设计
 ##### 2. Mysql集群设计
+- 新增集群共享订阅数据自动合并方法, 需要单独启动运行，简易代码 [cluster/stat/colong/auto_compress_sub/mysql.go](https://gitee.com/Ljolan/si-mqtt/tree/dev-cluster-v1/cluster/stat/colong/auto_compress_sub/mysql.go)
+
 ##### 3. 静态配置启动
 
 #### 多节点启动
@@ -56,7 +58,7 @@ golang mqtt服务器，集群版，目前支持DB集群和直连集群
     
 17. 订阅了共享订阅的客户端掉线后，导致其它节点依旧会发送共享订阅给这个客户端，需要处理，等重连后重新订阅此共享订阅
 
-18. 共享订阅保留问题
+18. 共享订阅保留问题【mysql方式已解决】
     
 19. .....
 
