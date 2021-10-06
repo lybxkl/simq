@@ -8,6 +8,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
 	"gitee.com/Ljolan/si-mqtt/logger"
+	"gitee.com/Ljolan/si-mqtt/utils"
 	"io"
 	"math"
 	"sync"
@@ -254,10 +255,26 @@ func (this *service) start(resp *messagev5.ConnackMessage) error {
 	go this.sender()
 
 	if !this.client {
-		offline := this.sess.OfflineMsg()   // TODO 发送获取到的离线消息
+		offline := this.sess.OfflineMsg()   //  发送获取到的离线消息
 		for i := 0; i < len(offline); i++ { // 依次处理离线消息
-			// FIXME topicsv5.Sub 获取
-			_ = this.onpub(offline[i].(*messagev5.PublishMessage), topicsv5.Sub{}, "", false)
+			pub := offline[i].(*messagev5.PublishMessage)
+			// topicsv5.Sub 获取
+			var (
+				subs []interface{}
+				qoss []topicsv5.Sub
+			)
+			_ = this.topicsMgr.Subscribers(pub.Topic(), pub.QoS(), &subs, &qoss, false, "", false)
+			tag := false
+			for j := 0; j < len(subs); j++ {
+				if utils.Equal(subs[i], &this.onpub) {
+					tag = true
+					_ = this.onpub(pub, qoss[j], "", false)
+					break
+				}
+			}
+			if !tag {
+				_ = this.onpub(pub, topicsv5.Sub{}, "", false)
+			}
 		}
 		// FIXME 是否主动发送未完成确认的过程消息，还是等客户端操作
 	}

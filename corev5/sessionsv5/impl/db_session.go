@@ -38,28 +38,25 @@ func (d *dbSession) Init(msg *messagev5.ConnectMessage, _ ...sessionsv5.SessionI
 	subs, err := d.sessionStore.GetSubscriptions(ctx, cid)
 	topics := make([]sessionsv5.SessionInitTopic, len(subs))
 	for i := 0; i < len(subs); i++ {
+		topic := subs[i].Topics()
+		if len(topic) == 0 {
+			continue
+		}
+		tpc := topic[0] // 正常来说 从数据库取出来的 只会有一个topic
 		topics[i] = sessionsv5.SessionInitTopic{
-			Topic: topics[i].Topic,
-			Qos:   topics[i].Qos,
+			Topic:             tpc,
+			Qos:               subs[i].Qos()[0],
+			NoLocal:           subs[i].TopicNoLocal(tpc),
+			RetainAsPublished: subs[i].TopicRetainAsPublished(tpc),
+			RetainHandling:    subs[i].TopicRetainHandling(tpc),
+			SubIdentifier:     subs[i].SubscriptionIdentifier(),
 		}
 	}
 	err = d.memSession.InitSample(msg, d.sessionStore, topics...)
 	if err != nil {
 		return err
 	}
-	// 将离线消息qos>0的转至outflow表中，再删除离线消息表中数据
-	// 拉取过程消息，inflow，outflow，outflow2
-	offline, _, err := d.sessionStore.GetAllOfflineMsg(ctx, cid)
-	if err != nil {
-		logger.Logger.Errorf("get client: %v all offline message error: %v", cid, err)
-	}
-	if len(offline) > 0 {
-		err = d.sessionStore.ClearOfflineMsgs(ctx, cid)
-		if err != nil {
-			logger.Logger.Errorf("del client: %v all offline message error: %v", cid, err)
-		}
-		d.offline = offline
-	}
+	// 拉取过程消息，inflow，outflow，outflow2，离线消息
 	// info
 	info, err := d.sessionStore.GetAllInflowMsg(ctx, cid)
 	if err != nil {
@@ -117,6 +114,18 @@ func (d *dbSession) Init(msg *messagev5.ConnectMessage, _ ...sessionsv5.SessionI
 				logger.Logger.Debugf("发送失败：%v,%v,%v", msg, ack, err)
 			}
 		})
+	}
+	// 将离线消息qos>0的转至outflow表中，再删除离线消息表中数据
+	offline, _, err := d.sessionStore.GetAllOfflineMsg(ctx, cid)
+	if err != nil {
+		logger.Logger.Errorf("get client: %v all offline message error: %v", cid, err)
+	}
+	if len(offline) > 0 {
+		err = d.sessionStore.ClearOfflineMsgs(ctx, cid) // fixme 提前删除不太好
+		if err != nil {
+			logger.Logger.Errorf("del client: %v all offline message error: %v", cid, err)
+		}
+		d.offline = offline
 	}
 	err = d.sessionStore.StoreSession(ctx, cid, d.memSession)
 	if err != nil {
