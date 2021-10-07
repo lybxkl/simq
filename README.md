@@ -13,7 +13,7 @@ golang mqtt服务器，集群版，目前支持DB集群和直连集群
 #### 目前支持的方案
 ##### 1. Mongo集群设计
 ##### 2. Mysql集群设计
-- 新增集群共享订阅数据自动合并方法, 需要单独启动运行，简易代码 [cluster/stat/colong/auto_compress_sub/mysql.go](https://gitee.com/Ljolan/si-mqtt/tree/dev-cluster-v1/cluster/stat/colong/auto_compress_sub/mysql.go)
+- 新增集群共享订阅数据自动合并方法，简易代码 [cluster/stat/colong/auto_compress_sub/factory.go](https://gitee.com/Ljolan/si-mqtt/blob/dev-cluster-v1/cluster/stat/colong/auto_compress_sub/factory.go)
 
 ##### 3. 静态配置启动
 
