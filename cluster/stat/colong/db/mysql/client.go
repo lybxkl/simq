@@ -10,8 +10,8 @@ type dbSender struct {
 	c           *mysqlOrm
 }
 
-func NewMysqlClusterClient(curNodeName, mysqlUrl string, maxConn int) colong.NodeClientFace {
-	db := newMysqlOrm(curNodeName, mysqlUrl, maxConn)
+func NewMysqlClusterClient(curNodeName, mysqlUrl string, maxConn int, subMinNum, autoPeriod int) colong.NodeClientFace {
+	db := newMysqlOrm(curNodeName, mysqlUrl, maxConn, subMinNum, autoPeriod)
 	dbSend := &dbSender{
 		curNodeName: curNodeName,
 		c:           db,

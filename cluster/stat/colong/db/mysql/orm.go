@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"encoding/hex"
+	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/auto_compress_sub"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
@@ -9,6 +10,7 @@ import (
 	"gorm.io/gorm"
 	glog "gorm.io/gorm/logger"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,7 +21,9 @@ type mysqlOrm struct {
 	db       *gorm.DB
 }
 
-func newMysqlOrm(curName, url string, maxConn int) *mysqlOrm {
+var once sync.Once
+
+func newMysqlOrm(curName, url string, maxConn, subMinNum, autoPeriod int) *mysqlOrm {
 	cfg := &gorm.Config{
 		SkipDefaultTransaction: true,
 		Logger:                 glog.Default.LogMode(glog.Error),
@@ -30,7 +34,7 @@ func newMysqlOrm(curName, url string, maxConn int) *mysqlOrm {
 	utils.MustPanic(err)
 	// 自动迁移
 	utils.MustPanic(db.AutoMigrate(&Message{}))
-	utils.MustPanic(db.AutoMigrate(&Sub{}))
+	utils.MustPanic(db.AutoMigrate(&autocompress.Sub{}))
 
 	// 启动时，每次都拉取全部，因为会合并记录
 	// 就完成启动时同步集群共享订阅数据了
@@ -41,6 +45,16 @@ func newMysqlOrm(curName, url string, maxConn int) *mysqlOrm {
 	utils.MustPanic(e)
 
 	sqlDB.SetMaxOpenConns(maxConn)
+	once.Do(func() {
+		if subMinNum <= 0 {
+			subMinNum = 20
+		}
+		if autoPeriod <= 0 {
+			autoPeriod = 10
+		}
+		// 不想把这个暴露在外面，就用了sync.Once
+		autocompress.SubAutoCompress(url, subMinNum, autoPeriod, autocompress.NewAutoCompress(curName, url))
+	})
 	return &mysqlOrm{
 		curName:  curName,
 		maxPubId: maxPubId,
@@ -50,7 +64,7 @@ func newMysqlOrm(curName, url string, maxConn int) *mysqlOrm {
 }
 
 func getMaxSubId(db *gorm.DB) int64 {
-	sub := &Sub{}
+	sub := &autocompress.Sub{}
 	d1 := db.Raw("select max(id) as idMax from sub").Select("idMax")
 	r, err := d1.Rows()
 	utils.MustPanic(err)
@@ -113,14 +127,19 @@ func (this *mysqlOrm) GetPubBatch(size int64) ([]Message, error) {
 	}
 	return data, nil
 }
-func (this *mysqlOrm) GetSubBatch(size int64) ([]Sub, error) {
-	data := make([]Sub, 0)
-	b := this.db.Raw("select * from sub where id > ? and sender != ? order by id asc limit ?", this.maxSubId, this.curName, size)
+func (this *mysqlOrm) GetSubBatch(size int64, needSelf bool) ([]autocompress.Sub, error) {
+	data := make([]autocompress.Sub, 0)
+	var b *gorm.DB
+	if !needSelf {
+		b = this.db.Raw("select * from sub where id > ? and sender != ? order by id asc limit ?", this.maxSubId, this.curName, size)
+	} else {
+		b = this.db.Raw("select * from sub where id > ? order by id asc limit ?", this.maxSubId, size)
+	}
 	if r, err := b.Rows(); err != nil {
 		return nil, err
 	} else {
 		for r.Next() {
-			m := Sub{}
+			m := autocompress.Sub{}
 			e := b.ScanRows(r, &m)
 			if e != nil {
 				logger.Logger.Warn(e)
@@ -134,11 +153,11 @@ func (this *mysqlOrm) GetSubBatch(size int64) ([]Sub, error) {
 	}
 	return data, nil
 }
-func voToPoSub(sender string, message *messagev5.SubscribeMessage) *Sub {
+func voToPoSub(sender string, message *messagev5.SubscribeMessage) *autocompress.Sub {
 	tps := message.Topics()
 	return toSub(sender, 1, tps)
 }
-func toSub(sender string, subOrUnSub int, tps [][]byte) *Sub {
+func toSub(sender string, subOrUnSub int, tps [][]byte) *autocompress.Sub {
 	tp := ""
 	for i := 0; i < len(tps); i++ {
 		tp += hex.EncodeToString(tps[i])
@@ -147,7 +166,7 @@ func toSub(sender string, subOrUnSub int, tps [][]byte) *Sub {
 	if len(tp) > 0 {
 		tp = tp[:len(tp)-1]
 	}
-	return &Sub{
+	return &autocompress.Sub{
 		SubOrUnSub: subOrUnSub,
 		Sender:     sender,
 		Topic:      tp,
@@ -155,23 +174,10 @@ func toSub(sender string, subOrUnSub int, tps [][]byte) *Sub {
 	}
 }
 
-type Sub struct {
-	Id         int64  `gorm:"primary_key"`
-	SubOrUnSub int    `gorm:"column:sub_or_unsub"` // 1: sub 2: unSub
-	Sender     string `gorm:"column:sender;type:varchar(30)"`
-	Topic      string `gorm:"column:topic;type:varchar(80)"` // 通过转为hex字符串拼接,号存储
-	Num        uint32 `gorm:"column:num"`                    // 合并的数据，默认0表示一个，其它表示 值+1 如， 2 表示 2+1=3
-	Stamp      int64  `gorm:"column:stamp;index"`
-}
-
-func (s Sub) TableName() string {
-	return "sub"
-}
-
 // Message 代表 pub、retain、will
 type Message struct {
 	Id        int64  `gorm:"primary_key"`
-	Sender    string `gorm:"column:index:sender_idx"`
+	Sender    string `gorm:"column:sender;index:sender_idx"`
 	Target    string `gorm:"column:target"`
 	ShareName string `gorm:"column:share_name"`
 	Stamp     int64  `gorm:"column:stamp;index"`
@@ -257,11 +263,11 @@ func poToVo(message *Message) *messagev5.PublishMessage {
 	pub.SetContentType([]byte(message.ContentType))
 	return pub
 }
-func voToPoUnSub(sender string, message *messagev5.UnsubscribeMessage) *Sub {
+func voToPoUnSub(sender string, message *messagev5.UnsubscribeMessage) *autocompress.Sub {
 	tps := message.Topics()
 	return toSub(sender, 2, tps)
 }
-func poToBytes(message *Sub) [][]byte {
+func poToBytes(message *autocompress.Sub) [][]byte {
 	tp := message.Topic
 	tps := strings.Split(tp, ",")
 	topics := make([][]byte, len(tps))

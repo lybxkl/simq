@@ -31,6 +31,8 @@ serverVersion = "5.0.1"
 
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
     clusterName = "node3"
+    subMinNum = 40
+    autoPeriod = 5 # 单位s
 
     ## 下面是Mongo集群方式配置
     mongoUrl = "mongodb://127.0.0.1:27017"

@@ -69,9 +69,11 @@ const (
 type Cluster struct {
 	Enabled             bool           `toml:"enabled"`
 	Model               ClusterModelEm `toml:"model"`
-	TaskClusterPoolSize int32          `toml:"taskClusterPoolSize"`
-	TaskServicePoolSize int32          `toml:"taskServicePoolSize"`
+	TaskClusterPoolSize uint32         `toml:"taskClusterPoolSize"`
+	TaskServicePoolSize uint32         `toml:"taskServicePoolSize"`
 	ClusterName         string         `toml:"clusterName"`
+	SubMinNum           uint32         `toml:"subMinNum"`
+	AutoPeriod          uint32         `toml:"autoPeriod"`
 
 	// mongo配置
 	MongoUrl             string `toml:"mongoUrl"`

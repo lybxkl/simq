@@ -4,8 +4,10 @@ import (
 	"errors"
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
+	autocompress "gitee.com/Ljolan/si-mqtt/cluster/stat/colong/auto_compress_sub"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"github.com/panjf2000/ants/v2"
+	"sync"
 	"time"
 )
 
@@ -26,7 +28,7 @@ type dbRcv struct {
 // size 每次获取数据量
 func RunMysqlClusterServer(curNodeName string, clusterInToPub colong.ClusterInToPub,
 	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
-	shareTopicMapNode cluster.ShareTopicMapNode, taskPoolSize int, period, size int64, mysqlUrl string, maxConn int) colong.NodeServerFace {
+	shareTopicMapNode cluster.ShareTopicMapNode, taskPoolSize int, period, size int64, mysqlUrl string, maxConn, subMinNum, autoPeriod int) colong.NodeServerFace {
 	dbServer := &dbRcv{}
 	dbServer.curNodeName = curNodeName
 	dbServer.clusterInToPubShare = clusterInToPubShare
@@ -42,7 +44,7 @@ func RunMysqlClusterServer(curNodeName string, clusterInToPub colong.ClusterInTo
 		logger.Logger.Errorf("协程池处理错误：%v", i)
 	}), ants.WithMaxBlockingTasks(taskPoolSize*10))
 
-	dbServer.c = newMysqlOrm(curNodeName, mysqlUrl, maxConn)
+	dbServer.c = newMysqlOrm(curNodeName, mysqlUrl, maxConn, subMinNum, autoPeriod)
 
 	dbServer.run(period, size)
 	return dbServer
@@ -75,6 +77,7 @@ var sharePrefix = []byte("$share/")
 // period 获取数据周期，单位ms
 // size 每次获取数据量
 func (s *dbRcv) run(period, size int64) {
+	var _once = &sync.Once{}
 	go func() {
 		for {
 			select {
@@ -84,7 +87,24 @@ func (s *dbRcv) run(period, size int64) {
 					return
 				}
 			}
-			sub, err := s.c.GetSubBatch(size / 2)
+			_once.Do(func() {
+				// 启动时，需要获取全部来初始化本地完整集群共享订阅数据
+				// 因为我们采用的是本地收到的订阅，消息都直接在本地处理了，然后发送到集群消息
+				// 所以，正常处理时，只会获取非自己发送的消息
+				sub, err := s.c.GetSubBatch(size/2, true)
+				if err != nil {
+					logger.Logger.Error(err)
+				}
+				for i := 0; i < len(sub); i++ {
+					if sub[i].SubOrUnSub == 1 {
+						s.sub(sub[i])
+					} else if sub[i].SubOrUnSub == 2 {
+						s.unSub(sub[i])
+					}
+				}
+				time.Sleep(time.Duration(period) * time.Millisecond)
+			})
+			sub, err := s.c.GetSubBatch(size/2, false)
 			if err != nil {
 				logger.Logger.Error(err)
 			}
@@ -158,46 +178,42 @@ func (s *dbRcv) share(mg Message) {
 	})
 }
 
-func (s *dbRcv) unSub(sub Sub) {
+func (s *dbRcv) unSub(sub autocompress.Sub) {
 	tpk := poToBytes(&sub)
 	node := sub.Sender
-	s.submit(func() {
-		for j := 0; j < len(tpk); j++ {
-			// 解析share name
-			shareName, top := shareTopic(tpk[j])
-			if shareName != "" {
-				err := s.shareTopicMapNode.RemoveTopicMapNode(top, shareName, node)
-				if err != nil {
-					logger.Logger.Errorf("%s,共享订阅节点减少失败, shareName:%v , err: %v", node, shareName, err)
-				} else {
-					logger.Logger.Debugf("收到节点：%s 发来的 取消共享订阅：topic-%s, shareName-%s", node, top, shareName)
-				}
+	for j := 0; j < len(tpk); j++ {
+		// 解析share name
+		shareName, top := shareTopic(tpk[j])
+		if shareName != "" {
+			err := s.shareTopicMapNode.RemoveTopicMapNode(top, shareName, node)
+			if err != nil {
+				logger.Logger.Errorf("%s,共享订阅节点减少失败, shareName:%v , err: %v", node, shareName, err)
 			} else {
-				logger.Logger.Warnf("收到非共享取消订阅：%s", string(tpk[j]))
+				logger.Logger.Debugf("收到节点：%s 发来的 取消共享订阅：topic-%s, shareName-%s", node, top, shareName)
 			}
+		} else {
+			logger.Logger.Warnf("收到非共享取消订阅：%s", string(tpk[j]))
 		}
-	})
+	}
 }
 
-func (s *dbRcv) sub(subi Sub) {
+func (s *dbRcv) sub(subi autocompress.Sub) {
 	tpk := poToBytes(&subi)
 	node := subi.Sender
-	s.submit(func() {
-		for j := 0; j < len(tpk); j++ {
-			// 解析share name
-			shareName, top := shareTopic(tpk[j])
-			if shareName != "" {
-				err := s.shareTopicMapNode.AddTopicMapNode(top, shareName, node, subi.Num+1) // 因为num是从0开始的，这里需要+1
-				if err != nil {
-					logger.Logger.Errorf("%s,共享订阅节点新增失败, shareName:%v , err: %v", node, shareName, err)
-				} else {
-					logger.Logger.Debugf("收到节点：%s 发来的 共享订阅：topic-%s, shareName-%s", node, top, shareName)
-				}
+	for j := 0; j < len(tpk); j++ {
+		// 解析share name
+		shareName, top := shareTopic(tpk[j])
+		if shareName != "" {
+			err := s.shareTopicMapNode.AddTopicMapNode(top, shareName, node, subi.Num+1) // 因为num是从0开始的，这里需要+1
+			if err != nil {
+				logger.Logger.Errorf("%s,共享订阅节点新增失败, shareName:%v , err: %v", node, shareName, err)
 			} else {
-				logger.Logger.Warnf("收到非共享订阅：%s", tpk[j])
+				logger.Logger.Debugf("收到节点：%s 发来的 共享订阅：topic-%s, shareName-%s", node, top, shareName)
 			}
+		} else {
+			logger.Logger.Warnf("收到非共享订阅：%s", string(tpk[j]))
 		}
-	})
+	}
 }
 
 // 共享组和topic

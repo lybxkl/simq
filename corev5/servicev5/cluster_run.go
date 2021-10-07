@@ -63,7 +63,7 @@ func DBMysqlClusterRun(this *Server, cfg *config.SIConfig) {
 	this.ClusterServer, this.ClusterClient, _ = mysql.NewMysqlCluster(cfg.Cluster.ClusterName,
 		svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode,
 		int(cfg.Cluster.TaskClusterPoolSize), int64(cfg.Cluster.Period), int64(cfg.Cluster.BatchSize),
-		cfg.Cluster.MysqlUrl, int(cfg.Cluster.MysqlMaxPool))
+		cfg.Cluster.MysqlUrl, int(cfg.Cluster.MysqlMaxPool), int(cfg.Cluster.SubMinNum), int(cfg.Cluster.AutoPeriod))
 	this.AddCloser(this.ClusterServer)
 	this.AddCloser(this.ClusterClient)
 }
