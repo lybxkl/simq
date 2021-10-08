@@ -28,7 +28,8 @@ type dbRcv struct {
 // size 每次获取数据量
 func RunMysqlClusterServer(curNodeName string, clusterInToPub colong.ClusterInToPub,
 	clusterInToPubShare colong.ClusterInToPubShare, clusterInToPubSys colong.ClusterInToPubSys,
-	shareTopicMapNode cluster.ShareTopicMapNode, taskPoolSize int, period, size int64, mysqlUrl string, maxConn, subMinNum, autoPeriod int) colong.NodeServerFace {
+	shareTopicMapNode cluster.ShareTopicMapNode, taskPoolSize int, period, size int64,
+	mysqlUrl string, maxConn int, compressCfg autocompress.CompressCfg) colong.NodeServerFace {
 	dbServer := &dbRcv{}
 	dbServer.curNodeName = curNodeName
 	dbServer.clusterInToPubShare = clusterInToPubShare
@@ -44,7 +45,7 @@ func RunMysqlClusterServer(curNodeName string, clusterInToPub colong.ClusterInTo
 		logger.Logger.Errorf("协程池处理错误：%v", i)
 	}), ants.WithMaxBlockingTasks(taskPoolSize*10))
 
-	dbServer.c = newMysqlOrm(curNodeName, mysqlUrl, maxConn, subMinNum, autoPeriod)
+	dbServer.c = newMysqlOrm(curNodeName, mysqlUrl, maxConn, compressCfg)
 
 	dbServer.run(period, size)
 	return dbServer

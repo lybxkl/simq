@@ -23,7 +23,7 @@ type mysqlOrm struct {
 
 var once sync.Once
 
-func newMysqlOrm(curName, url string, maxConn, subMinNum, autoPeriod int) *mysqlOrm {
+func newMysqlOrm(curName, url string, maxConn int, compressCfg autocompress.CompressCfg) *mysqlOrm {
 	cfg := &gorm.Config{
 		SkipDefaultTransaction: true,
 		Logger:                 glog.Default.LogMode(glog.Error),
@@ -46,14 +46,23 @@ func newMysqlOrm(curName, url string, maxConn, subMinNum, autoPeriod int) *mysql
 
 	sqlDB.SetMaxOpenConns(maxConn)
 	once.Do(func() {
-		if subMinNum <= 0 {
-			subMinNum = 20
+		if compressCfg.Min <= 0 {
+			compressCfg.Min = 20
 		}
-		if autoPeriod <= 0 {
-			autoPeriod = 10
+		if compressCfg.Period <= 0 {
+			compressCfg.Period = 10
+		}
+		if compressCfg.CompressProportion <= 0 {
+			compressCfg.CompressProportion = 0.75
+		}
+		if compressCfg.LockTimeOut <= 0 {
+			compressCfg.LockTimeOut = 10
+		}
+		if compressCfg.LockAddLive < 0 {
+			compressCfg.LockAddLive = 0
 		}
 		// 不想把这个暴露在外面，就用了sync.Once
-		autocompress.SubAutoCompress(url, subMinNum, autoPeriod, autocompress.NewAutoCompress(curName, url))
+		autocompress.SubAutoCompress(url, compressCfg, autocompress.NewAutoCompress(curName, url))
 	})
 	return &mysqlOrm{
 		curName:  curName,

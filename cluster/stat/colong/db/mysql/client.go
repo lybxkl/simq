@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
+	autocompress "gitee.com/Ljolan/si-mqtt/cluster/stat/colong/auto_compress_sub"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 )
 
@@ -10,8 +11,8 @@ type dbSender struct {
 	c           *mysqlOrm
 }
 
-func NewMysqlClusterClient(curNodeName, mysqlUrl string, maxConn int, subMinNum, autoPeriod int) colong.NodeClientFace {
-	db := newMysqlOrm(curNodeName, mysqlUrl, maxConn, subMinNum, autoPeriod)
+func NewMysqlClusterClient(curNodeName, mysqlUrl string, maxConn int, compressCfg autocompress.CompressCfg) colong.NodeClientFace {
+	db := newMysqlOrm(curNodeName, mysqlUrl, maxConn, compressCfg)
 	dbSend := &dbSender{
 		curNodeName: curNodeName,
 		c:           db,

@@ -52,12 +52,12 @@ func NewAutoCompress(nodeName, url string) AutoCompress {
 		dupErr:   "Error 1062: Duplicate entry 'auto_compress_sub' for key 'source'",
 	}
 }
-func (m *mysqlCompress) Lock() {
+func (m *mysqlCompress) Lock(lockTimeOut int) {
 	// 加分布式锁
 LOCK:
 	// 删除超时锁
 	sql1 := "delete from si_lock where `source`=? and ? - `time` > ?"
-	db1 := m.db.Exec(sql1, m.source, time.Now().Unix(), m.period*2)
+	db1 := m.db.Exec(sql1, m.source, time.Now().Unix(), lockTimeOut) // 两倍period作为超时，可改为配置控制
 	if e := db1.Error; e != nil {
 		log.Error(fmt.Sprintf("超时删除错误： %v", e.Error()))
 		time.Sleep(time.Duration(m.period*2) * time.Second)
@@ -81,10 +81,10 @@ LOCK:
 	}
 }
 
-func (m *mysqlCompress) LockAndLive() bool {
+func (m *mysqlCompress) LockAndLive(lockAddLive int64) bool {
 	// 锁续命
 	sql3 := "update si_lock set `time` = ? where `source` = ? and `belong`= ?"
-	db3 := m.db.Exec(sql3, time.Now().Unix(), m.source, m.nodeName)
+	db3 := m.db.Exec(sql3, time.Now().Unix()+lockAddLive, m.source, m.nodeName)
 	if e := db3.Error; e != nil {
 		log.Error(fmt.Sprintf("给锁续命失败，丢失锁，等待重新抢锁：%v", e.Error()))
 		time.Sleep(time.Duration(m.period*2) * time.Second)
@@ -133,13 +133,13 @@ func (m *mysqlCompress) getCount() int64 {
 	}
 	return c
 }
-func (m *mysqlCompress) GetSubs(min int) ([]*Sub, error) {
+func (m *mysqlCompress) GetSubs(min int, compressProportion float32) ([]*Sub, error) {
 	count := m.getCount()
 	if count < int64(min) { // 过小就不需要处理
 		return nil, nil
 	}
 	subs := make([]*Sub, 0)
-	b2 := m.db.Raw("select * from sub order by id asc limit ?", count*2/3)
+	b2 := m.db.Raw("select * from sub order by id asc limit ?", int(float32(min)*compressProportion))
 	if r, er := b2.Rows(); er != nil {
 		return nil, er
 	} else {

@@ -27,11 +27,19 @@ func (s Sub) TableName() string {
 }
 
 type AutoCompress interface {
-	Lock()                                                    // 阻塞时抢锁，可睡眠再抢，谁抢到谁负责合并sub
-	LockAndLive() bool                                        // 给锁续命，失败false,则会重新开始抢锁
-	GetSubs(min int) ([]*Sub, error)                          // 获取订阅和取消订阅事件，数据量低于min则不处理
-	DelSome(id int64, num int32, del []int64) error           // del中的全部删除 和 更新一条id的num数据
-	DelPatALl(sender string, topic string, del []int64) error // del中的全部删除
+	Lock(lockTimeOut int)                                        // 阻塞时抢锁，可睡眠再抢，谁抢到谁负责合并sub
+	LockAndLive(lockAddLive int64) bool                          // 给锁续命，失败false,则会重新开始抢锁
+	GetSubs(min int, compressProportion float32) ([]*Sub, error) // 获取订阅和取消订阅事件，数据量低于min则不处理
+	DelSome(id int64, num int32, del []int64) error              // del中的全部删除 和 更新一条id的num数据
+	DelPatALl(sender string, topic string, del []int64) error    // del中的全部删除
+}
+
+type CompressCfg struct {
+	Min                int
+	Period             int
+	LockTimeOut        int
+	LockAddLive        int
+	CompressProportion float32
 }
 
 // SubAutoCompress 自动合并压缩订阅、取消订阅事件数据
@@ -39,22 +47,22 @@ type AutoCompress interface {
 // min 最小保持数
 // period 周期，单位秒
 // auto 根据不同存储实现的插件
-func SubAutoCompress(url string, min, period int, auto AutoCompress) {
+func SubAutoCompress(url string, cfg CompressCfg, auto AutoCompress) {
 	once.Do(func() {
 		initLog()
 	})
-	auto.Lock()
+	auto.Lock(cfg.LockTimeOut)
 	go func() {
 		for {
 			select {
-			case <-time.After(time.Duration(period) * time.Second):
-				if !auto.LockAndLive() {
+			case <-time.After(time.Duration(cfg.Period) * time.Second):
+				if !auto.LockAndLive(int64(cfg.LockAddLive)) {
 					log.Warn("重新抢锁")
-					SubAutoCompress(url, min, period, auto)
+					SubAutoCompress(url, cfg, auto)
 					return
 				}
 			}
-			subs, err := auto.GetSubs(min)
+			subs, err := auto.GetSubs(cfg.Min, cfg.CompressProportion)
 			if err != nil {
 				log.Error(err.Error())
 				continue

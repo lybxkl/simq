@@ -31,8 +31,11 @@ serverVersion = "5.0.1"
 
     # 当前节点再集群中的名称，必须保证每个节点的名称都不一样
     clusterName = "node2"
-    subMinNum = 40
-    autoPeriod = 5 # 单位s
+    subMinNum = 40 # sub表 最小保持数据
+    autoPeriod = 5 # 单位s 自动合并周期
+    lockTimeOut = 10 # 单位s 锁超时时间
+    lockAddLive = 5 # 每次锁续命时间 单位 s
+    compressProportion = 0.75 # 每次获取所有数据的百分比数据进行处理
 
     ## 下面是Mongo,mysql集群方式配置
     mongoUrl = "mongodb://127.0.0.1:27017"

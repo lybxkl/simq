@@ -74,6 +74,9 @@ type Cluster struct {
 	ClusterName         string         `toml:"clusterName"`
 	SubMinNum           uint32         `toml:"subMinNum"`
 	AutoPeriod          uint32         `toml:"autoPeriod"`
+	LockTimeOut         uint32         `toml:"lockTimeOut"`
+	LockAddLive         uint32         `toml:"lockAddLive"`
+	CompressProportion  float32        `toml:"compressProportion"`
 
 	// mongo配置
 	MongoUrl             string `toml:"mongoUrl"`

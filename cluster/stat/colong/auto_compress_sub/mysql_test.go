@@ -27,7 +27,13 @@ func TestMysql(t *testing.T) {
 		}
 	}()
 
-	SubAutoCompress(url, 10, 5, NewAutoCompress("sender", url))
+	SubAutoCompress(url, CompressCfg{
+		Min:                20,
+		Period:             5,
+		LockTimeOut:        10,
+		LockAddLive:        5,
+		CompressProportion: 0.75,
+	}, NewAutoCompress("sender", url))
 
 	select {}
 }

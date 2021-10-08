@@ -2,6 +2,7 @@ package servicev5
 
 import (
 	"gitee.com/Ljolan/si-mqtt/cluster"
+	autocompress "gitee.com/Ljolan/si-mqtt/cluster/stat/colong/auto_compress_sub"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/db/mongo"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/db/mysql"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/static_getty"
@@ -60,10 +61,17 @@ func DBMysqlClusterRun(this *Server, cfg *config.SIConfig) {
 	this.AddCloser(InitServiceTaskPool(int(cfg.Cluster.TaskServicePoolSize)))
 	this.ShareTopicMapNode = cluster.NewShareMap()
 	svc := this.NewService() // 单独service用来处理集群来的消息
+	compressCfg := autocompress.CompressCfg{
+		Min:                int(cfg.Cluster.SubMinNum),
+		Period:             int(cfg.Cluster.AutoPeriod),
+		LockTimeOut:        int(cfg.Cluster.LockTimeOut),
+		LockAddLive:        int(cfg.Cluster.LockAddLive),
+		CompressProportion: cfg.Cluster.CompressProportion,
+	}
 	this.ClusterServer, this.ClusterClient, _ = mysql.NewMysqlCluster(cfg.Cluster.ClusterName,
 		svc.ClusterInToPub, svc.ClusterInToPubShare, svc.ClusterInToPubSys, this.ShareTopicMapNode,
 		int(cfg.Cluster.TaskClusterPoolSize), int64(cfg.Cluster.Period), int64(cfg.Cluster.BatchSize),
-		cfg.Cluster.MysqlUrl, int(cfg.Cluster.MysqlMaxPool), int(cfg.Cluster.SubMinNum), int(cfg.Cluster.AutoPeriod))
+		cfg.Cluster.MysqlUrl, int(cfg.Cluster.MysqlMaxPool), compressCfg)
 	this.AddCloser(this.ClusterServer)
 	this.AddCloser(this.ClusterClient)
 }
