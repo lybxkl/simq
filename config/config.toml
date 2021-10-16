@@ -22,6 +22,8 @@ serverVersion = "5.0.1"
     # 根证书
     ca = "certs/root.crt"
 
+    closeShareSub = true # 关闭共享订阅
+
 [cluster]
     # 是否开启集群模式
     enabled = true

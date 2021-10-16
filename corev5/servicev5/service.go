@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
+	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
 	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
 	"gitee.com/Ljolan/si-mqtt/corev5/topicsv5"
@@ -11,6 +12,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/utils"
 	"io"
 	"math"
+	"reflect"
 	"sync"
 	"sync/atomic"
 )
@@ -147,6 +149,7 @@ type service struct {
 	SessionStore store.SessionStore
 	MessageStore store.MessageStore
 	EventStore   store.EventStore
+	conFig       *config.SIConfig
 }
 
 func (this *service) start(resp *messagev5.ConnackMessage) error {
@@ -213,7 +216,10 @@ func (this *service) start(resp *messagev5.ConnackMessage) error {
 			return err
 		} else {
 			for _, t := range tpc {
-				this.topicsMgr.Subscribe(topicsv5.Sub{
+				if this.conFig.Broker.CloseShareSub && len(t.Topic) > 6 && reflect.DeepEqual(t.Topic[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
+					continue
+				}
+				_, _ = this.topicsMgr.Subscribe(topicsv5.Sub{
 					Topic:             t.Topic,
 					Qos:               t.Qos,
 					NoLocal:           t.NoLocal,

@@ -419,7 +419,29 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 	qos := msg.Qos()
 
 	this.rmsgs = this.rmsgs[0:0]
-
+	tmpResCode := make([]byte, 0)
+	unSupport := false
+	for _, t := range topics {
+		// 简单处理，直接断开连接，返回原因码
+		if this.conFig.Broker.CloseShareSub && len(t) > 6 && reflect.DeepEqual(t[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
+			//dis := messagev5.NewDisconnectMessage()
+			//dis.SetReasonCode(messagev5.UnsupportedSharedSubscriptions)
+			//if _, err := this.writeMessage(resp); err != nil {
+			//	return err
+			//}
+			unSupport = true
+			tmpResCode = append(tmpResCode, messagev5.UnsupportedSharedSubscriptions.Value())
+		} else {
+			tmpResCode = append(tmpResCode, messagev5.UnspecifiedError.Value())
+		}
+	}
+	if !unSupport && len(tmpResCode) > 0 {
+		_ = resp.AddReasonCodes(tmpResCode)
+		if _, err := this.writeMessage(resp); err != nil {
+			return err
+		}
+		return nil
+	}
 	for i, t := range topics {
 		noLocal := msg.TopicNoLocal(t)
 		retainAsPublished := msg.TopicRetainAsPublished(t)

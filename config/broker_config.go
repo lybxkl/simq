@@ -42,14 +42,15 @@ type PProf struct {
 	Port int64 `toml:"port"`
 }
 type Broker struct {
-	TcpAddr     string `toml:"tcpAddr"`
-	TcpTLSOpen  bool   `toml:"tcpTlsOpen"`
-	WsAddr      string `toml:"wsAddr"`
-	WsPath      string `toml:"wsPath"`
-	WssAddr     string `toml:"wssAddr"`
-	WssCertPath string `toml:"wssCertPath"`
-	WssKeyPath  string `toml:"wssKeyPath"`
-	Ca          string `toml:"ca"`
+	TcpAddr       string `toml:"tcpAddr"`
+	TcpTLSOpen    bool   `toml:"tcpTlsOpen"`
+	WsAddr        string `toml:"wsAddr"`
+	WsPath        string `toml:"wsPath"`
+	WssAddr       string `toml:"wssAddr"`
+	WssCertPath   string `toml:"wssCertPath"`
+	WssKeyPath    string `toml:"wssKeyPath"`
+	Ca            string `toml:"ca"`
+	CloseShareSub bool   `toml:"closeShareSub"`
 }
 type (
 	ClusterModelEm = string
