@@ -47,7 +47,7 @@ func GetServerName() string {
 type Server struct {
 	Version string // 服务版本
 
-	conFig *config.SIConfig // 偷懒了
+	ConFig *config.SIConfig // 偷懒了
 
 	// The number of seconds to keep the connection live if there's no data.
 	// If not set then default to 5 mins.
@@ -181,7 +181,7 @@ func (this *Server) ListenAndServe(uri string) error {
 	if !atomic.CompareAndSwapInt32(&this.running, 0, 1) {
 		return fmt.Errorf("server/ListenAndServe: Server is already running")
 	}
-	serverName = this.conFig.Cluster.ClusterName
+	serverName = this.ConFig.Cluster.ClusterName
 
 	this.quit = make(chan struct{})
 
@@ -250,7 +250,7 @@ func (this *Server) ListenAndServe(uri string) error {
 }
 
 func (this *Server) InitStore() {
-	switch this.conFig.Store.Model {
+	switch this.ConFig.Store.Model {
 	case config.MongoStore:
 		this.SessionStore = mongorepo.NewSessionStore()
 		this.MessageStore = mongorepo.NewMessageStore()
@@ -261,11 +261,11 @@ func (this *Server) InitStore() {
 		panic("不支持store方式")
 	}
 	ctx := context.Background()
-	utils.MustPanic(this.SessionStore.Start(ctx, *this.conFig))
-	utils.MustPanic(this.MessageStore.Start(ctx, *this.conFig))
+	utils.MustPanic(this.SessionStore.Start(ctx, *this.ConFig))
+	utils.MustPanic(this.MessageStore.Start(ctx, *this.ConFig))
 }
 func (this *Server) RunClusterComp() {
-	cfg := this.conFig
+	cfg := this.ConFig
 	if !cfg.Cluster.Enabled { // 集群服务启动
 		return
 	}
@@ -395,7 +395,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(this.ConnectTimeout)))
 
 	resp := messagev5.NewConnackMessage()
-	if !this.conFig.Broker.CloseShareSub { // 简单处理，热修改需要考虑的东西有点复杂
+	if !this.ConFig.Broker.CloseShareSub { // 简单处理，热修改需要考虑的东西有点复杂
 		resp.SetSharedSubscriptionAvailable(1)
 	}
 	// 从本次连接中获取到connectMessage
@@ -409,7 +409,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		}
 		return nil, err
 	}
-	svconf := this.conFig.DefaultConfig.Server
+	svconf := this.ConFig.DefaultConfig.Server
 	if svconf.RedirectOpen { // 重定向
 		dis := messagev5.NewDisconnectMessage()
 		if svconf.RedirectIsForEver {
@@ -436,7 +436,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	svc = &service{
 		id:          atomic.AddUint64(&gsvcid, 1),
 		client:      false,
-		clusterOpen: this.conFig.Cluster.Enabled,
+		clusterOpen: this.ConFig.Cluster.Enabled,
 
 		keepAlive:      int(req.KeepAlive()),
 		writeTimeout:   this.WriteTimeout,
@@ -448,7 +448,7 @@ func (this *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		sessMgr:           this.sessMgr,
 		topicsMgr:         this.topicsMgr,
 		shareTopicMapNode: this.ShareTopicMapNode,
-		conFig:            this.conFig,
+		conFig:            this.ConFig,
 	}
 	err = this.getSession(svc, req, resp)
 	if err != nil {
