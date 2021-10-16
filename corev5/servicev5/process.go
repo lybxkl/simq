@@ -442,6 +442,9 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 			return err
 		}
 		return nil
+	case len(tmpResCode) == 0:
+		// 正常情况不会走到此处，在编解码处已经限制了至少有一个主题过滤器/订阅选项对
+		return ErrInvalidSubscriber
 	}
 
 	for i, t := range topics {
