@@ -10,6 +10,99 @@ golang mqtt服务器，集群版，目前支持DB集群和直连集群
 - 添加环境变量 SI_CFG_PATH = "配置文件路径" ，如果不配置，则默认使用config/config.toml配置
 - 以package方式 运行 main.go即可
 
+##### 客户端调用测试
+- 可以使用开源库paho-golang的v5编解码client进行测试
+- [paho库的客户端测试][https://github.com/eclipse/paho.golang/tree/master/paho]
+
+```
+// 本地启动broker服务之后
+// 可以将此代码直接粘贴在paho的client_test.go里面运行即可测试
+
+func TestClientTest(t *testing.T) {
+ 	conn, _ := net.Dial("tcp","127.0.0.1:1883")
+ 	c := NewClient(ClientConfig{
+ 		Conn:                       conn,
+ 		Router: NewSingleHandlerRouter(func(p *Publish) {
+ 			fmt.Println(p.String())
+ 		}),
+ 	})
+ 	c.serverProps.SharedSubAvailable = true
+ 	require.NotNil(t, c)
+ 	c.SetDebugLogger(log.New(os.Stderr, "CONNECT: ", log.LstdFlags))
+ 
+ 	cp := &Connect{
+ 		KeepAlive:  30,
+ 		ClientID:   "testClient",
+ 		CleanStart: true,
+ 		Properties: &ConnectProperties{
+ 			ReceiveMaximum: Uint16(200),
+ 		},
+ 		WillMessage: &WillMessage{
+ 			Topic:   "will/topic",
+ 			Payload: []byte("am gone"),
+ 		},
+ 		WillProperties: &WillProperties{
+ 			WillDelayInterval: Uint32(200),
+ 		},
+ 	}
+ 
+ 	ca, err := c.Connect(context.Background(), cp)
+ 	require.Nil(t, err)
+ 	assert.Equal(t, uint8(0), ca.ReasonCode)
+ 
+ 	time.Sleep(10 * time.Millisecond)
+ 
+ 	s := &Subscribe{
+ 		Subscriptions: map[string]SubscribeOptions{
+ 			"test/1": {QoS: 1},
+ 			"test/2": {QoS: 2},
+ 			"test/3": {QoS: 0},
+ 			"$share/aa/test/1": {QoS: 0},
+ 		},
+ 	}
+ 
+ 	_, err = c.Subscribe(context.Background(), s)
+ 	require.Nil(t, err)
+ 	//assert.Equal(t, []byte{1, 2, 0}, sa.Reasons)
+ 
+ 	time.Sleep(10 * time.Millisecond)
+ 	var p *Publish
+ 	p = &Publish{
+ 		Topic:   "test/0",
+ 		QoS:     0,
+ 		Payload: []byte("test payload"),
+ 	}
+ 	
+ 	_, err = c.Publish(context.Background(), p)
+ 	require.Nil(t, err)
+ 	
+ 	time.Sleep(10 * time.Millisecond)
+ 
+ 	p = &Publish{
+ 		Topic:   "test/1",
+ 		QoS:     1,
+ 		Payload: []byte("test payload"),
+ 	}
+ 
+ 	pa, err := c.Publish(context.Background(), p)
+ 	require.Nil(t, err)
+ 	assert.Equal(t, uint8(0), pa.ReasonCode)
+ 
+ 	time.Sleep(20 * time.Millisecond)
+ 	p = &Publish{
+ 		Topic:   "test/2",
+ 		QoS:     2,
+ 		Payload: []byte("test payload"),
+ 	}
+ 	
+ 	pr, err := c.Publish(context.Background(), p)
+ 	require.Nil(t, err)
+ 	assert.Equal(t, uint8(0), pr.ReasonCode)
+ 	
+ 	time.Sleep(30 * time.Millisecond)
+ }
+```
+
 #### 目前支持的方案
 ##### 1. Mongo集群设计
 ##### 2. Mysql集群设计
@@ -68,3 +161,6 @@ golang mqtt服务器，集群版，目前支持DB集群和直连集群
 
 #### 系统领域uml设计
 [uml图、不同包中方法调用图](https://gitee.com/Ljolan/si-mqtt/tree/dev-cluster-v1/image)
+
+
+[https://github.com/eclipse/paho.golang/tree/master/paho]: https://github.com/eclipse/paho.golang/tree/master/paho
