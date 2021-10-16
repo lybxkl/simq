@@ -435,13 +435,15 @@ func (this *service) processSubscribe(msg *messagev5.SubscribeMessage) error {
 			tmpResCode = append(tmpResCode, messagev5.UnspecifiedError.Value())
 		}
 	}
-	if !unSupport && len(tmpResCode) > 0 {
+	switch {
+	case unSupport && len(tmpResCode) > 0:
 		_ = resp.AddReasonCodes(tmpResCode)
 		if _, err := this.writeMessage(resp); err != nil {
 			return err
 		}
 		return nil
 	}
+
 	for i, t := range topics {
 		noLocal := msg.TopicNoLocal(t)
 		retainAsPublished := msg.TopicRetainAsPublished(t)
