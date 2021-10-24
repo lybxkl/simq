@@ -109,7 +109,7 @@ func TestClientTest(t *testing.T) {
 - 新增集群共享订阅数据自动合并方法，简易代码 [cluster/stat/colong/auto_compress_sub/factory.go](https://gitee.com/Ljolan/si-mqtt/blob/dev-cluster-v1/cluster/stat/colong/auto_compress_sub/factory.go)
 
   > 采用DB存储集群消息的方式，可通过多主的方式提供写服务，拉取数据走从即可，可以防止主节点单点故障，并且不会全部broker连在一个DB实例上。[具体知识点可查看DDIA](https://ddia.vonng.com/#/part-ii)
-
+  > DB集群节点数据复制【反熵过程】延迟高峰期会比较大，对数据实时比较敏感的，建议在物模型的数据添加一个时间戳，订阅者收到数据根据时间戳决定是否丢弃
 ##### 3. 静态配置启动
 
 #### 多节点启动
