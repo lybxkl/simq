@@ -2,7 +2,7 @@ package cluster
 
 import (
 	"errors"
-	topicmapnode "gitee.com/Ljolan/si-mqtt/corev5/topicsv5/topic_map_node"
+	topicmapnode "gitee.com/Ljolan/si-mqtt/corev5/v2/topics/topic_map_node"
 )
 
 type ShareTopicMapNode interface {

@@ -9,9 +9,9 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster/store/mysqlImpl/orm/mysql"
 	"gitee.com/Ljolan/si-mqtt/cluster/store/mysqlImpl/po"
 	"gitee.com/Ljolan/si-mqtt/config"
-	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
-	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
-	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5/impl"
+	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions/impl"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
 	"strings"
@@ -44,7 +44,7 @@ func (s *SessionRepo) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *SessionRepo) GetSession(ctx context.Context, clientId string) (sessionsv5.Session, error) {
+func (s *SessionRepo) GetSession(ctx context.Context, clientId string) (sessions.Session, error) {
 	defer func() {
 		logger.Logger.Debugf("【GetSession <==】%s", clientId)
 	}()
@@ -56,7 +56,7 @@ func (s *SessionRepo) GetSession(ctx context.Context, clientId string) (sessions
 	return poToVoSession(data[0]), err
 }
 
-func (s *SessionRepo) StoreSession(ctx context.Context, clientId string, session sessionsv5.Session) error {
+func (s *SessionRepo) StoreSession(ctx context.Context, clientId string, session sessions.Session) error {
 	defer func() {
 		logger.Logger.Debugf("【StoreSession ==>】%s", clientId)
 	}()
@@ -105,7 +105,7 @@ func (s *SessionRepo) ClearSession(ctx context.Context, clientId string, clearOf
 	return s.c.Delete(ctx, "si_will", wrapperOne("client_id", clientId), po.Will{})
 }
 
-func (s *SessionRepo) StoreSubscription(ctx context.Context, clientId string, subscription *messagev5.SubscribeMessage) error {
+func (s *SessionRepo) StoreSubscription(ctx context.Context, clientId string, subscription *messagev52.SubscribeMessage) error {
 	defer func() {
 		logger.Logger.Debugf("【StoreSubscription ==>】%s", clientId)
 	}()
@@ -127,7 +127,7 @@ func (s *SessionRepo) ClearSubscriptions(ctx context.Context, clientId string) e
 	return s.c.Delete(ctx, "si_sub", wrapperOne("client_id", clientId), &po.Subscription{})
 }
 
-func (s *SessionRepo) GetSubscriptions(ctx context.Context, clientId string) ([]*messagev5.SubscribeMessage, error) {
+func (s *SessionRepo) GetSubscriptions(ctx context.Context, clientId string) ([]*messagev52.SubscribeMessage, error) {
 	defer func() {
 		logger.Logger.Debugf("【GetSubscriptions <==】%s", clientId)
 	}()
@@ -136,18 +136,18 @@ func (s *SessionRepo) GetSubscriptions(ctx context.Context, clientId string) ([]
 	if err != nil {
 		return nil, err
 	}
-	ret := make([]*messagev5.SubscribeMessage, len(data))
+	ret := make([]*messagev52.SubscribeMessage, len(data))
 	for i := 0; i < len(data); i++ {
 		ret[i] = poToVoSub(data[i])
 	}
 	return ret, err
 }
 
-func (s *SessionRepo) CacheInflowMsg(ctx context.Context, clientId string, message messagev5.Message) error {
+func (s *SessionRepo) CacheInflowMsg(ctx context.Context, clientId string, message messagev52.Message) error {
 	defer func() {
 		logger.Logger.Debugf("【CacheInflowMsg ==>】%s", clientId)
 	}()
-	return s.c.Save(ctx, "si_inflow", "", "", voToPoInflow(clientId, message.(*messagev5.PublishMessage)))
+	return s.c.Save(ctx, "si_inflow", "", "", voToPoInflow(clientId, message.(*messagev52.PublishMessage)))
 }
 func (s *SessionRepo) ReleaseAllInflowMsg(ctx context.Context, clientId string) error {
 	defer func() {
@@ -167,7 +167,7 @@ func (s *SessionRepo) ReleaseInflowMsgs(ctx context.Context, clientId string, pk
 	return nil
 }
 
-func (s *SessionRepo) ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error) {
+func (s *SessionRepo) ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev52.Message, error) {
 	defer func() {
 		logger.Logger.Debugf("【ReleaseInflowMsg ==X】%s, pk_id: %v", clientId, pkId)
 	}()
@@ -179,7 +179,7 @@ func (s *SessionRepo) ReleaseInflowMsg(ctx context.Context, clientId string, pkI
 	return poToVoInflow(*ms), nil
 }
 
-func (s *SessionRepo) GetAllInflowMsg(ctx context.Context, clientId string) (t []messagev5.Message, e error) {
+func (s *SessionRepo) GetAllInflowMsg(ctx context.Context, clientId string) (t []messagev52.Message, e error) {
 	defer func() {
 		logger.Logger.Debugf("【GetAllInflowMsg <==】%s, size: %v", clientId, len(t))
 	}()
@@ -188,21 +188,21 @@ func (s *SessionRepo) GetAllInflowMsg(ctx context.Context, clientId string) (t [
 	if err != nil || len(data) == 0 {
 		return nil, err
 	}
-	ret := make([]messagev5.Message, len(data))
+	ret := make([]messagev52.Message, len(data))
 	for i := 0; i < len(data); i++ {
 		ret[i] = poToVoInflow(data[i])
 	}
 	return ret, nil
 }
 
-func (s *SessionRepo) CacheOutflowMsg(ctx context.Context, clientId string, message messagev5.Message) error {
+func (s *SessionRepo) CacheOutflowMsg(ctx context.Context, clientId string, message messagev52.Message) error {
 	defer func() {
 		logger.Logger.Debugf("【CacheOutflowMsg ==>】%s", clientId)
 	}()
-	return s.c.Save(ctx, "si_outflow", "", "", voToPoOutflow(clientId, message.(*messagev5.PublishMessage)))
+	return s.c.Save(ctx, "si_outflow", "", "", voToPoOutflow(clientId, message.(*messagev52.PublishMessage)))
 }
 
-func (s *SessionRepo) GetAllOutflowMsg(ctx context.Context, clientId string) (t []messagev5.Message, e error) {
+func (s *SessionRepo) GetAllOutflowMsg(ctx context.Context, clientId string) (t []messagev52.Message, e error) {
 	defer func() {
 		logger.Logger.Debugf("【GetAllOutflowMsg <==】%s, size: %v", clientId, len(t))
 	}()
@@ -211,7 +211,7 @@ func (s *SessionRepo) GetAllOutflowMsg(ctx context.Context, clientId string) (t 
 	if err != nil || len(data) == 0 {
 		return nil, err
 	}
-	ret := make([]messagev5.Message, len(data))
+	ret := make([]messagev52.Message, len(data))
 	for i := 0; i < len(data); i++ {
 		ret[i] = poToVoOutflow(data[i])
 	}
@@ -227,7 +227,7 @@ func (s *SessionRepo) ReleaseAllOutflowMsg(ctx context.Context, clientId string)
 	}
 	return nil
 }
-func (s *SessionRepo) ReleaseOutflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error) {
+func (s *SessionRepo) ReleaseOutflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev52.Message, error) {
 	defer func() {
 		logger.Logger.Debugf("【ReleaseOutflowMsg ==X】%s, pk_id: %v", clientId, pkId)
 	}()
@@ -296,17 +296,17 @@ func (s *SessionRepo) ReleaseOutflowSecMsgIds(ctx context.Context, clientId stri
 	return s.c.Delete(ctx, "si_outflowsec", f, &po.MessagePk{})
 }
 
-func (s *SessionRepo) StoreOfflineMsg(ctx context.Context, clientId string, message messagev5.Message) error {
+func (s *SessionRepo) StoreOfflineMsg(ctx context.Context, clientId string, message messagev52.Message) error {
 	defer func() {
 		logger.Logger.Debugf("【StoreOfflineMsg ==>】%s", clientId)
 	}()
-	msg := voToPoOffline(clientId, message.(*messagev5.PublishMessage))
+	msg := voToPoOffline(clientId, message.(*messagev52.PublishMessage))
 	msg.MsgId = utils.Generate()
 	return s.c.Save(ctx, "si_offline", "", "", msg)
 }
 
 // 返回离线消息，和对应的消息id
-func (s *SessionRepo) GetAllOfflineMsg(ctx context.Context, clientId string) (t []messagev5.Message, mi []string, e error) {
+func (s *SessionRepo) GetAllOfflineMsg(ctx context.Context, clientId string) (t []messagev52.Message, mi []string, e error) {
 	defer func() {
 		logger.Logger.Debugf("【GetAllOfflineMsg <==】%s, size: %v", clientId, len(t))
 	}()
@@ -315,7 +315,7 @@ func (s *SessionRepo) GetAllOfflineMsg(ctx context.Context, clientId string) (t 
 	if err != nil || len(data) == 0 {
 		return nil, nil, err
 	}
-	ret := make([]messagev5.Message, len(data))
+	ret := make([]messagev52.Message, len(data))
 	msgId := make([]string, len(data))
 	for i := 0; i < len(data); i++ {
 		ret[i] = poToVoOffline(data[i])
@@ -339,7 +339,7 @@ func (s *SessionRepo) ClearOfflineMsgById(ctx context.Context, clientId string, 
 	return s.c.Delete(ctx, "si_offline", f, &po.Offline{})
 }
 
-func voToPoSession(clientId string, session sessionsv5.Session) po.Session {
+func voToPoSession(clientId string, session sessions.Session) po.Session {
 	up := session.UserProperty()
 	var ups string
 	if up != nil && len(up) >= 0 {
@@ -364,7 +364,7 @@ func voToPoSession(clientId string, session sessionsv5.Session) po.Session {
 		OfflineTime:        session.OfflineTime(),
 	}
 }
-func voToPoSub(clientId string, sub *messagev5.SubscribeMessage) ([]string, []interface{}) {
+func voToPoSub(clientId string, sub *messagev52.SubscribeMessage) ([]string, []interface{}) {
 	ret := make([]interface{}, 0)
 	qos := sub.Qos()
 	top := sub.Topics()
@@ -384,7 +384,7 @@ func voToPoSub(clientId string, sub *messagev5.SubscribeMessage) ([]string, []in
 	}
 	return sc, ret
 }
-func poToVoSession(session po.Session) sessionsv5.Session {
+func poToVoSession(session po.Session) sessions.Session {
 	sessionRet := impl.NewMemSession(session.ClientId)
 	sessionRet.SetClientId(session.ClientId)
 	sessionRet.SetStatus(session.Status)
@@ -409,8 +409,8 @@ func poToVoSession(session po.Session) sessionsv5.Session {
 }
 
 // 这里可以批量转为一条sub消息
-func poToVoSub(subscription po.Subscription) *messagev5.SubscribeMessage {
-	sub := messagev5.NewSubscribeMessage()
+func poToVoSub(subscription po.Subscription) *messagev52.SubscribeMessage {
+	sub := messagev52.NewSubscribeMessage()
 	_ = sub.AddTopicAll([]byte(subscription.Topic), subscription.Qos, subscription.NoLocal, subscription.RetainAsPublish, subscription.RetainHandling)
 	return sub
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
-	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"github.com/apache/dubbo-getty"
 	"github.com/panjf2000/ants/v2"
 	"io"
@@ -42,11 +42,11 @@ var (
 )
 
 func init() {
-	ps := messagev5.NewPingrespMessage()
+	ps := messagev52.NewPingrespMessage()
 	pingresp, _ = wrapperPub(ps)
 
-	ackM := messagev5.NewConnackMessage()
-	ackM.SetReasonCode(messagev5.Success)
+	ackM := messagev52.NewConnackMessage()
+	ackM.SetReasonCode(messagev52.Success)
 	ack, _ = wrapperPub(ackM)
 
 }

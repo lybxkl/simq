@@ -1,13 +1,13 @@
 package po
 
 import (
-	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 )
 
 // Session 会话
 type Session struct {
-	ClientId string            `gorm:"column:client_id;primary_key"`
-	Status   sessionsv5.Status `gorm:"column:status"`
+	ClientId string          `gorm:"column:client_id;primary_key"`
+	Status   sessions.Status `gorm:"column:status"`
 
 	ExpiryInterval     uint32 `gorm:"column:expiry_interval"`      // session 过期时间
 	ReceiveMaximum     uint16 `gorm:"column:receive_maximum"`      // 接收最大值

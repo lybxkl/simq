@@ -7,7 +7,7 @@ import (
 )
 
 type Closer interface {
-	Close()
+	Close() error
 }
 
 func WaitCloseSignals(closer Closer) {

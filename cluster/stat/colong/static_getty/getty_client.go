@@ -4,7 +4,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/util"
-	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	msg "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	getty "github.com/apache/dubbo-getty"
 	"sync"
 )
@@ -119,23 +119,23 @@ func (s *staticGettySender) removeSession(name string) {
 }
 
 // wrapperShare 发送共享主题消息
-func wrapperShare(msg messagev5.Message, shareName string) ([]byte, error) {
+func wrapperShare(msg msg.Message, shareName string) ([]byte, error) {
 	cmsg := NewWrapCMsgImpl(PubShareCMsg)
 	cmsg.SetShare(shareName, msg)
 	return EncodeCMsg(cmsg)
 }
 
 // wrapperPub 发送普通消息
-func wrapperPub(msg messagev5.Message) ([]byte, error) {
+func wrapperPub(msg msg.Message) ([]byte, error) {
 	cmsg := NewWrapCMsgImpl(PubCMsg)
 	cmsg.SetMsg(msg)
 	return EncodeCMsg(cmsg)
 }
 
 // SendOneNode 单个发送，共享订阅
-func (s *staticGettySender) SendOneNode(msg messagev5.Message, shareName, targetNode string,
-	oneNodeSendSucFunc func(name string, message messagev5.Message),
-	oneNodeSendFailFunc func(name string, message messagev5.Message)) {
+func (s *staticGettySender) SendOneNode(msg msg.Message, shareName, targetNode string,
+	oneNodeSendSucFunc func(name string, message msg.Message),
+	oneNodeSendFailFunc func(name string, message msg.Message)) {
 	var (
 		b   []byte
 		err error
@@ -187,9 +187,9 @@ func (s *staticGettySender) SendOneNode(msg messagev5.Message, shareName, target
 }
 
 // SendAllNode 发送所有的
-func (s *staticGettySender) SendAllNode(msg messagev5.Message, allSuccess func(message messagev5.Message),
-	oneNodeSendSucFunc func(name string, message messagev5.Message),
-	oneNodeSendFailFunc func(name string, message messagev5.Message)) {
+func (s *staticGettySender) SendAllNode(msg msg.Message, allSuccess func(message msg.Message),
+	oneNodeSendSucFunc func(name string, message msg.Message),
+	oneNodeSendFailFunc func(name string, message msg.Message)) {
 	var (
 		b      []byte
 		err    error

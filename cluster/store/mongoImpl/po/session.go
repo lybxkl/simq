@@ -1,13 +1,13 @@
 package po
 
 import (
-	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 )
 
 // Session 会话
 type Session struct {
-	ClientId string            `bson:"_id"`
-	Status   sessionsv5.Status `bson:"status"`
+	ClientId string          `bson:"_id"`
+	Status   sessions.Status `bson:"status"`
 
 	ExpiryInterval     uint32   `bson:"expiry_interval"`      // session 过期时间
 	ReceiveMaximum     uint16   `bson:"receive_maximum"`      // 接收最大值

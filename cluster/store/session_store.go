@@ -2,36 +2,36 @@ package store
 
 import (
 	"context"
-	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
-	"gitee.com/Ljolan/si-mqtt/corev5/sessionsv5"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 )
 
 type SessionStore interface {
 	BaseStore
 
-	GetSession(ctx context.Context, clientId string) (sessionsv5.Session, error)
-	StoreSession(ctx context.Context, clientId string, session sessionsv5.Session) error
+	GetSession(ctx context.Context, clientId string) (sessions.Session, error)
+	StoreSession(ctx context.Context, clientId string, session sessions.Session) error
 	ClearSession(ctx context.Context, clientId string, clearOfflineMsg bool) error
-	StoreSubscription(ctx context.Context, clientId string, subscription *messagev5.SubscribeMessage) error
+	StoreSubscription(ctx context.Context, clientId string, subscription *message.SubscribeMessage) error
 	DelSubscription(ctx context.Context, client, topic string) error
 	ClearSubscriptions(ctx context.Context, clientId string) error
-	GetSubscriptions(ctx context.Context, clientId string) ([]*messagev5.SubscribeMessage, error)
+	GetSubscriptions(ctx context.Context, clientId string) ([]*message.SubscribeMessage, error)
 	/**
 	 * 缓存qos2 publish报文消息-入栈消息
 	 * @return true:缓存成功   false:缓存失败
 	 */
-	CacheInflowMsg(ctx context.Context, clientId string, message messagev5.Message) error
-	ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error)
+	CacheInflowMsg(ctx context.Context, clientId string, msg message.Message) error
+	ReleaseInflowMsg(ctx context.Context, clientId string, pkId uint16) (message.Message, error)
 	ReleaseInflowMsgs(ctx context.Context, clientId string, pkId []uint16) error
 	ReleaseAllInflowMsg(ctx context.Context, clientId string) error
-	GetAllInflowMsg(ctx context.Context, clientId string) ([]messagev5.Message, error)
+	GetAllInflowMsg(ctx context.Context, clientId string) ([]message.Message, error)
 
 	/**
 	 * 缓存出栈消息-分发给客户端的qos1,qos2消息
 	 */
-	CacheOutflowMsg(ctx context.Context, client string, message messagev5.Message) error
-	GetAllOutflowMsg(ctx context.Context, clientId string) ([]messagev5.Message, error)
-	ReleaseOutflowMsg(ctx context.Context, clientId string, pkId uint16) (messagev5.Message, error)
+	CacheOutflowMsg(ctx context.Context, client string, msg message.Message) error
+	GetAllOutflowMsg(ctx context.Context, clientId string) ([]message.Message, error)
+	ReleaseOutflowMsg(ctx context.Context, clientId string, pkId uint16) (message.Message, error)
 	ReleaseOutflowMsgs(ctx context.Context, clientId string, pkId []uint16) error
 	ReleaseAllOutflowMsg(ctx context.Context, clientId string) error
 	/**
@@ -44,8 +44,8 @@ type SessionStore interface {
 	ReleaseAllOutflowSecMsg(ctx context.Context, clientId string) error
 
 	// 采用离线消息方便做离线消息的限制最大数量
-	StoreOfflineMsg(ctx context.Context, clientId string, message messagev5.Message) error
-	GetAllOfflineMsg(ctx context.Context, clientId string) ([]messagev5.Message, []string, error)
+	StoreOfflineMsg(ctx context.Context, clientId string, msg message.Message) error
+	GetAllOfflineMsg(ctx context.Context, clientId string) ([]message.Message, []string, error)
 	ClearOfflineMsgs(ctx context.Context, clientId string) error
 	ClearOfflineMsgById(ctx context.Context, clientId string, msgIds []string) error
 }

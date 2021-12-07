@@ -9,7 +9,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster/store/mysqlImpl/orm/mysql"
 	"gitee.com/Ljolan/si-mqtt/cluster/store/mysqlImpl/po"
 	"gitee.com/Ljolan/si-mqtt/config"
-	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/utils"
 	"strings"
 )
@@ -41,7 +41,7 @@ func (m *MessageRepo) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (m *MessageRepo) StoreWillMessage(ctx context.Context, clientId string, message *messagev5.PublishMessage) error {
+func (m *MessageRepo) StoreWillMessage(ctx context.Context, clientId string, message *messagev52.PublishMessage) error {
 	return m.c.Save(ctx, "si_will", "client_id", "", voToPoWill(clientId, message))
 }
 
@@ -49,7 +49,7 @@ func (m *MessageRepo) ClearWillMessage(ctx context.Context, clientId string) err
 	return m.c.Delete(ctx, "si_will", wrapperOne("client_id", clientId), &po.Will{})
 }
 
-func (m *MessageRepo) GetWillMessage(ctx context.Context, clientId string) (*messagev5.PublishMessage, error) {
+func (m *MessageRepo) GetWillMessage(ctx context.Context, clientId string) (*messagev52.PublishMessage, error) {
 	ret := make([]po.Will, 0)
 	err := m.c.Get(ctx, "si_will", wrapperOne("client_id", clientId), &ret)
 	if err != nil || len(ret) == 0 {
@@ -58,7 +58,7 @@ func (m *MessageRepo) GetWillMessage(ctx context.Context, clientId string) (*mes
 	return poToVoWill(ret[0]), nil
 }
 
-func (m *MessageRepo) StoreRetainMessage(ctx context.Context, topic string, message *messagev5.PublishMessage) error {
+func (m *MessageRepo) StoreRetainMessage(ctx context.Context, topic string, message *messagev52.PublishMessage) error {
 	rt := voToPoRetain(topic, message)
 	return m.c.Save(ctx, "si_retain", "client_id", "", rt)
 }
@@ -67,7 +67,7 @@ func (m *MessageRepo) ClearRetainMessage(ctx context.Context, topic string) erro
 	return m.c.Delete(ctx, "si_retain", wrapperOne("topic", topic), &po.Retain{})
 }
 
-func (m *MessageRepo) GetRetainMessage(ctx context.Context, topic string) (*messagev5.PublishMessage, error) {
+func (m *MessageRepo) GetRetainMessage(ctx context.Context, topic string) (*messagev52.PublishMessage, error) {
 	ret := make([]po.Retain, 0)
 	err := m.c.Get(ctx, "si_retain", wrapperOne("topic", topic), &ret)
 	if err != nil || len(ret) == 0 {
@@ -76,19 +76,19 @@ func (m *MessageRepo) GetRetainMessage(ctx context.Context, topic string) (*mess
 	return poToVoRetain(ret[0]), nil
 }
 
-func (m *MessageRepo) GetAllRetainMsg(ctx context.Context) ([]*messagev5.PublishMessage, error) {
+func (m *MessageRepo) GetAllRetainMsg(ctx context.Context) ([]*messagev52.PublishMessage, error) {
 	data := make([]po.Retain, 0)
 	err := m.c.Get(ctx, "si_retain", "", &data)
 	if err != nil || len(data) == 0 {
 		return nil, err
 	}
-	ret := make([]*messagev5.PublishMessage, len(data))
+	ret := make([]*messagev52.PublishMessage, len(data))
 	for i := 0; i < len(ret); i++ {
 		ret[i] = poToVoRetain(data[i])
 	}
 	return ret, nil
 }
-func voToPo(id string, message *messagev5.PublishMessage) po.Message {
+func voToPo(id string, message *messagev52.PublishMessage) po.Message {
 	up := message.UserProperty()
 	var ups string
 	if up != nil && len(up) >= 0 {
@@ -117,7 +117,7 @@ func voToPo(id string, message *messagev5.PublishMessage) po.Message {
 		ContentType:     string(message.ContentType()),
 	}
 }
-func voToPoWill(id string, message *messagev5.PublishMessage) po.Will {
+func voToPoWill(id string, message *messagev52.PublishMessage) po.Will {
 	m := voToPo(id, message)
 	return po.Will{
 		ClientId:        m.ClientId,
@@ -135,7 +135,7 @@ func voToPoWill(id string, message *messagev5.PublishMessage) po.Will {
 		ContentType:     m.ContentType,
 	}
 }
-func voToPoRetain(id string, message *messagev5.PublishMessage) po.Retain {
+func voToPoRetain(id string, message *messagev52.PublishMessage) po.Retain {
 	m := voToPo(id, message)
 	return po.Retain{
 		Mtypeflags:      m.Mtypeflags,
@@ -152,16 +152,16 @@ func voToPoRetain(id string, message *messagev5.PublishMessage) po.Retain {
 		ContentType:     m.ContentType,
 	}
 }
-func voToPoInflow(id string, message *messagev5.PublishMessage) po.Inflow {
+func voToPoInflow(id string, message *messagev52.PublishMessage) po.Inflow {
 	return po.Inflow(voToPo(id, message))
 }
-func voToPoOutflow(id string, message *messagev5.PublishMessage) po.Outflow {
+func voToPoOutflow(id string, message *messagev52.PublishMessage) po.Outflow {
 	return po.Outflow(voToPo(id, message))
 }
-func voToPoOffline(id string, message *messagev5.PublishMessage) po.Offline {
+func voToPoOffline(id string, message *messagev52.PublishMessage) po.Offline {
 	return po.Offline(voToPo(id, message))
 }
-func poToVoWill(message po.Will) *messagev5.PublishMessage {
+func poToVoWill(message po.Will) *messagev52.PublishMessage {
 	return poToVo(po.Message{
 		ClientId:        message.ClientId,
 		Mtypeflags:      message.Mtypeflags,
@@ -178,7 +178,7 @@ func poToVoWill(message po.Will) *messagev5.PublishMessage {
 		ContentType:     message.ContentType,
 	})
 }
-func poToVoRetain(message po.Retain) *messagev5.PublishMessage {
+func poToVoRetain(message po.Retain) *messagev52.PublishMessage {
 	return poToVo(po.Message{
 		Mtypeflags:      message.Mtypeflags,
 		Topic:           message.Topic,
@@ -194,17 +194,17 @@ func poToVoRetain(message po.Retain) *messagev5.PublishMessage {
 		ContentType:     message.ContentType,
 	})
 }
-func poToVoInflow(message po.Inflow) *messagev5.PublishMessage {
+func poToVoInflow(message po.Inflow) *messagev52.PublishMessage {
 	return poToVo(po.Message(message))
 }
-func poToVoOutflow(message po.Outflow) *messagev5.PublishMessage {
+func poToVoOutflow(message po.Outflow) *messagev52.PublishMessage {
 	return poToVo(po.Message(message))
 }
-func poToVoOffline(message po.Offline) *messagev5.PublishMessage {
+func poToVoOffline(message po.Offline) *messagev52.PublishMessage {
 	return poToVo(po.Message(message))
 }
-func poToVo(message po.Message) *messagev5.PublishMessage {
-	pub := messagev5.NewPublishMessage()
+func poToVo(message po.Message) *messagev52.PublishMessage {
+	pub := messagev52.NewPublishMessage()
 	pub.SetMtypeFlags(message.Mtypeflags)
 	_ = pub.SetTopic([]byte(message.Topic))
 	_ = pub.SetQoS(message.Qos)

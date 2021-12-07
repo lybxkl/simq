@@ -22,11 +22,11 @@ serverVersion = "5.0.1"
     # 根证书
     ca = "certs/root.crt"
 
-    closeShareSub = true # 关闭共享订阅
+    closeShareSub = false # 关闭共享订阅
 
 [cluster]
     # 是否开启集群模式
-    enabled = true
+    enabled = false
     model = "mysql" # getty 集群启动方式，目前支持mongo、mysql和getty
     taskClusterPoolSize=1000 # 节点处理其它节点发来的消息的协程池大小
     taskServicePoolSize=1000 # 服务向其它节点发送的协程池大小
@@ -94,7 +94,7 @@ serverVersion = "5.0.1"
         redirectIsForEver = true # 临时还是永久
         redirectOpen = false # 开关
 [store]
-    model = "mysql"
+    model = ""
     [store.mongo]
         source = "mongodb://127.0.0.1:27017"
         minPool = 50

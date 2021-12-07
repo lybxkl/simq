@@ -3,7 +3,7 @@ package mysql
 import (
 	"encoding/hex"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong/auto_compress_sub"
-	"gitee.com/Ljolan/si-mqtt/corev5/messagev5"
+	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
 	"gorm.io/driver/mysql"
@@ -103,16 +103,16 @@ func getMaxPubId(db *gorm.DB) int64 {
 	}
 	return maxPubId
 }
-func (this *mysqlOrm) SaveSub(message *messagev5.SubscribeMessage) error {
+func (this *mysqlOrm) SaveSub(message *messagev52.SubscribeMessage) error {
 	return this.db.Save(voToPoSub(this.curName, message)).Error
 }
-func (this *mysqlOrm) SaveUnSub(message *messagev5.UnsubscribeMessage) error {
+func (this *mysqlOrm) SaveUnSub(message *messagev52.UnsubscribeMessage) error {
 	return this.db.Save(voToPoUnSub(this.curName, message)).Error
 }
-func (this *mysqlOrm) SaveSharePub(target, shareName string, message *messagev5.PublishMessage) error {
+func (this *mysqlOrm) SaveSharePub(target, shareName string, message *messagev52.PublishMessage) error {
 	return this.db.Save(voToPo(this.curName, target, shareName, message)).Error
 }
-func (this *mysqlOrm) SavePub(message *messagev5.PublishMessage) error {
+func (this *mysqlOrm) SavePub(message *messagev52.PublishMessage) error {
 	return this.db.Save(voToPo(this.curName, "", "", message)).Error
 }
 func (this *mysqlOrm) GetPubBatch(size int64) ([]Message, error) {
@@ -162,7 +162,7 @@ func (this *mysqlOrm) GetSubBatch(size int64, needSelf bool) ([]autocompress.Sub
 	}
 	return data, nil
 }
-func voToPoSub(sender string, message *messagev5.SubscribeMessage) *autocompress.Sub {
+func voToPoSub(sender string, message *messagev52.SubscribeMessage) *autocompress.Sub {
 	tps := message.Topics()
 	return toSub(sender, 1, tps)
 }
@@ -210,7 +210,7 @@ type Message struct {
 func (s Message) TableName() string {
 	return "pub"
 }
-func voToPo(sender, target, shareName string, message *messagev5.PublishMessage) *Message {
+func voToPo(sender, target, shareName string, message *messagev52.PublishMessage) *Message {
 	up := message.UserProperty()
 	var ups string
 	if up != nil && len(up) >= 0 {
@@ -241,8 +241,8 @@ func voToPo(sender, target, shareName string, message *messagev5.PublishMessage)
 		ContentType:     string(message.ContentType()),
 	}
 }
-func poToVo(message *Message) *messagev5.PublishMessage {
-	pub := messagev5.NewPublishMessage()
+func poToVo(message *Message) *messagev52.PublishMessage {
+	pub := messagev52.NewPublishMessage()
 	pub.SetMtypeFlags(message.Mtypeflags)
 	_ = pub.SetTopic([]byte(message.Topic))
 	_ = pub.SetQoS(message.Qos)
@@ -272,7 +272,7 @@ func poToVo(message *Message) *messagev5.PublishMessage {
 	pub.SetContentType([]byte(message.ContentType))
 	return pub
 }
-func voToPoUnSub(sender string, message *messagev5.UnsubscribeMessage) *autocompress.Sub {
+func voToPoUnSub(sender string, message *messagev52.UnsubscribeMessage) *autocompress.Sub {
 	tps := message.Topics()
 	return toSub(sender, 2, tps)
 }
