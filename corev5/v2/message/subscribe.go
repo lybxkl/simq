@@ -54,6 +54,25 @@ type SubscribeMessage struct {
 	// 订阅选项的第6和7比特为将来所保留。服务端必须把此保留位非0的SUBSCRIBE报文当做无效报文
 }
 
+// Clone 简单克隆部分数据
+func (this *SubscribeMessage) Clone() []*SubscribeMessage {
+	ret := make([]*SubscribeMessage, 0, len(this.topics))
+	for i := 0; i < len(this.topics); i++ {
+		sub := NewSubscribeMessage()
+		sub.userProperty = this.userProperty
+		sub.subscriptionIdentifier = this.subscriptionIdentifier
+
+		sub.topics = [][]byte{this.topics[0]}
+		sub.qos = []byte{this.qos[0]}
+		sub.retainHandling = []byte{this.retainHandling[0]}
+		sub.retainAsPub = []byte{this.retainAsPub[0]}
+		sub.noLocal = []byte{this.noLocal[0]}
+
+		ret = append(ret, sub)
+	}
+	return ret
+}
+
 func (this *SubscribeMessage) PropertiesLen() uint32 {
 	return this.propertiesLen
 }
