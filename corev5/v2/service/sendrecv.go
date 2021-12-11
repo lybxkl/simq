@@ -44,25 +44,25 @@ func (r timeoutReader) Read(b []byte) (int, error) {
 }
 
 // receiver() reads data from the network, and writes the data into the incoming buffer
-func (this *service) receiver() {
+func (svc *service) receiver() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			logger.Logger.Errorf("(%s) Recovering from panic: %v", svc.cid(), r)
 		}
 
-		this.wgStopped.Done()
-		if this.sign.TooManyMessages() {
-			logger.Logger.Debugf("TooManyMessages stop in buf, client : %v", this.cid())
+		svc.wgStopped.Done()
+		if svc.sign.TooManyMessages() {
+			logger.Logger.Debugf("TooManyMessages stop in buf, client : %v", svc.cid())
 		}
-		logger.Logger.Debugf("(%s) Stopping receiver", this.cid())
+		logger.Logger.Debugf("(%s) Stopping receiver", svc.cid())
 	}()
 
-	logger.Logger.Debugf("(%s) Starting receiver", this.cid())
+	logger.Logger.Debugf("(%s) Starting receiver", svc.cid())
 
-	this.wgStarted.Done()
+	svc.wgStarted.Done()
 
-	switch conn := this.conn.(type) {
+	switch conn := svc.conn.(type) {
 	// 普通tcp连接
 	case net.Conn:
 		// 如果保持连接的值非零，并且服务端在1.5倍的保持连接时间内没有收到客户端的控制报文，
@@ -70,92 +70,92 @@ func (this *service) receiver() {
 		// 保持连接的实际值是由应用指定的，一般是几分钟。允许的最大值是18小时12分15秒(两个字节)
 		// 保持连接（Keep Alive）值为零的结果是关闭保持连接（Keep Alive）机制。
 		// 如果保持连接（Keep Alive）612 值为零，客户端不必按照任何特定的时间发送MQTT控制报文。
-		keepAlive := time.Second * time.Duration(this.keepAlive)
+		keepAlive := time.Second * time.Duration(svc.keepAlive)
 		r := timeoutReader{
 			d:    keepAlive + (keepAlive / 2),
 			conn: conn,
 		}
 
 		for {
-			_, err := this.in.ReadFrom(r)
+			_, err := svc.in.ReadFrom(r)
 
 			// 检查done是否关闭，如果关闭，退出
 
 			if err != nil {
 				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
 					// TODO 更新session状态
-					logger.Logger.Warnf("<<(%s)>> 读超时关闭：%v", this.cid(), er)
+					logger.Logger.Warnf("<<(%s)>> 读超时关闭：%v", svc.cid(), er)
 					return
 				}
-				if this.isDone() && (strings.Contains(err.Error(), "use of closed network connection") || this.in.Len() == 0) {
+				if svc.isDone() && (strings.Contains(err.Error(), "use of closed network connection") || svc.in.Len() == 0) {
 					return
 				}
 				if err != io.EOF {
 					//连接异常或者断线啥的
 					// TODO 更新session状态
-					logger.Logger.Errorf("<<(%s)>> 连接异常关闭：%v", this.cid(), err.Error())
+					logger.Logger.Errorf("<<(%s)>> 连接异常关闭：%v", svc.cid(), err.Error())
 				}
 				return
 			}
 		}
 	//添加websocket，启动cl里有对websocket转tcp，这里就不用处理
 	//case *websocket.Conn:
-	//	glog.Errorf("(%s) Websocket: %v", this.cid(), ErrInvalidConnectionType)
+	//	glog.Errorf("(%s) Websocket: %v", svc.cid(), ErrInvalidConnectionType)
 
 	default:
-		logger.Logger.Errorf("未知异常 (%s) %v", this.cid(), ErrInvalidConnectionType)
+		logger.Logger.Errorf("未知异常 (%s) %v", svc.cid(), ErrInvalidConnectionType)
 	}
 }
 
 // sender() writes data from the outgoing buffer to the network
-func (this *service) sender() {
+func (svc *service) sender() {
 	defer func() {
 		// Let's recover from panic
 		if r := recover(); r != nil {
-			logger.Logger.Errorf("(%s) Recovering from panic: %v", this.cid(), r)
+			logger.Logger.Errorf("(%s) Recovering from panic: %v", svc.cid(), r)
 		}
 
-		this.wgStopped.Done()
-		if this.sign.TooManyMessages() && this.out.Len() == 0 {
-			logger.Logger.Debugf("BeyondQuota or TooManyMessages stop out buf, client : %v", this.cid())
+		svc.wgStopped.Done()
+		if svc.sign.TooManyMessages() && svc.out.Len() == 0 {
+			logger.Logger.Debugf("BeyondQuota or TooManyMessages stop out buf, client : %v", svc.cid())
 		}
-		logger.Logger.Debugf("(%s) Stopping sender", this.cid())
+		logger.Logger.Debugf("(%s) Stopping sender", svc.cid())
 	}()
 
-	logger.Logger.Debugf("(%s) Starting sender", this.cid())
+	logger.Logger.Debugf("(%s) Starting sender", svc.cid())
 
-	this.wgStarted.Done()
-	switch conn := this.conn.(type) {
+	svc.wgStarted.Done()
+	switch conn := svc.conn.(type) {
 	case net.Conn:
-		writeTimeout := time.Second * time.Duration(this.writeTimeout)
+		writeTimeout := time.Second * time.Duration(svc.writeTimeout)
 		r := timeoutWriter{
 			d:    writeTimeout + (writeTimeout / 2),
 			conn: conn,
 		}
 		for {
-			_, err := this.out.WriteTo(r)
+			_, err := svc.out.WriteTo(r)
 			if err != nil {
 				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
-					logger.Logger.Warnf("<<(%s)>> 写超时关闭：%v", this.cid(), er)
+					logger.Logger.Warnf("<<(%s)>> 写超时关闭：%v", svc.cid(), er)
 					return
 				}
-				if this.isDone() && (strings.Contains(err.Error(), "use of closed network connection")) {
+				if svc.isDone() && (strings.Contains(err.Error(), "use of closed network connection")) {
 					// TODO 怎么处理这些未发送的
 					//
 					return
 				}
 				if err != io.EOF {
-					logger.Logger.Errorf("(%s) error writing data: %v", this.cid(), err)
+					logger.Logger.Errorf("(%s) error writing data: %v", svc.cid(), err)
 				}
 				return
 			}
 		}
 
 	//case *websocket.Conn:
-	//	glog.Errorf("(%s) Websocket not supported", this.cid())
+	//	glog.Errorf("(%s) Websocket not supported", svc.cid())
 
 	default:
-		logger.Logger.Infof("(%s) Invalid connection type", this.cid())
+		logger.Logger.Infof("(%s) Invalid connection type", svc.cid())
 	}
 }
 
@@ -163,14 +163,14 @@ func (this *service) sender() {
 // the next messagev5 and returns the type and size.
 // peekMessageSize()读取，但不提交，足够的字节来确定大小
 //下一条消息，并返回类型和大小。
-func (this *service) peekMessageSize() (messagev52.MessageType, int, error) {
+func (svc *service) peekMessageSize() (messagev52.MessageType, int, error) {
 	var (
 		b   []byte
 		err error
 		cnt int = 2
 	)
 
-	if this.in == nil {
+	if svc.in == nil {
 		err = ErrBufferNotReady
 		return 0, 0, err
 	}
@@ -187,7 +187,7 @@ func (this *service) peekMessageSize() (messagev52.MessageType, int, error) {
 
 		// Peek cnt bytes from the input buffer.
 		//从输入缓冲区中读取cnt字节。
-		b, err = this.in.ReadWait(cnt)
+		b, err = svc.in.ReadWait(cnt)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -226,7 +226,7 @@ func (this *service) peekMessageSize() (messagev52.MessageType, int, error) {
 // This means the buffer still thinks the bytes are not read yet.
 // peekMessage()从缓冲区读取消息，但是没有提交字节。
 //这意味着缓冲区仍然认为字节还没有被读取。
-func (this *service) peekMessage(mtype messagev52.MessageType, total int) (messagev52.Message, int, error) {
+func (svc *service) peekMessage(mtype messagev52.MessageType, total int) (messagev52.Message, int, error) {
 	var (
 		b    []byte
 		err  error
@@ -234,7 +234,7 @@ func (this *service) peekMessage(mtype messagev52.MessageType, total int) (messa
 		msg  messagev52.Message
 	)
 
-	if this.in == nil {
+	if svc.in == nil {
 		return nil, 0, ErrBufferNotReady
 	}
 
@@ -243,7 +243,7 @@ func (this *service) peekMessage(mtype messagev52.MessageType, total int) (messa
 	for i = 0; ; i++ {
 		// Peek remlen bytes from the input buffer.
 		//从输入缓冲区Peekremlen字节数。
-		b, err = this.in.ReadWait(total)
+		b, err = svc.in.ReadWait(total)
 		if err != nil && err != ErrBufferInsufficientData {
 			return nil, 0, err
 		}
@@ -266,7 +266,7 @@ func (this *service) peekMessage(mtype messagev52.MessageType, total int) (messa
 
 // readMessage() reads and copies a messagev5 from the buffer. The buffer bytes are
 // committed as a result of the read.
-func (this *service) readMessage(mtype messagev52.MessageType, total int) (messagev52.Message, int, error) {
+func (svc *service) readMessage(mtype messagev52.MessageType, total int) (messagev52.Message, int, error) {
 	var (
 		b   []byte
 		err error
@@ -274,19 +274,19 @@ func (this *service) readMessage(mtype messagev52.MessageType, total int) (messa
 		msg messagev52.Message
 	)
 
-	if this.in == nil {
+	if svc.in == nil {
 		err = ErrBufferNotReady
 		return nil, 0, err
 	}
 
-	if len(this.intmp) < total {
-		this.intmp = make([]byte, total)
+	if len(svc.intmp) < total {
+		svc.intmp = make([]byte, total)
 	}
 
 	// Read until we get total bytes
 	l := 0
 	for l < total {
-		n, err = this.in.Read(this.intmp[l:])
+		n, err = svc.in.Read(svc.intmp[l:])
 		l += n
 		logger.Logger.Debugf("read %d bytes, total %d", n, l)
 		if err != nil {
@@ -294,7 +294,7 @@ func (this *service) readMessage(mtype messagev52.MessageType, total int) (messa
 		}
 	}
 
-	b = this.intmp[:total]
+	b = svc.intmp[:total]
 
 	msg, err = mtype.New()
 	if err != nil {
@@ -307,7 +307,7 @@ func (this *service) readMessage(mtype messagev52.MessageType, total int) (messa
 
 // writeMessage() writes a messagev5 to the outgoing buffer
 //writeMessage()将消息写入传出缓冲区
-func (this *service) writeMessage(msg messagev52.Message) (int, error) {
+func (svc *service) writeMessage(msg messagev52.Message) (int, error) {
 	var (
 		l    int = msg.Len()
 		m, n int
@@ -316,20 +316,20 @@ func (this *service) writeMessage(msg messagev52.Message) (int, error) {
 		wrap bool
 	)
 
-	if this.out == nil {
+	if svc.out == nil {
 		return 0, ErrBufferNotReady
 	}
 
 	// This is to serialize writes to the underlying buffer. Multiple goroutines could
 	// potentially get here because of calling Publish() or Subscribe() or other
 	// functions that will send messages. For example, if a messagev5 is received in
-	// another connetion, and the messagev5 needs to be published to this client, then
+	// another connetion, and the messagev5 needs to be published to svc client, then
 	// the Publish() function is called, and at the same time, another client could
 	// do exactly the same thing.
 	//
 	// Not an ideal fix though. If possible we should remove mutex and be lockfree.
 	// Mainly because when there's a large number of goroutines that want to publish
-	// to this client, then they will all block. However, this will do for now.
+	// to svc client, then they will all block. However, svc will do for now.
 	//
 	//这是串行写入到底层缓冲区。 多了goroutine可能
 	//可能是因为调用了Publish()或Subscribe()或其他方法而到达这里
@@ -344,25 +344,25 @@ func (this *service) writeMessage(msg messagev52.Message) (int, error) {
 	//对于这个客户端，它们将全部阻塞。
 	//但是，现在可以这样做。
 	// FIXME: Try to find a better way than a mutex...if possible.
-	this.wmu.Lock()
-	defer this.wmu.Unlock()
+	svc.wmu.Lock()
+	defer svc.wmu.Unlock()
 
-	buf, wrap, err = this.out.WriteWait(l)
+	buf, wrap, err = svc.out.WriteWait(l)
 	if err != nil {
 		return 0, err
 	}
 
 	if wrap {
-		if len(this.outtmp) < l {
-			this.outtmp = make([]byte, l)
+		if len(svc.outtmp) < l {
+			svc.outtmp = make([]byte, l)
 		}
 
-		n, err = msg.Encode(this.outtmp[0:])
+		n, err = msg.Encode(svc.outtmp[0:])
 		if err != nil {
 			return 0, err
 		}
 
-		m, err = this.out.Write(this.outtmp[0:n])
+		m, err = svc.out.Write(svc.outtmp[0:n])
 		if err != nil {
 			return m, err
 		}
@@ -372,13 +372,13 @@ func (this *service) writeMessage(msg messagev52.Message) (int, error) {
 			return 0, err
 		}
 
-		m, err = this.out.WriteCommit(n)
+		m, err = svc.out.WriteCommit(n)
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	this.outStat.increment(int64(m))
+	svc.outStat.increment(int64(m))
 
 	return m, nil
 }

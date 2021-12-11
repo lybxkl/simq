@@ -3,13 +3,14 @@ package message
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 )
 
 const (
 	maxLPString          uint16 = 65535
 	maxFixedHeaderLength int    = 5
-	maxRemainingLength   int32  = 268435455 // bytes, or 256 MB
+	maxRemainingLength   uint32 = 268435455 // bytes, or 256 MB
 )
 
 const (
@@ -84,6 +85,8 @@ type Message interface {
 	// the way. If there's any errors, then the byte slice and count should be
 	// considered invalid.
 	Encode([]byte) (int, error)
+
+	EncodeToBuf(dst *bytes.Buffer) (int, error)
 
 	// Decode reads the bytes in the byte slice from the argument. It returns the
 	// total number of bytes decoded, and whether there's any errors during the
@@ -400,4 +403,57 @@ func writeLPBytes(buf []byte, b []byte) (int, error) {
 	total += n
 
 	return total, nil
+}
+
+/**
+	下面都是大端模式
+**/
+
+func writeToBufLPBytes(buf *bytes.Buffer, b []byte) (int, error) {
+	if buf == nil {
+		return 0, errors.New("buf is nil")
+	}
+	total, n := 0, len(b)
+
+	if n > int(maxLPString) {
+		return 0, fmt.Errorf("utils/writeLPBytes: Length (%d) greater than %d bytes.", n, maxLPString)
+	}
+
+	buf.WriteByte(byte(n >> 8))
+	buf.WriteByte(byte(n))
+	total += 2
+
+	n, err := buf.Write(b)
+	total += n
+	return total, err
+}
+
+func BigEndianPutUint32(buf *bytes.Buffer, v uint32) error {
+	if buf == nil {
+		return errors.New("buf is nil")
+	}
+	buf.WriteByte(byte(v >> 24))
+	buf.WriteByte(byte(v >> 16))
+	buf.WriteByte(byte(v >> 8))
+	buf.WriteByte(byte(v))
+	return nil
+}
+func BigEndianPutUint16(buf *bytes.Buffer, v uint16) error {
+	if buf == nil {
+		return errors.New("buf is nil")
+	}
+	buf.WriteByte(byte(v >> 8))
+	buf.WriteByte(byte(v))
+	return nil
+}
+
+func BigEndianPutUvarint(buf *bytes.Buffer, x uint64) int {
+	i := 0
+	for x >= 0x80 {
+		buf.WriteByte(byte(x) | 0x80)
+		x >>= 7
+		i++
+	}
+	buf.WriteByte(byte(x))
+	return i + 1
 }

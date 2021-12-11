@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"fmt"
 )
 
@@ -108,11 +109,11 @@ func (this *AuthMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(ml); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return this.header.msglen() + int(ml)
 }
 
 func (this *AuthMessage) Decode(src []byte) (int, error) {
@@ -218,11 +219,12 @@ func (this *AuthMessage) Encode(dst []byte) (int, error) {
 	ml := this.msglen()
 	hl := this.header.msglen()
 
-	if len(dst) < hl+ml {
-		return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
+	ln := hl + int(ml)
+	if len(dst) < ln {
+		return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", ln, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(ml); err != nil {
 		return 0, err
 	}
 
@@ -282,6 +284,64 @@ func (this *AuthMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 
+func (this *AuthMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	if this.Type() != AUTH {
+		return 0, fmt.Errorf("auth/Encode: Invalid message type. Expecting %d, got %d", AUTH, this.Type())
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(ml); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	if this.reasonCode == Success && len(this.authMethod) == 0 && len(this.authData) == 0 && len(this.reasonStr) == 0 && len(this.userProperty) == 0 {
+		return dst.Len(), nil
+	} else {
+		dst.WriteByte(byte(this.reasonCode))
+	}
+	dst.Write(lbEncode(this.propertiesLen))
+
+	if len(this.authMethod) > 0 {
+		dst.WriteByte(AuthenticationMethod)
+		_, err = writeToBufLPBytes(dst, this.authMethod)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.authData) > 0 {
+		dst.WriteByte(AuthenticationData)
+		_, err = writeToBufLPBytes(dst, this.authData)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.reasonStr) > 0 {
+		dst.WriteByte(ReasonString)
+		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	for i := 0; i < len(this.userProperty); i++ {
+		dst.WriteByte(UserProperty)
+		_, err = writeToBufLPBytes(dst, this.userProperty[i])
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	return dst.Len(), nil
+}
+
 func (this *AuthMessage) build() {
 	// == 可变报头 ==
 	total := 1 // 认证原因码
@@ -313,10 +373,10 @@ func (this *AuthMessage) build() {
 		return
 	}
 	total += len(lbEncode(this.propertiesLen))
-	_ = this.SetRemainingLength(int32(total))
+	_ = this.SetRemainingLength(uint32(total))
 }
 
-func (this *AuthMessage) msglen() int {
+func (this *AuthMessage) msglen() uint32 {
 	this.build()
-	return int(this.remlen)
+	return this.remlen
 }

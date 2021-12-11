@@ -1,6 +1,9 @@
 package message
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 // The PINGREQ Packet is sent from a Client to the Server. It can be used to:
 // 1. Indicate to the Server that the Client is alive in the absence of any other
@@ -35,4 +38,12 @@ func (this *PingreqMessage) Encode(dst []byte) (int, error) {
 	}
 
 	return this.header.encode(dst)
+}
+
+func (this *PingreqMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	return this.header.encodeToBuf(dst)
 }

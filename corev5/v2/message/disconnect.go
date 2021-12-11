@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -131,7 +132,7 @@ func (this *DisconnectMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -183,6 +184,57 @@ func (this *DisconnectMessage) Encode(dst []byte) (int, error) {
 	}
 	return total, nil
 }
+
+func (this *DisconnectMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	ml := this.msglen()
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	if this.reasonCode == Success && this.remlen == 0 {
+		return dst.Len(), nil
+	}
+	dst.WriteByte(this.reasonCode.Value())
+
+	dst.Write(lbEncode(this.propertyLen))
+
+	if this.sessionExpiryInterval > 0 {
+		dst.WriteByte(SessionExpirationInterval)
+		_ = BigEndianPutUint32(dst, this.sessionExpiryInterval)
+	}
+	if len(this.reasonStr) > 0 {
+		dst.WriteByte(ReasonString)
+		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	for i := 0; i < len(this.userProperty); i++ {
+		dst.WriteByte(UserProperty)
+		_, err = writeToBufLPBytes(dst, this.userProperty[i])
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.serverReference) > 0 {
+		dst.WriteByte(ServerReference)
+		_, err = writeToBufLPBytes(dst, this.serverReference)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	return dst.Len(), nil
+}
+
 func (this *DisconnectMessage) build() {
 	total := 0
 	if this.sessionExpiryInterval > 0 {
@@ -209,7 +261,7 @@ func (this *DisconnectMessage) build() {
 		return
 	}
 	// 加 1 是断开原因码
-	_ = this.SetRemainingLength(int32(1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
+	_ = this.SetRemainingLength(uint32(1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
 }
 func (this *DisconnectMessage) msglen() int {
 	this.build()
@@ -222,7 +274,7 @@ func (this *DisconnectMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 

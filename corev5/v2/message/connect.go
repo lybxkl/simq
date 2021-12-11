@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"regexp"
@@ -257,9 +258,9 @@ func (this *ConnectMessage) build() {
 		willPropertiesLen += len(this.correlationData)
 	}
 	this.willPropertiesLen = uint32(willPropertiesLen)
-	rl := int32(remlen + propertiesLen + len(lbEncode(this.propertiesLen)))
+	rl := uint32(remlen + propertiesLen + len(lbEncode(this.propertiesLen)))
 	if this.WillFlag() {
-		rl += int32(willPropertiesLen + len(lbEncode(this.willPropertiesLen)))
+		rl += uint32(willPropertiesLen + len(lbEncode(this.willPropertiesLen)))
 	}
 	_ = this.SetRemainingLength(rl)
 }
@@ -698,7 +699,7 @@ func (this *ConnectMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
@@ -756,7 +757,7 @@ func (this *ConnectMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("connect/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -775,6 +776,35 @@ func (this *ConnectMessage) Encode(dst []byte) (int, error) {
 	}
 
 	return total, nil
+}
+
+func (this *ConnectMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	if this.Type() != CONNECT {
+		return 0, fmt.Errorf("connect/Encode: Invalid message type. Expecting %d, got %d", CONNECT, this.Type())
+	}
+
+	_, ok := SupportedVersions[this.version]
+	if !ok {
+		return 0, UnSupportedProtocolVersion
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	_, err = this.encodeMessageToBuf(dst)
+	return dst.Len(), err
 }
 
 func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
@@ -974,6 +1004,160 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 	}
 
 	return total, nil
+}
+
+func (this *ConnectMessage) encodeMessageToBuf(dst *bytes.Buffer) (int, error) {
+	/**
+		===可变报头===
+	**/
+	_, err := writeToBufLPBytes(dst, []byte(SupportedVersions[this.version])) // 写入协议长度和协议名称
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	dst.WriteByte(this.version) // 写入协议版本号
+
+	dst.WriteByte(this.connectFlags) // 写入连接标志
+
+	_ = BigEndianPutUint16(dst, this.keepAlive) // 写入保持连接
+
+	// 属性
+	dst.Write(lbEncode(this.propertiesLen)) // 属性长度
+
+	if this.sessionExpiryInterval > 0 {
+		dst.WriteByte(SessionExpirationInterval)
+		_ = BigEndianPutUint32(dst, this.sessionExpiryInterval) // 会话过期间隔
+	}
+
+	if this.receiveMaximum > 0 && this.receiveMaximum < 65535 {
+		dst.WriteByte(MaximumQuantityReceived)
+		_ = BigEndianPutUint16(dst, this.receiveMaximum) // 接收最大值
+	}
+
+	dst.WriteByte(MaximumMessageLength)
+	_ = BigEndianPutUint32(dst, this.maxPacketSize) // 最大报文长度
+
+	if this.topicAliasMax > 0 {
+		dst.WriteByte(MaximumLengthOfTopicAlias)
+		_ = BigEndianPutUint16(dst, this.topicAliasMax) // 主题别名最大值
+	}
+
+	// TODO if this.requestRespInfo == 0 ==>> 可发可不发
+	if this.requestRespInfo != 0 { // 默认0
+		dst.WriteByte(RequestResponseInformation)
+		dst.WriteByte(this.requestRespInfo) // 请求响应信息
+	}
+	if this.requestProblemInfo != 1 { // 默认1
+		dst.WriteByte(RequestProblemInformation)
+		dst.WriteByte(this.requestProblemInfo) // 请求问题信息
+	}
+
+	for _, v1 := range this.userProperty {
+		dst.WriteByte(UserProperty) // 用户属性
+		_, err = writeToBufLPBytes(dst, v1)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+
+	if len(this.authMethod) > 0 {
+		dst.WriteByte(AuthenticationMethod) // 认证方法
+		_, err = writeToBufLPBytes(dst, this.authMethod)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.authData) > 0 {
+		dst.WriteByte(AuthenticationData) // 认证数据
+		_, err = writeToBufLPBytes(dst, this.authData)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+
+	/**
+		===载荷===
+	**/
+	_, err = writeToBufLPBytes(dst, this.clientId) // 客户标识符
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	if this.WillFlag() {
+		// 遗嘱属性
+		dst.Write(lbEncode(this.willPropertiesLen)) // 遗嘱属性长度
+
+		if this.willDelayInterval > 0 {
+			dst.WriteByte(DelayWills)
+			_ = BigEndianPutUint32(dst, this.willDelayInterval) // 遗嘱延时间隔
+		}
+		if this.payloadFormatIndicator > 0 {
+			dst.WriteByte(LoadFormatDescription)
+			dst.WriteByte(this.payloadFormatIndicator) // 遗嘱载荷指示
+		}
+		if this.willMsgExpiryInterval > 0 {
+			dst.WriteByte(MessageExpirationTime)
+			_ = BigEndianPutUint32(dst, this.willMsgExpiryInterval) // 遗嘱消息过期间隔
+		}
+		if len(this.contentType) > 0 {
+			dst.WriteByte(ContentType)
+			_, err = writeToBufLPBytes(dst, this.contentType) // 遗嘱内容类型
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+		if len(this.responseTopic) > 0 {
+			dst.WriteByte(ResponseTopic)
+			_, err = writeToBufLPBytes(dst, this.responseTopic) // 遗嘱响应主题
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+		if len(this.correlationData) > 0 {
+			dst.WriteByte(RelatedData)
+			_, err = writeToBufLPBytes(dst, this.correlationData) // 对比数据
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+		for _, v1 := range this.willUserProperty {
+			dst.WriteByte(UserProperty)
+			_, err = writeToBufLPBytes(dst, v1) // 遗嘱用户属性
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+
+		_, err = writeToBufLPBytes(dst, this.willTopic) // 遗嘱主题
+		if err != nil {
+			return dst.Len(), err
+		}
+
+		_, err = writeToBufLPBytes(dst, this.willMessage) // 遗嘱载荷
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+
+	// According to the 3.1 spec, it's possible that the usernameFlag is set,
+	// but the username string is missing.
+	if this.UsernameFlag() && len(this.username) > 0 {
+		_, err = writeToBufLPBytes(dst, this.username) // 用户名
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+
+	// According to the 3.1 spec, it's possible that the passwordFlag is set,
+	// but the password string is missing.
+	if this.PasswordFlag() && len(this.password) > 0 {
+		_, err = writeToBufLPBytes(dst, this.password) // 密码
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+
+	return dst.Len(), nil
 }
 
 func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {

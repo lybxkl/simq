@@ -114,7 +114,7 @@ func (this *UnsubscribeMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
@@ -207,7 +207,7 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("unsubscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -250,6 +250,49 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
+
+func (this *UnsubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	if this.PacketId() == 0 {
+		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	}
+
+	dst.Write(this.packetId)
+
+	dst.Write(lbEncode(this.propertyLen))
+
+	for i := 0; i < len(this.userProperty); i++ {
+		dst.WriteByte(UserProperty)
+		_, err = writeToBufLPBytes(dst, this.userProperty[i])
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	for _, t := range this.topics {
+		_, err = writeToBufLPBytes(dst, t)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+
+	return dst.Len(), nil
+}
+
 func (this *UnsubscribeMessage) build() {
 	total := 0
 	for _, t := range this.userProperty {
@@ -262,7 +305,7 @@ func (this *UnsubscribeMessage) build() {
 		total += 2 + len(t)
 	}
 	total += len(lbEncode(this.propertyLen))
-	_ = this.SetRemainingLength(int32(total))
+	_ = this.SetRemainingLength(uint32(total))
 }
 func (this *UnsubscribeMessage) msglen() int {
 	this.build()

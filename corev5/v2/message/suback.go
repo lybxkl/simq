@@ -1,6 +1,9 @@
 package message
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 // SubackMessage A SUBACK Packet is sent by the Server to the Client to confirm receipt and processing
 // of a SUBSCRIBE Packet.
@@ -98,7 +101,7 @@ func (this *SubackMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
@@ -198,7 +201,7 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("suback/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -245,6 +248,59 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
+
+func (this *SubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	for i, code := range this.reasonCodes {
+		if !ValidSubAckReasonCode(ReasonCode(code)) {
+			return 0, fmt.Errorf("suback/Encode: Invalid return code %d for topic %d", code, i)
+		}
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	if len(this.packetId) != 2 {
+		dst.Write([]byte{0, 0})
+	} else {
+		dst.Write(this.packetId)
+	}
+
+	dst.Write(lbEncode(this.propertiesLen))
+
+	if len(this.reasonStr) > 0 { // todo && 太长，超过了客户端指定的最大报文长度，不发送
+		dst.WriteByte(ReasonString)
+		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.userProperty) > 0 {
+		for i := 0; i < len(this.userProperty); i++ {
+			dst.WriteByte(UserProperty)
+			_, err = writeToBufLPBytes(dst, this.userProperty[i])
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+	}
+
+	dst.Write(this.reasonCodes)
+
+	return dst.Len(), nil
+}
+
 func (this *SubackMessage) build() {
 	// packet ID
 	total := 2
@@ -262,7 +318,7 @@ func (this *SubackMessage) build() {
 	this.propertiesLen = uint32(total - 2)
 	total += len(lbEncode(this.propertiesLen))
 	total += len(this.reasonCodes)
-	_ = this.SetRemainingLength(int32(total))
+	_ = this.SetRemainingLength(uint32(total))
 }
 func (this *SubackMessage) msglen() int {
 	this.build()

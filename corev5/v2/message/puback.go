@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"fmt"
 )
 
@@ -78,7 +79,7 @@ func (this *PubackMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
@@ -152,6 +153,7 @@ func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 	this.dirty = false
 	return total, nil
 }
+
 func (this *PubackMessage) Encode(dst []byte) (int, error) {
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
@@ -167,7 +169,7 @@ func (this *PubackMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("pubxxx/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -217,6 +219,58 @@ func (this *PubackMessage) Encode(dst []byte) (int, error) {
 	}
 	return total, nil
 }
+
+func (this *PubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	// 可变报头
+	if len(this.packetId) == 2 {
+		dst.Write(this.packetId)
+	} else {
+		dst.Write([]byte{0, 0})
+	}
+
+	if this.header.remlen == 2 && this.reasonCode == Success {
+		return dst.Len(), nil
+	}
+	dst.WriteByte(this.reasonCode.Value())
+
+	if this.propertyLen > 0 {
+		dst.Write(lbEncode(this.propertyLen))
+	} else {
+		return dst.Len(), nil
+	}
+	// TODO 下面两个在PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此原因字符串
+	if len(this.reasonStr) > 0 {
+		dst.WriteByte(ReasonString)
+		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	for i := 0; i < len(this.userProperty); i++ {
+		dst.WriteByte(UserProperty)
+		_, err = writeToBufLPBytes(dst, this.userProperty[i])
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	return dst.Len(), nil
+}
+
 func (this *PubackMessage) build() {
 	total := 0
 	if len(this.reasonStr) > 0 {
@@ -233,14 +287,14 @@ func (this *PubackMessage) build() {
 	// 2 是报文标识符，2字节
 	// 1 是原因码
 	if this.propertyLen == 0 && this.reasonCode == Success {
-		_ = this.SetRemainingLength(int32(2))
+		_ = this.SetRemainingLength(uint32(2))
 		return
 	}
 	if this.propertyLen == 0 && this.reasonCode != Success {
-		_ = this.SetRemainingLength(int32(2 + 1))
+		_ = this.SetRemainingLength(uint32(2 + 1))
 		return
 	}
-	_ = this.SetRemainingLength(int32(2 + 1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
+	_ = this.SetRemainingLength(uint32(2 + 1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
 }
 func (this *PubackMessage) msglen() int {
 	this.build()

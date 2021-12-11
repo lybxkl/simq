@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"sync/atomic"
@@ -235,7 +236,7 @@ func (this *PublishMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
@@ -396,7 +397,7 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 	ml := this.msglen()
 	hl := this.header.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -502,6 +503,99 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
+
+func (this *PublishMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	if len(this.topic) == 0 && this.topicAlias == 0 {
+		return 0, fmt.Errorf("publish/Encode: Topic name is empty, and topic alice <= 0.")
+	}
+
+	if len(this.payload) == 0 {
+		return 0, fmt.Errorf("publish/Encode: Payload is empty.")
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	_, err = writeToBufLPBytes(dst, this.topic)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	// The packet identifier field is only present in the PUBLISH packets where the QoS level is 1 or 2
+	if this.QoS() != 0 {
+		if this.PacketId() == 0 {
+			this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+			//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+		}
+
+		dst.Write(this.packetId)
+	}
+	// === 属性 ===
+	dst.Write(lbEncode(this.propertiesLen))
+
+	if this.payloadFormatIndicator != 0 { // 载荷格式指示
+		dst.WriteByte(LoadFormatDescription)
+		dst.WriteByte(this.payloadFormatIndicator)
+	}
+	if this.messageExpiryInterval > 0 { // 消息过期间隔
+		dst.WriteByte(MessageExpirationTime)
+		_ = BigEndianPutUint32(dst, this.messageExpiryInterval)
+	}
+	if this.topicAlias > 0 { // 主题别名
+		dst.WriteByte(ThemeAlias)
+		_ = BigEndianPutUint16(dst, this.topicAlias)
+	}
+	if len(this.responseTopic) > 0 { // 响应主题
+		dst.WriteByte(ResponseTopic)
+		_, err = writeToBufLPBytes(dst, this.responseTopic)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.correlationData) > 0 { // 对比数据
+		dst.WriteByte(RelatedData)
+		_, err = writeToBufLPBytes(dst, this.correlationData)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.userProperty) > 0 { // 用户属性
+		for i := 0; i < len(this.userProperty); i++ {
+			dst.WriteByte(UserProperty)
+			_, err = writeToBufLPBytes(dst, this.userProperty[i])
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+	}
+	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier < 168435455 { // 订阅标识符
+		dst.WriteByte(DefiningIdentifiers)
+		dst.Write(lbEncode(this.subscriptionIdentifier))
+	}
+	if len(this.contentType) > 0 { // 内容类型
+		dst.WriteByte(ContentType)
+		_, err = writeToBufLPBytes(dst, this.contentType)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+
+	dst.Write(this.payload)
+	return dst.Len(), nil
+}
+
 func (this *PublishMessage) build() {
 	total := 0
 
@@ -551,7 +645,7 @@ func (this *PublishMessage) build() {
 	this.propertiesLen = propertiesLen
 	total += len(lbEncode(propertiesLen))
 	total += len(this.payload)
-	_ = this.SetRemainingLength(int32(total))
+	_ = this.SetRemainingLength(uint32(total))
 }
 func (this *PublishMessage) msglen() int {
 	this.build()

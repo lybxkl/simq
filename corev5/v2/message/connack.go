@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -159,7 +160,7 @@ func (this *ConnackMessage) build() {
 	}
 	this.propertiesLen = uint32(propertiesLen)
 	// 两个 1 分别是连接确认标志和连接原因码
-	_ = this.SetRemainingLength(int32(1 + 1 + propertiesLen + len(lbEncode(this.propertiesLen))))
+	_ = this.SetRemainingLength(uint32(1 + 1 + propertiesLen + len(lbEncode(this.propertiesLen))))
 }
 func (this *ConnackMessage) PropertiesLen() uint32 {
 	return this.propertiesLen
@@ -362,7 +363,7 @@ func (this *ConnackMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
@@ -613,7 +614,7 @@ func (this *ConnackMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("connack/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -765,6 +766,130 @@ func (this *ConnackMessage) Encode(dst []byte) (int, error) {
 		}
 	}
 	return total, nil
+}
+
+func (this *ConnackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	// CONNACK remaining length fixed at 2 bytes
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return 0, err
+	}
+
+	if this.sessionPresent { // 连接确认标志
+		dst.WriteByte(1)
+	} else {
+		dst.WriteByte(0)
+	}
+
+	if this.reasonCode > UnsupportedWildcardSubscriptions {
+		return dst.Len(), fmt.Errorf("connack/Encode: Invalid CONNACK return code (%d)", this.reasonCode)
+	}
+
+	dst.WriteByte(this.reasonCode.Value()) // 原因码
+
+	dst.Write(lbEncode(this.propertiesLen))
+
+	// 属性
+	if this.sessionExpiryInterval > 0 { // 会话过期间隔
+		dst.WriteByte(SessionExpirationInterval)
+		_ = BigEndianPutUint32(dst, this.sessionExpiryInterval)
+	}
+	if this.receiveMaximum > 0 && this.receiveMaximum < 65535 { // 接收最大值
+		dst.WriteByte(MaximumQuantityReceived)
+		_ = BigEndianPutUint16(dst, this.receiveMaximum)
+	}
+	if this.maxQos > 0 { // 最大服务质量，正常都会编码
+		dst.WriteByte(MaximumQoS)
+		dst.WriteByte(this.maxQos)
+	}
+	if this.retainAvailable != 1 { // 保留可用
+		dst.WriteByte(PreservePropertyAvailability)
+		dst.WriteByte(this.retainAvailable)
+	}
+	if this.maxPacketSize != 1 { // 最大报文长度
+		dst.WriteByte(MaximumMessageLength)
+		_ = BigEndianPutUint32(dst, this.maxPacketSize)
+	}
+	if len(this.assignedIdentifier) > 0 { // 分配客户标识符
+		dst.WriteByte(AssignCustomerIdentifiers)
+		_, err = writeToBufLPBytes(dst, this.assignedIdentifier)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if this.topicAliasMax > 0 { // 主题别名最大值
+		dst.WriteByte(MaximumLengthOfTopicAlias)
+		_ = BigEndianPutUint16(dst, this.topicAliasMax)
+	}
+	if len(this.reasonStr) > 0 { // 原因字符串
+		dst.WriteByte(ReasonString)
+		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	for _, v := range this.userProperties { // 用户属性
+		dst.WriteByte(UserProperty)
+		_, err = writeToBufLPBytes(dst, v)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if this.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
+		dst.WriteByte(WildcardSubscriptionAvailability)
+		dst.WriteByte(this.wildcardSubscriptionAvailable)
+	}
+	if this.subscriptionIdentifierAvailable != 1 { // 订阅标识符可用
+		dst.WriteByte(AvailabilityOfSubscriptionIdentifiers)
+		dst.WriteByte(this.subscriptionIdentifierAvailable)
+	}
+	if this.sharedSubscriptionAvailable != 1 { // 共享订阅可用
+		dst.WriteByte(SharedSubscriptionAvailability)
+		dst.WriteByte(this.sharedSubscriptionAvailable)
+	}
+	if this.serverKeepAlive > 0 { // 服务端保持连接
+		dst.WriteByte(ServerSurvivalTime)
+		_ = BigEndianPutUint16(dst, this.serverKeepAlive)
+	}
+	if len(this.responseInformation) > 0 { // 响应信息
+		dst.WriteByte(SolicitedMessage)
+		_, err = writeToBufLPBytes(dst, this.responseInformation)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.serverReference) > 0 { // 服务端参考
+		dst.WriteByte(ServerReference)
+		_, err = writeToBufLPBytes(dst, this.serverReference)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.authMethod) > 0 { // 认证方法
+		dst.WriteByte(AuthenticationMethod)
+		_, err = writeToBufLPBytes(dst, this.authMethod)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	if len(this.authData) > 0 { // 认证数据
+		dst.WriteByte(AuthenticationData)
+		_, err = writeToBufLPBytes(dst, this.authData)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	return dst.Len(), nil
 }
 
 // propertiesLen

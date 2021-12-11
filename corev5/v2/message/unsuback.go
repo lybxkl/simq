@@ -1,6 +1,9 @@
 package message
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 // UnsubackMessage The UNSUBACK Packet is sent by the Server to the Client to confirm receipt of an
 // UNSUBSCRIBE Packet.
@@ -137,6 +140,7 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 	this.dirty = false
 	return total, nil
 }
+
 func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
 	if !this.dirty {
 		if len(dst) < len(this.dbuf) {
@@ -152,7 +156,7 @@ func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("unsuback/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -198,6 +202,51 @@ func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
+
+func (this *UnsubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	// 可变报头
+	if len(this.packetId) != 2 {
+		dst.Write([]byte{0, 0})
+	} else {
+		dst.Write(this.packetId)
+	}
+
+	dst.Write(lbEncode(this.propertyLen))
+
+	// TODO 下面两个在PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此原因字符串
+	if len(this.reasonStr) > 0 {
+		dst.WriteByte(ReasonString)
+		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	for i := 0; i < len(this.userProperty); i++ {
+		dst.WriteByte(UserProperty)
+		_, err = writeToBufLPBytes(dst, this.userProperty[i])
+		if err != nil {
+			return dst.Len(), err
+		}
+	}
+	dst.Write(this.reasonCodes)
+	return dst.Len(), nil
+}
+
 func (this *UnsubackMessage) build() {
 	// packet ID
 	total := 2
@@ -215,7 +264,7 @@ func (this *UnsubackMessage) build() {
 	this.propertyLen = uint32(total - 2)
 	total += len(lbEncode(this.propertyLen))
 	total += len(this.reasonCodes)
-	_ = this.SetRemainingLength(int32(total))
+	_ = this.SetRemainingLength(uint32(total))
 }
 func (this *UnsubackMessage) msglen() int {
 	this.build()
@@ -229,7 +278,7 @@ func (this *UnsubackMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 

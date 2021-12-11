@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/bufpool"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"github.com/panjf2000/ants/v2"
 	"io"
@@ -52,14 +53,14 @@ func dealAntsErr(err error) {
 	logger.Logger.Errorf("线程池处理异常：%v", err)
 }
 
-func getConnectMessage(conn io.Closer) (*messagev52.ConnectMessage, error) {
+func getConnectMessage(conn io.Closer) (*messagev2.ConnectMessage, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {
 		//glog.Logger.Debug("Receive error: %v", err)
 		return nil, err
 	}
 
-	msg := messagev52.NewConnectMessage()
+	msg := messagev2.NewConnectMessage()
 
 	_, err = msg.Decode(buf)
 	logger.Logger.Debugf("Received: %s", msg)
@@ -67,27 +68,27 @@ func getConnectMessage(conn io.Closer) (*messagev52.ConnectMessage, error) {
 }
 
 // 获取增强认证数据，或者connack数据
-func getAuthMessageOrOther(conn io.Closer) (messagev52.Message, error) {
+func getAuthMessageOrOther(conn io.Closer) (messagev2.Message, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {
 		//glog.Logger.Debug("Receive error: %v", err)
 		return nil, err
 	}
 	mtypeflags := buf[0]
-	tp := messagev52.MessageType(mtypeflags >> 4)
+	tp := messagev2.MessageType(mtypeflags >> 4)
 	switch tp {
-	case messagev52.DISCONNECT:
-		dis := messagev52.NewDisconnectMessage()
+	case messagev2.DISCONNECT:
+		dis := messagev2.NewDisconnectMessage()
 		_, err = dis.Decode(buf)
 		logger.Logger.Debugf("Received: %s", dis)
 		return dis, nil
-	case messagev52.AUTH:
-		msg := messagev52.NewAuthMessage()
+	case messagev2.AUTH:
+		msg := messagev2.NewAuthMessage()
 		_, err = msg.Decode(buf)
 		logger.Logger.Debugf("Received: %s", msg)
 		return msg, err
-	case messagev52.CONNACK:
-		msg := messagev52.NewConnackMessage()
+	case messagev2.CONNACK:
+		msg := messagev2.NewConnackMessage()
 		_, err = msg.Decode(buf)
 		logger.Logger.Debugf("Received: %s", msg)
 		return msg, err
@@ -101,14 +102,14 @@ func getAuthMessageOrOther(conn io.Closer) (messagev52.Message, error) {
 		return nil, errors.New(fmt.Sprintf("error type %v,  %v", tp.Name(), err))
 	}
 }
-func getConnackMessage(conn io.Closer) (*messagev52.ConnackMessage, error) {
+func getConnackMessage(conn io.Closer) (*messagev2.ConnackMessage, error) {
 	buf, err := getMessageBuffer(conn)
 	if err != nil {
 		//glog.Logger.Debug("Receive error: %v", err)
 		return nil, err
 	}
 
-	msg := messagev52.NewConnackMessage()
+	msg := messagev2.NewConnackMessage()
 
 	_, err = msg.Decode(buf)
 	logger.Logger.Debugf("Received: %s", msg)
@@ -116,16 +117,18 @@ func getConnackMessage(conn io.Closer) (*messagev52.ConnackMessage, error) {
 }
 
 //消息发送
-func writeMessage(conn io.Closer, msg messagev52.Message) error {
-	buf := make([]byte, msg.Len())
-	_, err := msg.Encode(buf)
+func writeMessage(conn io.Closer, msg messagev2.Message) error {
+	buf := bufpool.BufferPoolGet()
+	defer bufpool.BufferPoolPut(buf)
+
+	_, err := msg.EncodeToBuf(buf)
 	if err != nil {
 		logger.Logger.Debugf("Write error: %v", err)
 		return err
 	}
 	logger.Logger.Debugf("Writing: %s", msg)
 
-	return writeMessageBuffer(conn, buf)
+	return writeMessageBuffer(conn, buf.Bytes()) // TODO 是否会因为后面其它协程拿到此对象，重新继续塞数据时，会不会影响
 }
 
 func getMessageBuffer(c io.Closer) ([]byte, error) {

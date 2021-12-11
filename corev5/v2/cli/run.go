@@ -23,7 +23,6 @@ func init() {
 func Run() {
 	cfg := config2.GetConfig()
 	conCif := cfg.DefaultConfig.Connect
-	proCif := cfg.DefaultConfig.Provider
 	authPlusCif := cfg.DefaultConfig.Auth
 
 	svr := &service.Server{
@@ -33,9 +32,6 @@ func Run() {
 		ConnectTimeout:   conCif.ConnectTimeout,
 		AckTimeout:       conCif.AckTimeout,
 		TimeoutRetries:   conCif.TimeoutRetries,
-		SessionsProvider: proCif.SessionsProvider,
-		TopicsProvider:   proCif.TopicsProvider,
-		Authenticator:    proCif.Authenticator,
 		AuthPlusProvider: authPlusCif.Allows,
 		Version:          cfg.ServerVersion,
 	}

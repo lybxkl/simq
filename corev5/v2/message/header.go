@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -17,7 +18,7 @@ type header struct {
 	// 剩余长度 变长字节整数, 用来表示当前控制报文剩余部分的字节数, 包括可变报头和负载的数据.
 	// 剩余长度不包括用于编码剩余长度字段本身的字节数.
 	// MQTT控制报文总长度等于固定报头的长度加上剩余长度.
-	remlen int32
+	remlen uint32
 
 	// mtypeflags是固定报头的第一个字节，前四位4位是mtype, 4位是flags标志
 	mtypeflags []byte
@@ -111,14 +112,14 @@ func (this *header) Flags() byte {
 }
 
 // RemainingLength returns the length of the non-fixed-header part of the message.
-func (this *header) RemainingLength() int32 {
+func (this *header) RemainingLength() uint32 {
 	return this.remlen
 }
 
 // SetRemainingLength sets the length of the non-fixed-header part of the message.
 // It returns error if the length is greater than 268435455, which is the max
 // message length as defined by the MQTT spec.
-func (this *header) SetRemainingLength(remlen int32) error {
+func (this *header) SetRemainingLength(remlen uint32) error {
 	if remlen > maxRemainingLength || remlen < 0 {
 		return fmt.Errorf("header/SetLength: Remaining length (%d) out of bound (max %d, min 0)", remlen, maxRemainingLength)
 	}
@@ -189,6 +190,23 @@ func (this *header) encode(dst []byte) (int, error) {
 	return total, nil
 }
 
+func (this *header) encodeToBuf(dst *bytes.Buffer) (int, error) {
+
+	if this.remlen > maxRemainingLength || this.remlen < 0 {
+		return 0, fmt.Errorf("header/Encode: Remaining length (%d) out of bound (max %d, min 0)", this.remlen, maxRemainingLength)
+	}
+
+	if !this.Type().Valid() {
+		return 0, fmt.Errorf("header/Encode: Invalid message type %d", this.Type())
+	}
+
+	dst.WriteByte(this.mtypeflags[0])
+
+	BigEndianPutUvarint(dst, uint64(this.remlen))
+
+	return dst.Len(), nil
+}
+
 // Decode reads from the io.Reader parameter until a full message is decoded, or
 // when io.Reader returns EOF or error. The first return value is the number of
 // bytes read from io.Reader. The second is error if Decode encounters any problems.
@@ -224,7 +242,7 @@ func (this *header) decode(src []byte) (int, error) {
 	// 剩余长度，传进来的就是只有固定报头数据，所以剩下的就是剩余长度变长解码的数据
 	remlen, m := binary.Uvarint(src[total:])
 	total += m
-	this.remlen = int32(remlen)
+	this.remlen = uint32(remlen)
 
 	if this.remlen > maxRemainingLength ||
 		(this.Type() != PINGREQ && this.Type() != PINGRESP &&

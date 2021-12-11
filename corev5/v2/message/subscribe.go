@@ -325,7 +325,7 @@ func (this *SubscribeMessage) Len() int {
 
 	ml := this.msglen()
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
@@ -439,7 +439,7 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 		return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(int32(ml)); err != nil {
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -501,6 +501,63 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 
 	return total, nil
 }
+
+func (this *SubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	ml := this.msglen()
+
+	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+		return 0, err
+	}
+
+	_, err := this.header.encodeToBuf(dst)
+	if err != nil {
+		return dst.Len(), err
+	}
+
+	if this.PacketId() == 0 {
+		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	}
+
+	dst.Write(this.packetId)
+
+	dst.Write(lbEncode(this.propertiesLen))
+
+	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+		dst.WriteByte(DefiningIdentifiers)
+		dst.Write(lbEncode(this.subscriptionIdentifier))
+	}
+	if len(this.userProperty) > 0 {
+		for i := 0; i < len(this.userProperty); i++ {
+			dst.WriteByte(UserProperty)
+			_, err = writeToBufLPBytes(dst, this.userProperty[i])
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+	}
+
+	for i, t := range this.topics {
+		_, err = writeToBufLPBytes(dst, t)
+		if err != nil {
+			return dst.Len(), err
+		}
+		// 订阅选项
+		subOp := byte(0)
+		subOp |= this.qos[i]
+		subOp |= this.noLocal[i] << 2
+		subOp |= this.retainAsPub[i] << 3
+		subOp |= this.retainHandling[i] << 4
+		dst.WriteByte(subOp)
+	}
+
+	return dst.Len(), nil
+}
+
 func (this *SubscribeMessage) build() {
 	// packet ID
 	total := 2
@@ -519,7 +576,7 @@ func (this *SubscribeMessage) build() {
 	for _, t := range this.topics {
 		total += 2 + len(t) + 1
 	}
-	_ = this.SetRemainingLength(int32(total))
+	_ = this.SetRemainingLength(uint32(total))
 }
 func (this *SubscribeMessage) msglen() int {
 	this.build()

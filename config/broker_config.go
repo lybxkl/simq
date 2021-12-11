@@ -34,6 +34,11 @@ type SIConfig struct {
 	Store         Store         `toml:"store"`
 	PProf         PProf         `toml:"pprof"`
 }
+
+func (cfg *SIConfig) OpenShare() bool {
+	return !cfg.Broker.CloseShareSub
+}
+
 type Log struct {
 	Level string `toml:"level"`
 }

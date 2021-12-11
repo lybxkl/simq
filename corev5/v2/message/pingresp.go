@@ -1,6 +1,9 @@
 package message
 
-import "fmt"
+import (
+	"bytes"
+	"fmt"
+)
 
 // A PINGRESP Packet is sent by the Server to the Client in response to a PINGREQ
 // Packet. It indicates that the Server is alive.
@@ -31,4 +34,12 @@ func (this *PingrespMessage) Encode(dst []byte) (int, error) {
 	}
 
 	return this.header.encode(dst)
+}
+
+func (this *PingrespMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !this.dirty {
+		return dst.Write(this.dbuf)
+	}
+
+	return this.header.encodeToBuf(dst)
 }
