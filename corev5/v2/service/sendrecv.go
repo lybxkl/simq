@@ -78,16 +78,14 @@ func (svc *service) receiver() {
 
 		for {
 			_, err := svc.in.ReadFrom(r)
-
 			// 检查done是否关闭，如果关闭，退出
-
 			if err != nil {
 				if er, ok := err.(*net.OpError); ok && er.Err.Error() == "i/o timeout" {
 					// TODO 更新session状态
 					logger.Logger.Warnf("<<(%s)>> 读超时关闭：%v", svc.cid(), er)
 					return
 				}
-				if svc.isDone() && (strings.Contains(err.Error(), "use of closed network connection") || svc.in.Len() == 0) {
+				if svc.isDone() && strings.Contains(err.Error(), "use of closed network connection") {
 					return
 				}
 				if err != io.EOF {

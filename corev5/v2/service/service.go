@@ -120,6 +120,7 @@ type service struct {
 	conFig       *config.SIConfig
 }
 
+// 运行接入的连接，会产生三个协程异步逻辑处理，当前不会阻塞
 func (svc *service) start(resp *message.ConnackMessage) error {
 	var err error
 	svc.ccid = fmt.Sprintf("%d/%s", svc.id, svc.sess.IDs())
@@ -207,23 +208,16 @@ func (svc *service) start(resp *message.ConnackMessage) error {
 		svc.outStat.increment(int64(resp.Len()))
 	}
 
-	// Processor is responsible for reading messages out of the buffer and processing
-	// them accordingly.
 	//处理器负责从缓冲区读取消息并进行处理
-	//他们。
 	svc.wgStarted.Add(1)
 	svc.wgStopped.Add(1)
 	go svc.processor()
 
-	// Receiver is responsible for reading from the connection and putting data into
-	// a buffer.
-	//接收端负责从连接中读取数据并将数据放入
-	//一个缓冲区。
+	//接收端负责从连接中读取数据并将数据放入 一个缓冲区。
 	svc.wgStarted.Add(1)
 	svc.wgStopped.Add(1)
 	go svc.receiver()
 
-	// Sender is responsible for writing data in the buffer into the connection.
 	//发送方负责将缓冲区中的数据写入连接。
 	svc.wgStarted.Add(1)
 	svc.wgStopped.Add(1)

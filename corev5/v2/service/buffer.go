@@ -37,12 +37,12 @@ func newSequence() *sequence {
 	return &sequence{}
 }
 
-func (this *sequence) get() int64 {
-	return atomic.LoadInt64(&this.cursor)
+func (buf *sequence) get() int64 {
+	return atomic.LoadInt64(&buf.cursor)
 }
 
-func (this *sequence) set(seq int64) {
-	atomic.StoreInt64(&this.cursor, seq)
+func (buf *sequence) set(seq int64) {
+	atomic.StoreInt64(&buf.cursor, seq)
 }
 
 type buffer struct {
@@ -98,55 +98,55 @@ func newBuffer(size int64) (*buffer, error) {
 	}, nil
 }
 
-func (this *buffer) ID() int64 {
-	return this.id
+func (buf *buffer) ID() int64 {
+	return buf.id
 }
 
-func (this *buffer) Close() error {
-	atomic.StoreInt64(&this.done, 1)
+func (buf *buffer) Close() error {
+	atomic.StoreInt64(&buf.done, 1)
 
-	this.pcond.L.Lock()
-	this.pcond.Broadcast()
-	this.pcond.L.Unlock()
+	buf.pcond.L.Lock()
+	buf.pcond.Broadcast()
+	buf.pcond.L.Unlock()
 
-	this.pcond.L.Lock()
-	this.ccond.Broadcast()
-	this.pcond.L.Unlock()
+	buf.pcond.L.Lock()
+	buf.ccond.Broadcast()
+	buf.pcond.L.Unlock()
 
 	return nil
 }
 
-func (this *buffer) Len() int {
-	cpos := this.cseq.get()
-	ppos := this.pseq.get()
+func (buf *buffer) Len() int {
+	cpos := buf.cseq.get()
+	ppos := buf.pseq.get()
 	return int(ppos - cpos)
 }
 
-func (this *buffer) ReadFrom(r io.Reader) (int64, error) {
-	defer this.Close()
+func (buf *buffer) ReadFrom(r io.Reader) (int64, error) {
+	defer buf.Close()
 
 	total := int64(0)
 
 	for {
-		if this.isDone() {
+		if buf.isDone() {
 			return total, io.EOF
 		}
 
-		start, cnt, err := this.waitForWriteSpace(int(defaultReadBlockSize))
+		start, cnt, err := buf.waitForWriteSpace(int(defaultReadBlockSize))
 		if err != nil {
 			return 0, err
 		}
 
-		pstart := start & this.mask
+		pstart := start & buf.mask
 		pend := pstart + int64(cnt)
-		if pend > this.size {
-			pend = this.size
+		if pend > buf.size {
+			pend = buf.size
 		}
 
-		n, err := r.Read(this.buf[pstart:pend])
+		n, err := r.Read(buf.buf[pstart:pend])
 		if n > 0 {
 			total += int64(n)
-			_, err := this.WriteCommit(n)
+			_, err := buf.WriteCommit(n)
 			if err != nil {
 				return total, err
 			}
@@ -158,19 +158,19 @@ func (this *buffer) ReadFrom(r io.Reader) (int64, error) {
 	}
 }
 
-func (this *buffer) WriteTo(w io.Writer) (int64, error) {
+func (buf *buffer) WriteTo(w io.Writer) (int64, error) {
 	defer func() {
-		this.Close()
+		buf.Close()
 	}()
 
 	total := int64(0)
 
 	for {
-		if this.isDone() {
+		if buf.isDone() {
 			return total, io.EOF
 		}
 
-		p, err := this.ReadPeek(int(defaultWriteBlockSize))
+		p, err := buf.ReadPeek(int(defaultWriteBlockSize))
 		//if err != nil {
 		//	return 0, err
 		//}
@@ -184,7 +184,7 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 				return total, err
 			}
 
-			_, err = this.ReadCommit(n)
+			_, err = buf.ReadCommit(n)
 			if err != nil {
 				return total, err
 			}
@@ -196,26 +196,26 @@ func (this *buffer) WriteTo(w io.Writer) (int64, error) {
 	}
 }
 
-func (this *buffer) Read(p []byte) (int, error) {
-	if this.isDone() && this.Len() == 0 {
-		//glog.Debugf("isDone and len = %d", this.Len())
+func (buf *buffer) Read(p []byte) (int, error) {
+	if buf.isDone() && buf.Len() == 0 {
+		//glog.Debugf("isDone and len = %d", buf.Len())
 		return 0, io.EOF
 	}
 
 	pl := int64(len(p))
 
 	for {
-		cpos := this.cseq.get()
-		ppos := this.pseq.get()
-		cindex := cpos & this.mask
+		cpos := buf.cseq.get()
+		ppos := buf.pseq.get()
+		cindex := cpos & buf.mask
 
 		// If consumer position is at least len(p) less than producer position, that means
 		// we have enough data to fill p. There are two scenarios that could happen:
-		// 1. cindex + len(p) < buffer size, in this case, we can just copy() data from
+		// 1. cindex + len(p) < buffer size, in buf case, we can just copy() data from
 		//    buffer to p, and copy will just copy enough to fill p and stop.
 		//    The number of bytes copied will be len(p).
-		// 2. cindex + len(p) > buffer size, this means the data will wrap around to the
-		//    the beginning of the buffer. In thise case, we can also just copy data from
+		// 2. cindex + len(p) > buffer size, buf means the data will wrap around to the
+		//    the beginning of the buffer. In bufe case, we can also just copy data from
 		//    buffer to p, and copy will just copy until the end of the buffer and stop.
 		//    The number of bytes will NOT be len(p) but less than that.
 		//如果消费者至少是len(p)小于生产者，这意味着
@@ -228,12 +228,12 @@ func (this *buffer) Read(p []byte) (int, error) {
 		//缓冲到p，然后复制，一直复制到缓冲区的末尾，然后停止。
 		//字节数不是len(p)，而是小于len(p)。
 		if cpos+pl < ppos {
-			n := copy(p, this.buf[cindex:])
+			n := copy(p, buf.buf[cindex:])
 
-			this.cseq.set(cpos + int64(n))
-			this.pcond.L.Lock()
-			this.pcond.Broadcast()
-			this.pcond.L.Unlock()
+			buf.cseq.set(cpos + int64(n))
+			buf.pcond.L.Lock()
+			buf.pcond.Broadcast()
+			buf.pcond.L.Unlock()
 
 			return n, nil
 		}
@@ -254,21 +254,21 @@ func (this *buffer) Read(p []byte) (int, error) {
 			var n int
 
 			// if cindex+n < size, that means we can copy all n bytes into p.
-			// No wrapping in this case.
+			// No wrapping in buf case.
 			//如果cindex+n < size，这意味着我们可以将所有的n个字节复制到p中。
 			//这种箱子不用包装。
-			if cindex+b < this.size {
-				n = copy(p, this.buf[cindex:cindex+b])
+			if cindex+b < buf.size {
+				n = copy(p, buf.buf[cindex:cindex+b])
 			} else {
 				// If cindex+n >= size, that means we can copy to the end of buffer
 				//如果cindex+n >= size，这意味着我们可以复制到缓冲区的末尾
-				n = copy(p, this.buf[cindex:])
+				n = copy(p, buf.buf[cindex:])
 			}
 
-			this.cseq.set(cpos + int64(n))
-			this.pcond.L.Lock()
-			this.pcond.Broadcast()
-			this.pcond.L.Unlock()
+			buf.cseq.set(cpos + int64(n))
+			buf.pcond.L.Lock()
+			buf.pcond.Broadcast()
+			buf.pcond.L.Unlock()
 			return n, nil
 		}
 
@@ -276,39 +276,39 @@ func (this *buffer) Read(p []byte) (int, error) {
 		// If so, let's wait...
 		//如果我们到这里，这意味着cpos >= ppos，这意味着没有可用的数据。
 		//如果是这样的话，我们等着……
-		this.ccond.L.Lock()
-		for ppos = this.pseq.get(); cpos >= ppos; ppos = this.pseq.get() {
-			if this.isDone() {
+		buf.ccond.L.Lock()
+		for ppos = buf.pseq.get(); cpos >= ppos; ppos = buf.pseq.get() {
+			if buf.isDone() {
 				return 0, io.EOF
 			}
 
-			this.cwait++
-			this.ccond.Wait()
+			buf.cwait++
+			buf.ccond.Wait()
 		}
-		this.ccond.L.Unlock()
+		buf.ccond.L.Unlock()
 	}
 }
 
-func (this *buffer) Write(p []byte) (int, error) {
-	if this.isDone() {
+func (buf *buffer) Write(p []byte) (int, error) {
+	if buf.isDone() {
 		return 0, io.EOF
 	}
 
-	start, _, err := this.waitForWriteSpace(len(p))
+	start, _, err := buf.waitForWriteSpace(len(p))
 	if err != nil {
 		return 0, err
 	}
 
 	// If we are here that means we now have enough space to write the full p.
-	// Let's copy from p into this.buf, starting at position ppos&this.mask.
+	// Let's copy from p into buf.buf, starting at position ppos&buf.mask.
 	//如果我们在这里，这意味着我们现在有足够的空间来写完整的p。
-	//我们把p复制到这里。buf，从ppos&this.mask开始。
-	total := ringCopy(this.buf, p, int64(start)&this.mask)
+	//我们把p复制到这里。buf，从ppos&buf.mask开始。
+	total := ringCopy(buf.buf, p, int64(start)&buf.mask)
 
-	this.pseq.set(start + int64(len(p)))
-	this.ccond.L.Lock()
-	this.ccond.Broadcast()
-	this.ccond.L.Unlock()
+	buf.pseq.set(start + int64(len(p)))
+	buf.ccond.L.Lock()
+	buf.ccond.Broadcast()
+	buf.ccond.L.Unlock()
 
 	return total, nil
 }
@@ -329,8 +329,8 @@ func (this *buffer) Write(p []byte) (int, error) {
 // b的缓冲区大小。
 //如果没有足够的数据供查看，则错误为ErrBufferInsufficientData。
 //如果n < 0，错误是bufio.ErrNegativeCount
-func (this *buffer) ReadPeek(n int) ([]byte, error) {
-	if int64(n) > this.size {
+func (buf *buffer) ReadPeek(n int) ([]byte, error) {
+	if int64(n) > buf.size {
 		return nil, bufio.ErrBufferFull
 	}
 
@@ -338,21 +338,21 @@ func (this *buffer) ReadPeek(n int) ([]byte, error) {
 		return nil, bufio.ErrNegativeCount
 	}
 
-	cpos := this.cseq.get()
-	ppos := this.pseq.get()
+	cpos := buf.cseq.get()
+	ppos := buf.pseq.get()
 
 	// If there's no data, then let's wait until there is some data
 	//如果没有数据，那就等到有数据的时候
-	this.ccond.L.Lock()
-	for ; cpos >= ppos; ppos = this.pseq.get() {
-		if this.isDone() {
+	buf.ccond.L.Lock()
+	for ; cpos >= ppos; ppos = buf.pseq.get() {
+		if buf.isDone() {
 			return nil, io.EOF
 		}
 
-		this.cwait++
-		this.ccond.Wait()
+		buf.cwait++
+		buf.ccond.Wait()
 	}
-	this.ccond.L.Unlock()
+	buf.ccond.L.Unlock()
 
 	// m = the number of bytes available. If m is more than what's requested (n),
 	// then we make m = n, basically peek max n bytes
@@ -370,37 +370,34 @@ func (this *buffer) ReadPeek(n int) ([]byte, error) {
 	// There's data to peek. The size of the data could be <= n.
 	//有数据可以看。数据的大小可以是<= n。
 	if cpos+m <= ppos {
-		cindex := cpos & this.mask
+		cindex := cpos & buf.mask
 
 		// If cindex (index relative to buffer) + n is more than buffer size, that means
 		// the data wrapped
 		//如果cindex(相对于缓冲区的索引)+ n大于缓冲区大小，这意味着
 		//数据包装
-		if cindex+m > this.size {
+		if cindex+m > buf.size {
 			// reset the tmp buffer
-			this.tmp = this.tmp[0:0]
+			buf.tmp = buf.tmp[0:0]
 
-			l := len(this.buf[cindex:])
-			this.tmp = append(this.tmp, this.buf[cindex:]...)
+			l := len(buf.buf[cindex:])
+			buf.tmp = append(buf.tmp, buf.buf[cindex:]...)
 			// 不足，就从前面读取
-			this.tmp = append(this.tmp, this.buf[0:m-int64(l)]...)
-			return this.tmp, err
+			buf.tmp = append(buf.tmp, buf.buf[0:m-int64(l)]...)
+			return buf.tmp, err
 		} else {
-			return this.buf[cindex : cindex+m], err
+			return buf.buf[cindex : cindex+m], err
 		}
 	}
 
 	return nil, ErrBufferInsufficientData
 }
 
-// Wait waits for for n bytes to be ready. If there's not enough data, then it will
-// wait until there's enough. This differs from ReadPeek or Readin that Peek will
-// return whatever is available and won't wait for full count.
-// Wait等待n个字节的数据准备好。如果没有足够的数据，它就会
+// ReadWait Wait等待n个字节的数据准备好。如果没有足够的数据，它就会
 //等到足够了。这与ReadPeek或Readin的那个Peek不同
 //返回所有可用的，不会等待完整计数。
-func (this *buffer) ReadWait(n int) ([]byte, error) {
-	if int64(n) > this.size {
+func (buf *buffer) ReadWait(n int) ([]byte, error) {
+	if int64(n) > buf.size {
 		return nil, bufio.ErrBufferFull
 	}
 
@@ -408,8 +405,8 @@ func (this *buffer) ReadWait(n int) ([]byte, error) {
 		return nil, bufio.ErrNegativeCount
 	}
 
-	cpos := this.cseq.get()
-	ppos := this.pseq.get()
+	cpos := buf.cseq.get()
+	ppos := buf.pseq.get()
 
 	// This is the magic read-to position. The producer position must be equal or
 	// greater than the next position we read to.
@@ -418,35 +415,35 @@ func (this *buffer) ReadWait(n int) ([]byte, error) {
 	next := cpos + int64(n)
 
 	// If there's no data, then let's wait until there is some data
-	this.ccond.L.Lock()
-	for ; next > ppos; ppos = this.pseq.get() {
-		if this.isDone() {
+	buf.ccond.L.Lock()
+	for ; next > ppos; ppos = buf.pseq.get() {
+		if buf.isDone() {
 			return nil, io.EOF
 		}
 
-		this.ccond.Wait()
+		buf.ccond.Wait()
 	}
-	this.ccond.L.Unlock()
+	buf.ccond.L.Unlock()
 
 	// If we are here that means we have at least n bytes of data available.
 	//如果我们在这里，这意味着我们至少有n个字节的可用数据。
-	cindex := cpos & this.mask
+	cindex := cpos & buf.mask
 
 	// If cindex (index relative to buffer) + n is more than buffer size, that means
 	// the data wrapped
 	//如果cindex(相对于缓冲区的索引)+ n大于缓冲区大小，这意味着
 	//数据包装，因为超过了buf大小
-	if cindex+int64(n) > this.size {
+	if cindex+int64(n) > buf.size {
 		// reset the tmp buffer
-		this.tmp = this.tmp[0:0]
+		buf.tmp = buf.tmp[0:0]
 
-		l := len(this.buf[cindex:])
-		this.tmp = append(this.tmp, this.buf[cindex:]...)
-		this.tmp = append(this.tmp, this.buf[0:n-l]...)
-		return this.tmp[:n], nil
+		l := len(buf.buf[cindex:])
+		buf.tmp = append(buf.tmp, buf.buf[cindex:]...)
+		buf.tmp = append(buf.tmp, buf.buf[0:n-l]...)
+		return buf.tmp[:n], nil
 	}
 
-	return this.buf[cindex : cindex+int64(n)], nil
+	return buf.buf[cindex : cindex+int64(n)], nil
 }
 
 // Commit moves the cursor forward by n bytes. It behaves like Read() except it doesn't
@@ -457,8 +454,8 @@ func (this *buffer) ReadWait(n int) ([]byte, error) {
 //返回任何数据。如果有足够的数据，那么光标将向前移动
 // n将被返回。如果没有足够的数据，那么光标将向前移动
 //尽可能多地返回移动的位置(字节)数量。
-func (this *buffer) ReadCommit(n int) (int, error) {
-	if int64(n) > this.size {
+func (buf *buffer) ReadCommit(n int) (int, error) {
+	if int64(n) > buf.size {
 		return 0, bufio.ErrBufferFull
 	}
 
@@ -466,23 +463,23 @@ func (this *buffer) ReadCommit(n int) (int, error) {
 		return 0, bufio.ErrNegativeCount
 	}
 
-	cpos := this.cseq.get()
-	ppos := this.pseq.get()
+	cpos := buf.cseq.get()
+	ppos := buf.pseq.get()
 
 	// If consumer position is at least n less than producer position, that means
 	// we have enough data to fill p. There are two scenarios that could happen:
-	// 1. cindex + n < buffer size, in this case, we can just copy() data from
+	// 1. cindex + n < buffer size, in buf case, we can just copy() data from
 	//    buffer to p, and copy will just copy enough to fill p and stop.
 	//    The number of bytes copied will be len(p).
-	// 2. cindex + n > buffer size, this means the data will wrap around to the
-	//    the beginning of the buffer. In thise case, we can also just copy data from
+	// 2. cindex + n > buffer size, buf means the data will wrap around to the
+	//    the beginning of the buffer. In bufe case, we can also just copy data from
 	//    buffer to p, and copy will just copy until the end of the buffer and stop.
 	//    The number of bytes will NOT be len(p) but less than that.
 	if cpos+int64(n) <= ppos {
-		this.cseq.set(cpos + int64(n))
-		this.pcond.L.Lock()
-		this.pcond.Broadcast()
-		this.pcond.L.Unlock()
+		buf.cseq.set(cpos + int64(n))
+		buf.pcond.L.Lock()
+		buf.pcond.Broadcast()
+		buf.pcond.L.Unlock()
 		return n, nil
 	}
 
@@ -497,40 +494,40 @@ func (this *buffer) ReadCommit(n int) (int, error) {
 // 1。指向缓冲区中要填充的位置的片
 // 2。 一个布尔值，指示可用的字节是否包围环
 // 3。 遇到任何错误。 如果出现错误，则其他返回值无效
-func (this *buffer) WriteWait(n int) ([]byte, bool, error) {
-	start, cnt, err := this.waitForWriteSpace(n)
+func (buf *buffer) WriteWait(n int) ([]byte, bool, error) {
+	start, cnt, err := buf.waitForWriteSpace(n)
 	if err != nil {
 		return nil, false, err
 	}
 
-	pstart := start & this.mask
-	if pstart+int64(cnt) > this.size {
-		return this.buf[pstart:], true, nil
+	pstart := start & buf.mask
+	if pstart+int64(cnt) > buf.size {
+		return buf.buf[pstart:], true, nil
 	}
 
-	return this.buf[pstart : pstart+int64(cnt)], false, nil
+	return buf.buf[pstart : pstart+int64(cnt)], false, nil
 }
 
-func (this *buffer) WriteCommit(n int) (int, error) {
-	start, cnt, err := this.waitForWriteSpace(n)
+func (buf *buffer) WriteCommit(n int) (int, error) {
+	start, cnt, err := buf.waitForWriteSpace(n)
 	if err != nil {
 		return 0, err
 	}
 
 	// If we are here then there's enough bytes to commit
 	//如果我们在这里，那么有足够的字节提交
-	this.pseq.set(start + int64(cnt))
+	buf.pseq.set(start + int64(cnt))
 
-	this.ccond.L.Lock()
-	this.ccond.Broadcast()
-	this.ccond.L.Unlock()
+	buf.ccond.L.Lock()
+	buf.ccond.Broadcast()
+	buf.ccond.L.Unlock()
 
 	return cnt, nil
 }
 
 // 等待写空间
-func (this *buffer) waitForWriteSpace(n int) (int64, int, error) {
-	if this.isDone() {
+func (buf *buffer) waitForWriteSpace(n int) (int64, int, error) {
+	if buf.isDone() {
 		return 0, 0, io.EOF
 	}
 
@@ -538,7 +535,7 @@ func (this *buffer) waitForWriteSpace(n int) (int64, int, error) {
 	// NOT the position relative to the buffer
 	//当前的生产者位置，记住它是一个永远递增的int64，
 	//不是相对于缓冲区的位置
-	ppos := this.pseq.get()
+	ppos := buf.pseq.get()
 
 	// The next producer position we will get to if we write len(p)
 	//如果我们写入len(p)，我们将得到的下一个生产者位置
@@ -546,9 +543,9 @@ func (this *buffer) waitForWriteSpace(n int) (int64, int, error) {
 
 	// For the producer, gate is the previous consumer sequence.
 	//对于生产者，gate是前面的消费者序列。
-	gate := this.pseq.gate
+	gate := buf.pseq.gate
 
-	wrap := next - this.size
+	wrap := next - buf.size
 
 	// If wrap point is greater than gate, that means the consumer hasn't read
 	// some of the data in the buffer, and if we read in additional data and put
@@ -593,25 +590,25 @@ func (this *buffer) waitForWriteSpace(n int) (int64, int, error) {
 	//
 	if wrap > gate || gate > ppos {
 		var cpos int64
-		this.pcond.L.Lock()
-		for cpos = this.cseq.get(); wrap > cpos; cpos = this.cseq.get() {
-			if this.isDone() {
+		buf.pcond.L.Lock()
+		for cpos = buf.cseq.get(); wrap > cpos; cpos = buf.cseq.get() {
+			if buf.isDone() {
 				return 0, 0, io.EOF
 			}
 
-			this.pwait++
-			this.pcond.Wait()
+			buf.pwait++
+			buf.pcond.Wait()
 		}
 
-		this.pseq.gate = cpos
-		this.pcond.L.Unlock()
+		buf.pseq.gate = cpos
+		buf.pcond.L.Unlock()
 	}
 
 	return ppos, n, nil
 }
 
-func (this *buffer) isDone() bool {
-	if atomic.LoadInt64(&this.done) == 1 {
+func (buf *buffer) isDone() bool {
+	if atomic.LoadInt64(&buf.done) == 1 {
 		return true
 	}
 

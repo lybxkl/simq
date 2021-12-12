@@ -24,14 +24,6 @@ type memTopics struct {
 	rroot *rRnode
 }
 
-const (
-	stateCHR byte = iota // Regular character 普通字符
-	stateMWC             // Multi-level wildcard 多层次的通配符
-	stateSWC             // Single-level wildcard 单层通配符
-	stateSEP             // Topic level separator 主题水平分隔符
-	stateSYS             // System level topic ($) 系统级主题($)
-)
-
 func NewMemProvider() *memTopics {
 	return &memTopics{
 		sroot: newRSNode(),
@@ -419,12 +411,12 @@ func (node *rRnode) allRetained(msgs *[]*messagev2.PublishMessage) {
 
 // Returns topic level, remaining topic levels and any errors
 func nextRTopicLevel(topic []byte) ([]byte, []byte, error) {
-	s := stateCHR
+	s := consts.StateCHR
 
 	for i, c := range topic {
 		switch c {
 		case '/':
-			if s == stateMWC {
+			if s == consts.StateMWC {
 				return nil, nil, fmt.Errorf("redistopics/nextTopicLevel: Multi-level wildcard found in topic and it's not at the last level")
 			}
 
@@ -439,28 +431,28 @@ func nextRTopicLevel(topic []byte) ([]byte, []byte, error) {
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Wildcard character '#' must occupy entire topic level")
 			}
 
-			s = stateMWC
+			s = consts.StateMWC
 
 		case '+':
 			if i != 0 {
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Wildcard character '+' must occupy entire topic level")
 			}
 
-			s = stateSWC
+			s = consts.StateSWC
 
 		case '$':
 			if i == 0 {
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Cannot publish to $ topics")
 			}
 
-			s = stateSYS
+			s = consts.StateSYS
 
 		default:
-			if s == stateMWC || s == stateSWC {
+			if s == consts.StateMWC || s == consts.StateSWC {
 				return nil, nil, fmt.Errorf("redistopics/nextTopicLevel: Wildcard characters '#' and '+' must occupy entire topic level")
 			}
 
-			s = stateCHR
+			s = consts.StateCHR
 		}
 	}
 
@@ -553,13 +545,13 @@ func equal(k1, k2 interface{}) bool {
 // Returns topic level, remaining topic levels and any errors
 //返回主题级别、剩余的主题级别和任何错误
 func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
-	s := stateCHR
+	s := consts.StateCHR
 
 	//遍历topic，判断是何种类型的主题
 	for i, c := range topic {
 		switch c {
 		case '/':
-			if s == stateMWC {
+			if s == consts.StateMWC {
 				//多层次通配符发现的主题，它不是在最后一层
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Multi-level wildcard found in topic and it's not at the last level")
 			}
@@ -576,7 +568,7 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Wildcard character '#' must occupy entire topic level")
 			}
 
-			s = stateMWC
+			s = consts.StateMWC
 
 		case '+':
 			if i != 0 {
@@ -584,7 +576,7 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Wildcard character '+' must occupy entire topic level")
 			}
 
-			s = stateSWC
+			s = consts.StateSWC
 
 		case '$':
 			if i == 0 {
@@ -592,15 +584,15 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Cannot publish to $ topics")
 			}
 
-			s = stateSYS
+			s = consts.StateSYS
 
 		default:
-			if s == stateMWC || s == stateSWC {
+			if s == consts.StateMWC || s == consts.StateSWC {
 				//通配符“#”和“+”必须占据整个主题级别
 				return nil, nil, fmt.Errorf("memtopics/nextTopicLevel: Wildcard characters '#' and '+' must occupy entire topic level")
 			}
 
-			s = stateCHR
+			s = consts.StateCHR
 		}
 	}
 

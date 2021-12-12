@@ -80,7 +80,7 @@ func (svc *service) processor() {
 		}
 
 		// 检查done是否关闭，如果关闭，退出
-		if svc.isDone() && svc.in.Len() == 0 {
+		if svc.isDone() {
 			return
 		}
 
