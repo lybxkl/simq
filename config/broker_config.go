@@ -56,6 +56,23 @@ type Broker struct {
 	WssKeyPath    string `toml:"wssKeyPath"`
 	Ca            string `toml:"ca"`
 	CloseShareSub bool   `toml:"closeShareSub"`
+
+	AllowZeroLengthClientId    bool   `toml:"allow_zero_length_clientId"`
+	AutoIdPrefix               string `toml:"auto_id_prefix"`               // 设置客户端id前缀， 默认auto-
+	PerListenerSettings        bool   `toml:"per_listener_settings"`        // 每个listener都需要配置参数
+	CheckRetainSource          bool   `toml:"check_retain_source"`          // 检查发送者是否有发送保留消息的权限，有则可以发送
+	MaxInflightBytes           int32  `toml:"max_inflight_bytes"`           // 对于Qos1/2, 表示最大正在处理的字节数，默认为0（无最大值）
+	MaxInflightMessages        int32  `toml:"max_inflight_messages"`        // 同时传输的消息最大数， qos>0
+	MaxKeepalive               uint16 `toml:"max_keepalive"`                // 允许最大值65535 单位为s
+	MaxPacketSize              int32  `toml:"max_packet_size"`              // 最大数据包大小，单位字节，超过会主动断开连接
+	MaxQueueBytes              int64  `toml:"max_queue_bytes"`              // 最大消息队列的数量，超过会被丢弃，默认0-无最大值
+	MaxQueueMessages           int32  `toml:"max_queue_messages"`           // 超过max_inflight_messages的消息会被缓存到队列中，默认100
+	MessageSizeLimit           int32  `toml:"message_size_limit"`           // 允许发送的最大有效负载大小，默认0-无限制
+	PersistentClientExpiration int64  `toml:"persistent_client_expiration"` // 客户端断开超过该时间，broker会删除该会话信息，就收不到断开后的离线消息了，非标准选项，默认为0-永不
+	QueueQos0Messages          bool   `toml:"queue_qos0_messages"`          // 设置为true，在持久化session的离线消息中，会有qos=0的消息也在排队，同时也会受max_queue_messages限制，默认false
+	RetainAvailable            bool   `toml:"retain_available"`             // 设置为true表示，支持retain 消息，设置为false，不支持，当发送了保留位设置为1的消息，会断开连接
+	SysInterval                int64  `toml:"sys_interval"`                 // 订阅$sys level topic树的更新时间，默认10s，设为0，表示禁用$sys level
+	UpgradeOutgoingQos         bool   `json:"upgrade_outgoing_qos"`         // 设置为true，改变qos等级，与订阅者的消息等级匹配，默认false
 }
 type (
 	ClusterModelEm = string
