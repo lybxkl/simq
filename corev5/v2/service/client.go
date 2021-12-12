@@ -171,6 +171,7 @@ redirect:
 	}
 
 	p := topic_impl.NewMemProvider()
+	p.SetStore(this.svc.SessionStore, this.svc.MessageStore)
 
 	this.svc.topicsMgr = p
 	if err != nil {

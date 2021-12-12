@@ -52,7 +52,7 @@ type session struct {
 	//如果连接意外关闭，遗嘱消息将发布
 	will *message.PublishMessage
 
-	// cbuf is the CONNECT messagev5 buffer, this is for storing all the will stuff
+	// cbuf is the CONNECT messagev5 buffer, sess is for storing all the will stuff
 	//cbuf是连接消息缓冲区，用于存储所有的will内容
 	cbuf []byte
 
@@ -60,7 +60,7 @@ type session struct {
 	// rbuf是保留的发布消息缓冲区
 	rbuf []byte
 
-	// topics stores all the topis for this session/client
+	// topics stores all the topis for sess session/client
 	//主题存储此会话/客户机的所有topics
 	topics map[string]*topics.Sub
 
@@ -70,7 +70,7 @@ type session struct {
 	// Initialized?
 	initted bool
 
-	// Serialize access to this session
+	// Serialize access to sess session
 	//序列化对该会话的访问锁
 	mu   sync.Mutex
 	stop int8 // 2 为关闭
@@ -83,61 +83,61 @@ func NewMemSession(id string) *session {
 func NewMemSessionByCon(con *message.ConnectMessage) *session {
 	return &session{cmessage: con}
 }
-func (this *session) InitSample(msg *message.ConnectMessage, sessionStore store.SessionStore, tps ...sessions.SessionInitTopic) error {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	if this.initted {
+func (sess *session) InitSample(msg *message.ConnectMessage, sessionStore store.SessionStore, tps ...sessions.SessionInitTopic) error {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	if sess.initted {
 		return fmt.Errorf("session already initialized")
 	}
-	this.cbuf = make([]byte, msg.Len())
+	sess.cbuf = make([]byte, msg.Len())
 
-	if _, err := msg.Encode(this.cbuf); err != nil {
+	if _, err := msg.Encode(sess.cbuf); err != nil {
 		return err
 	}
 
-	if _, err := this.cmessage.Decode(this.cbuf); err != nil {
+	if _, err := sess.cmessage.Decode(sess.cbuf); err != nil {
 		return err
 	}
 
-	if this.cmessage.WillFlag() {
-		this.will = message.NewPublishMessage()
-		this.will.SetQoS(this.cmessage.WillQos())
-		this.will.SetTopic(this.cmessage.WillTopic())
-		this.will.SetPayload(this.cmessage.WillMessage())
-		this.will.SetRetain(this.cmessage.WillRetain())
+	if sess.cmessage.WillFlag() {
+		sess.will = message.NewPublishMessage()
+		sess.will.SetQoS(sess.cmessage.WillQos())
+		sess.will.SetTopic(sess.cmessage.WillTopic())
+		sess.will.SetPayload(sess.cmessage.WillMessage())
+		sess.will.SetRetain(sess.cmessage.WillRetain())
 	}
 
-	this.topics = make(map[string]*topics.Sub)
-	this.topicAlice = make(map[uint16][]byte)
-	this.topicAliceRe = make(map[string]uint16)
+	sess.topics = make(map[string]*topics.Sub)
+	sess.topicAlice = make(map[uint16][]byte)
+	sess.topicAliceRe = make(map[string]uint16)
 
-	this.id = string(msg.ClientId())
-	this.pub1ack = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, false, true)
-	this.pub2in = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, true, false)
-	this.pub2out = newDbAckQueue(sessionStore, defaultQueueSize<<1, this.id, false, true)
-	this.suback = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false, false)
-	this.unsuback = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false, false)
-	this.pingack = newDbAckQueue(sessionStore, defaultQueueSize>>4, this.id, false, false)
-	this.runBatch()
+	sess.id = string(msg.ClientId())
+	sess.pub1ack = newDbAckQueue(sessionStore, defaultQueueSize<<1, sess.id, false, true)
+	sess.pub2in = newDbAckQueue(sessionStore, defaultQueueSize<<1, sess.id, true, false)
+	sess.pub2out = newDbAckQueue(sessionStore, defaultQueueSize<<1, sess.id, false, true)
+	sess.suback = newDbAckQueue(sessionStore, defaultQueueSize>>4, sess.id, false, false)
+	sess.unsuback = newDbAckQueue(sessionStore, defaultQueueSize>>4, sess.id, false, false)
+	sess.pingack = newDbAckQueue(sessionStore, defaultQueueSize>>4, sess.id, false, false)
+	sess.runBatch()
 
 	for i := 0; i < len(tps); i++ {
 		sb := topics.Sub(tps[i])
-		this.topics[string(tps[i].Topic)] = &sb
+		sess.topics[string(tps[i].Topic)] = &sb
 	}
 
-	this.status = sessions.ONLINE
+	sess.status = sessions.ONLINE
 
-	this.initted = true
+	sess.initted = true
 
 	return nil
 }
-func (this *session) runBatch() {
+func (sess *session) runBatch() {
 	go func() {
-		b2o := this.pub2out.(batchOption)
-		b1o := this.pub1ack.(batchOption)
+		b2o := sess.pub2out.(batchOption)
+		b1o := sess.pub1ack.(batchOption)
 		tg := 0
 		for {
-			if this.stop == 2 {
+			if sess.stop == 2 {
 				return
 			}
 			select {
@@ -162,139 +162,139 @@ func (this *session) runBatch() {
 }
 
 //Init 遗嘱和connect消息会存在每个session中，不用每次查询数据库的
-func (this *session) Init(msg *message.ConnectMessage, tps ...sessions.SessionInitTopic) error {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+func (sess *session) Init(msg *message.ConnectMessage, tps ...sessions.SessionInitTopic) error {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
 
-	if this.initted {
+	if sess.initted {
 		return fmt.Errorf("session already initialized")
 	}
 
-	this.cbuf = make([]byte, msg.Len())
+	sess.cbuf = make([]byte, msg.Len())
 
-	if _, err := msg.Encode(this.cbuf); err != nil {
+	if _, err := msg.Encode(sess.cbuf); err != nil {
 		return err
 	}
 
-	if _, err := this.cmessage.Decode(this.cbuf); err != nil {
+	if _, err := sess.cmessage.Decode(sess.cbuf); err != nil {
 		return err
 	}
 
-	if this.cmessage.WillFlag() {
-		this.will = message.NewPublishMessage()
-		this.will.SetQoS(this.cmessage.WillQos())
-		this.will.SetTopic(this.cmessage.WillTopic())
-		this.will.SetPayload(this.cmessage.WillMessage())
-		this.will.SetRetain(this.cmessage.WillRetain())
+	if sess.cmessage.WillFlag() {
+		sess.will = message.NewPublishMessage()
+		sess.will.SetQoS(sess.cmessage.WillQos())
+		sess.will.SetTopic(sess.cmessage.WillTopic())
+		sess.will.SetPayload(sess.cmessage.WillMessage())
+		sess.will.SetRetain(sess.cmessage.WillRetain())
 	}
 
-	this.topics = make(map[string]*topics.Sub)
-	this.topicAlice = make(map[uint16][]byte)
-	this.topicAliceRe = make(map[string]uint16)
+	sess.topics = make(map[string]*topics.Sub)
+	sess.topicAlice = make(map[uint16][]byte)
+	sess.topicAliceRe = make(map[string]uint16)
 
-	this.id = string(msg.ClientId())
+	sess.id = string(msg.ClientId())
 
-	this.pub1ack = newAckqueue(defaultQueueSize << 1)
-	this.pub2in = newAckqueue(defaultQueueSize << 1)
-	this.pub2out = newAckqueue(defaultQueueSize << 1)
-	this.suback = newAckqueue(defaultQueueSize >> 4)
-	this.unsuback = newAckqueue(defaultQueueSize >> 4)
-	this.pingack = newAckqueue(defaultQueueSize >> 4)
+	sess.pub1ack = newAckqueue(defaultQueueSize << 1)
+	sess.pub2in = newAckqueue(defaultQueueSize << 1)
+	sess.pub2out = newAckqueue(defaultQueueSize << 1)
+	sess.suback = newAckqueue(defaultQueueSize >> 4)
+	sess.unsuback = newAckqueue(defaultQueueSize >> 4)
+	sess.pingack = newAckqueue(defaultQueueSize >> 4)
 
 	for i := 0; i < len(tps); i++ {
 		sb := topics.Sub(tps[i])
-		this.topics[string(tps[i].Topic)] = &sb
+		sess.topics[string(tps[i].Topic)] = &sb
 	}
 
-	this.status = sessions.ONLINE
+	sess.status = sessions.ONLINE
 
-	this.initted = true
+	sess.initted = true
 
 	return nil
 }
-func (this *session) OfflineMsg() []message.Message {
+func (sess *session) OfflineMsg() []message.Message {
 	return nil
 }
-func (this *session) Update(msg *message.ConnectMessage) error {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+func (sess *session) Update(msg *message.ConnectMessage) error {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
 
-	this.cbuf = make([]byte, msg.Len())
-	this.cmessage = message.NewConnectMessage()
+	sess.cbuf = make([]byte, msg.Len())
+	sess.cmessage = message.NewConnectMessage()
 
-	if _, err := msg.Encode(this.cbuf); err != nil {
+	if _, err := msg.Encode(sess.cbuf); err != nil {
 		return err
 	}
 
-	if _, err := this.cmessage.Decode(this.cbuf); err != nil {
+	if _, err := sess.cmessage.Decode(sess.cbuf); err != nil {
 		return err
 	}
-	this.stop = 1
-	if this.pingack != nil {
-		if _, ok := this.pingack.(*dbAckqueue); ok {
-			this.runBatch()
+	sess.stop = 1
+	if sess.pingack != nil {
+		if _, ok := sess.pingack.(*dbAckqueue); ok {
+			sess.runBatch()
 		}
 	}
 	return nil
 }
 
-func (this *session) AddTopicAlice(topic []byte, alice uint16) {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	this.topicAlice[alice] = topic
-	this.topicAliceRe[string(topic)] = alice
+func (sess *session) AddTopicAlice(topic []byte, alice uint16) {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	sess.topicAlice[alice] = topic
+	sess.topicAliceRe[string(topic)] = alice
 }
-func (this *session) GetTopicAlice(topic []byte) (uint16, bool) {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	tp, exist := this.topicAliceRe[string(topic)]
+func (sess *session) GetTopicAlice(topic []byte) (uint16, bool) {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	tp, exist := sess.topicAliceRe[string(topic)]
 	return tp, exist
 }
-func (this *session) GetAliceTopic(alice uint16) ([]byte, bool) {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	tp, exist := this.topicAlice[alice]
+func (sess *session) GetAliceTopic(alice uint16) ([]byte, bool) {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	tp, exist := sess.topicAlice[alice]
 	return tp, exist
 }
-func (this *session) AddTopic(sub topics.Sub) error {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+func (sess *session) AddTopic(sub topics.Sub) error {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
 
-	if !this.initted {
+	if !sess.initted {
 		return fmt.Errorf("session not yet initialized")
 	}
 
-	this.topics[string(sub.Topic)] = &sub
+	sess.topics[string(sub.Topic)] = &sub
 
 	return nil
 }
 
-func (this *session) RemoveTopic(topic string) error {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+func (sess *session) RemoveTopic(topic string) error {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
 
-	if !this.initted {
+	if !sess.initted {
 		return fmt.Errorf("session not yet initialized")
 	}
 
-	delete(this.topics, topic)
+	delete(sess.topics, topic)
 
 	return nil
 }
-func (this *session) SubOption(topic []byte) topics.Sub {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	sub, ok := this.topics[string(topic)]
+func (sess *session) SubOption(topic []byte) topics.Sub {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
+	sub, ok := sess.topics[string(topic)]
 	if !ok {
 		return topics.Sub{}
 	}
 	return *sub
 }
-func (this *session) Topics() ([]topics.Sub, error) {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+func (sess *session) Topics() ([]topics.Sub, error) {
+	sess.mu.Lock()
+	defer sess.mu.Unlock()
 
-	if !this.initted {
+	if !sess.initted {
 		return nil, fmt.Errorf("session not yet initialized")
 	}
 
@@ -302,87 +302,87 @@ func (this *session) Topics() ([]topics.Sub, error) {
 		subs []topics.Sub
 	)
 
-	for _, v := range this.topics {
+	for _, v := range sess.topics {
 		subs = append(subs, *v)
 	}
 
 	return subs, nil
 }
 
-func (this *session) ID() string {
-	return string(this.Cmsg().ClientId())
+func (sess *session) ID() string {
+	return string(sess.Cmsg().ClientId())
 }
-func (this *session) IDs() []byte {
-	return this.Cmsg().ClientId()
-}
-
-func (this *session) Cmsg() *message.ConnectMessage {
-	return this.cmessage
+func (sess *session) IDs() []byte {
+	return sess.Cmsg().ClientId()
 }
 
-func (this *session) Will() *message.PublishMessage {
-	if this.stop == 1 {
-		this.stop = 2
+func (sess *session) Cmsg() *message.ConnectMessage {
+	return sess.cmessage
+}
+
+func (sess *session) Will() *message.PublishMessage {
+	if sess.stop == 1 {
+		sess.stop = 2
 	} else {
-		this.stop = 1
+		sess.stop = 1
 	}
-	return this.will
+	return sess.will
 }
 
-func (this *session) Pub1ack() sessions.Ackqueue {
-	return this.pub1ack
+func (sess *session) Pub1ack() sessions.Ackqueue {
+	return sess.pub1ack
 }
 
-func (this *session) Pub2in() sessions.Ackqueue {
-	return this.pub2in
+func (sess *session) Pub2in() sessions.Ackqueue {
+	return sess.pub2in
 }
 
-func (this *session) Pub2out() sessions.Ackqueue {
-	return this.pub2out
+func (sess *session) Pub2out() sessions.Ackqueue {
+	return sess.pub2out
 }
 
-func (this *session) Suback() sessions.Ackqueue {
-	return this.suback
+func (sess *session) Suback() sessions.Ackqueue {
+	return sess.suback
 }
 
-func (this *session) Unsuback() sessions.Ackqueue {
-	return this.unsuback
+func (sess *session) Unsuback() sessions.Ackqueue {
+	return sess.unsuback
 }
 
-func (this *session) Pingack() sessions.Ackqueue {
-	return this.pingack
+func (sess *session) Pingack() sessions.Ackqueue {
+	return sess.pingack
 }
 
-func (this *session) ExpiryInterval() uint32 {
-	return this.cmessage.SessionExpiryInterval()
+func (sess *session) ExpiryInterval() uint32 {
+	return sess.cmessage.SessionExpiryInterval()
 }
 
-func (this *session) Status() sessions.Status {
-	return this.status
+func (sess *session) Status() sessions.Status {
+	return sess.status
 }
 
-func (this *session) ReceiveMaximum() uint16 {
-	return this.cmessage.ReceiveMaximum()
+func (sess *session) ReceiveMaximum() uint16 {
+	return sess.cmessage.ReceiveMaximum()
 }
 
-func (this *session) MaxPacketSize() uint32 {
-	return this.cmessage.MaxPacketSize()
+func (sess *session) MaxPacketSize() uint32 {
+	return sess.cmessage.MaxPacketSize()
 }
 
-func (this *session) TopicAliasMax() uint16 {
-	return this.cmessage.TopicAliasMax()
+func (sess *session) TopicAliasMax() uint16 {
+	return sess.cmessage.TopicAliasMax()
 }
 
-func (this *session) RequestRespInfo() byte {
-	return this.cmessage.RequestRespInfo()
+func (sess *session) RequestRespInfo() byte {
+	return sess.cmessage.RequestRespInfo()
 }
 
-func (this *session) RequestProblemInfo() byte {
-	return this.cmessage.RequestProblemInfo()
+func (sess *session) RequestProblemInfo() byte {
+	return sess.cmessage.RequestProblemInfo()
 }
 
-func (this *session) UserProperty() []string {
-	u := this.cmessage.UserProperty()
+func (sess *session) UserProperty() []string {
+	u := sess.cmessage.UserProperty()
 	up := make([]string, len(u))
 	for i := 0; i < len(u); i++ {
 		up[i] = string(u[i])
@@ -390,67 +390,67 @@ func (this *session) UserProperty() []string {
 	return up
 }
 
-func (this *session) OfflineTime() int64 {
-	return this.offlineTime
+func (sess *session) OfflineTime() int64 {
+	return sess.offlineTime
 }
 
-func (this *session) ClientId() string {
-	return string(this.cmessage.ClientId())
+func (sess *session) ClientId() string {
+	return string(sess.cmessage.ClientId())
 }
 
-func (this *session) SetClientId(s string) {
-	_ = this.cmessage.SetClientId([]byte(s))
+func (sess *session) SetClientId(s string) {
+	_ = sess.cmessage.SetClientId([]byte(s))
 }
 
-func (this *session) SetExpiryInterval(u uint32) {
-	this.cmessage.SetSessionExpiryInterval(u)
+func (sess *session) SetExpiryInterval(u uint32) {
+	sess.cmessage.SetSessionExpiryInterval(u)
 }
 
-func (this *session) SetStatus(status sessions.Status) {
-	this.status = status
+func (sess *session) SetStatus(status sessions.Status) {
+	sess.status = status
 }
 
-func (this *session) SetReceiveMaximum(u uint16) {
-	this.cmessage.SetReceiveMaximum(u)
+func (sess *session) SetReceiveMaximum(u uint16) {
+	sess.cmessage.SetReceiveMaximum(u)
 }
 
-func (this *session) SetMaxPacketSize(u uint32) {
-	this.cmessage.SetMaxPacketSize(u)
+func (sess *session) SetMaxPacketSize(u uint32) {
+	sess.cmessage.SetMaxPacketSize(u)
 }
 
-func (this *session) SetTopicAliasMax(u uint16) {
-	this.cmessage.SetTopicAliasMax(u)
+func (sess *session) SetTopicAliasMax(u uint16) {
+	sess.cmessage.SetTopicAliasMax(u)
 }
 
-func (this *session) SetRequestRespInfo(b byte) {
-	this.cmessage.SetRequestRespInfo(b)
+func (sess *session) SetRequestRespInfo(b byte) {
+	sess.cmessage.SetRequestRespInfo(b)
 }
 
-func (this *session) SetRequestProblemInfo(b byte) {
-	this.cmessage.SetRequestProblemInfo(b)
+func (sess *session) SetRequestProblemInfo(b byte) {
+	sess.cmessage.SetRequestProblemInfo(b)
 }
 
-func (this *session) SetUserProperty(up []string) {
+func (sess *session) SetUserProperty(up []string) {
 	u := make([][]byte, len(up))
 	for i := 0; i < len(up); i++ {
 		u[i] = []byte(up[i])
 	}
-	this.cmessage.AddUserPropertys(u)
+	sess.cmessage.AddUserPropertys(u)
 }
 
-func (this *session) SetOfflineTime(i int64) {
-	this.offlineTime = i
+func (sess *session) SetOfflineTime(i int64) {
+	sess.offlineTime = i
 }
 
-func (this *session) SetWill(will *message.PublishMessage) {
-	this.will = will
+func (sess *session) SetWill(will *message.PublishMessage) {
+	sess.will = will
 }
 
-func (this *session) SetSub(sub *message.SubscribeMessage) {
+func (sess *session) SetSub(sub *message.SubscribeMessage) {
 	tp := sub.Topics()
 	qos := sub.Qos()
 	for i := 0; i < len(tp); i++ {
-		_ = this.AddTopic(topics.Sub{
+		_ = sess.AddTopic(topics.Sub{
 			Topic:             tp[i],
 			Qos:               qos[i],
 			NoLocal:           sub.TopicNoLocal(tp[i]),
@@ -460,5 +460,5 @@ func (this *session) SetSub(sub *message.SubscribeMessage) {
 		})
 	}
 }
-func (this *session) SetStore(_ store.SessionStore, _ store.MessageStore) {
+func (sess *session) SetStore(_ store.SessionStore, _ store.MessageStore) {
 }

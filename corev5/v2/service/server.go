@@ -449,6 +449,9 @@ func (server *Server) checkAndInitConfiguration() error {
 			server.TimeoutRetries = 3
 		}
 
+		// store
+		server.initStore()
+
 		auPlus := &sync.Map{} // make(map[string]authplus.AuthPlus)
 		for _, s := range server.AuthPlusProvider {
 			auPlus.Store(s, authplus.NewDefaultAuth()) // TODO
@@ -458,8 +461,9 @@ func (server *Server) checkAndInitConfiguration() error {
 		server.sessMgr = sessions_impl.NewMemProvider()
 		server.topicsMgr = topics_impl.NewMemProvider()
 
-		// store
-		server.initStore()
+		(server.sessMgr).(store.Store).SetStore(server.SessionStore, server.MessageStore)
+		(server.topicsMgr).(store.Store).SetStore(server.SessionStore, server.MessageStore)
+
 		// cluster
 		server.runClusterComp()
 		// 打印启动banner

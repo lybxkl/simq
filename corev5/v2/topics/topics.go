@@ -1,7 +1,7 @@
 package topics
 
 import (
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 )
 
 type Sub struct {
@@ -9,7 +9,7 @@ type Sub struct {
 	Qos               byte
 	NoLocal           bool
 	RetainAsPublished bool
-	RetainHandling    messagev52.RetainHandling
+	RetainHandling    messagev2.RetainHandling
 	SubIdentifier     uint32 // 订阅标识符
 }
 
@@ -28,7 +28,7 @@ type Manager interface {
 
 	Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]Sub, svc bool, shareName string, onlyShare bool) error
 	AllSubInfo() (map[string][]string, error) // 获取所有的共享订阅，k: 主题，v: 该主题的所有共享组
-	Retain(msg *messagev52.PublishMessage) error
-	Retained(topic []byte, msgs *[]*messagev52.PublishMessage) error
+	Retain(msg *messagev2.PublishMessage) error
+	Retained(topic []byte, msgs *[]*messagev2.PublishMessage) error
 	Close() error
 }

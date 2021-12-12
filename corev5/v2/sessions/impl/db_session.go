@@ -36,14 +36,14 @@ func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionIn
 	ctx := context.Background()
 	// 拉取订阅
 	subs, err := d.sessionStore.GetSubscriptions(ctx, cid)
-	topics := make([]sessions.SessionInitTopic, len(subs))
+	tps := make([]sessions.SessionInitTopic, len(subs))
 	for i := 0; i < len(subs); i++ {
 		topic := subs[i].Topics()
 		if len(topic) == 0 {
 			continue
 		}
 		tpc := topic[0] // 正常来说 从数据库取出来的 只会有一个topic
-		topics[i] = sessions.SessionInitTopic{
+		tps[i] = sessions.SessionInitTopic{
 			Topic:             tpc,
 			Qos:               subs[i].Qos()[0],
 			NoLocal:           subs[i].TopicNoLocal(tpc),
@@ -52,7 +52,7 @@ func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionIn
 			SubIdentifier:     subs[i].SubscriptionIdentifier(),
 		}
 	}
-	err = d.memSession.InitSample(msg, d.sessionStore, topics...)
+	err = d.memSession.InitSample(msg, d.sessionStore, tps...)
 	if err != nil {
 		return err
 	}

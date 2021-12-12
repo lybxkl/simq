@@ -19,8 +19,8 @@ type memMessageStore struct {
 
 func NewMemMessageStore() store2.MessageStore {
 	return &memMessageStore{
-		willTable:   map[string]*messagev2.PublishMessage{},
-		retainTable: map[string]*messagev2.PublishMessage{},
+		willTable:   make(map[string]*messagev2.PublishMessage),
+		retainTable: make(map[string]*messagev2.PublishMessage),
 	}
 }
 func (m *memMessageStore) Start(ctx context.Context, config config.SIConfig) error {

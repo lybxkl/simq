@@ -1,9 +1,11 @@
 package impl
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"gitee.com/Ljolan/si-mqtt/cluster/store"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
@@ -14,8 +16,14 @@ import (
 var _ sessions.Provider = (*memProvider)(nil)
 
 type memProvider struct {
-	st map[string]sessions.Session
+	sessStore store.SessionStore
+
 	mu sync.RWMutex
+	st map[string]sessions.Session
+}
+
+func (prv *memProvider) SetStore(store store.SessionStore, _ store.MessageStore) {
+	prv.sessStore = store
 }
 
 func NewMemProvider() sessions.Provider {
@@ -24,48 +32,51 @@ func NewMemProvider() sessions.Provider {
 	}
 }
 
-func (this *memProvider) New(id string, cleanStart bool, expiryTime uint32) (sessions.Session, error) {
+func (prv *memProvider) New(id string, cleanStart bool, expiryTime uint32) (sessions.Session, error) {
 	if id == "" {
 		id = sessionId()
 	}
-	this.mu.Lock()
-	defer this.mu.Unlock()
+	prv.mu.Lock()
+	defer prv.mu.Unlock()
 	if expiryTime == 0 {
-		this.st[id] = NewMemSession(id)
+		prv.st[id] = NewMemSession(id)
 	} else {
-		this.st[id] = NewDBSession(id) // 新开始，需要删除旧的
+		s := NewDBSession(id) // 新开始，需要删除旧的
+		prv.st[id] = s
+		prv.sessStore.StoreSession(context.Background(), id, s)
 	}
-	return this.st[id], nil
+	return prv.st[id], nil
 }
 
-func (this *memProvider) Get(id string, cleanStart bool, expiryTime uint32) (sessions.Session, error) {
-	this.mu.RLock()
-	defer this.mu.RUnlock()
+func (prv *memProvider) Get(id string, cleanStart bool, expiryTime uint32) (sessions.Session, error) {
+	prv.mu.RLock()
+	defer prv.mu.RUnlock()
 
-	sess, ok := this.st[id]
+	sess, ok := prv.st[id]
 	if !ok {
 		return nil, fmt.Errorf("store/Get: No session found for key %s", id)
 	}
-	logger.Logger.Info(strconv.Itoa(len(this.st)))
+	logger.Logger.Info(strconv.Itoa(len(prv.st)))
 	return sess, nil
 }
 
-func (this *memProvider) Del(id string) {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	delete(this.st, id)
+func (prv *memProvider) Del(id string) {
+	prv.mu.Lock()
+	defer prv.mu.Unlock()
+	prv.sessStore.ClearSession(context.Background(), id, true)
+	delete(prv.st, id)
 }
 
-func (this *memProvider) Save(id string) error {
+func (prv *memProvider) Save(id string) error {
 	return nil
 }
 
-func (this *memProvider) Count() int {
-	return len(this.st)
+func (prv *memProvider) Count() int {
+	return len(prv.st)
 }
 
-func (this *memProvider) Close() error {
-	this.st = make(map[string]sessions.Session)
+func (prv *memProvider) Close() error {
+	prv.st = make(map[string]sessions.Session)
 	return nil
 }
 func sessionId() string {

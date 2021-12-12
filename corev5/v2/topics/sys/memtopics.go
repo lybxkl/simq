@@ -4,8 +4,8 @@ package sys
 import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/consts"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
-	topicsv52 "gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	topicsv2 "gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
 	"reflect"
 	"sync"
 )
@@ -32,10 +32,6 @@ const (
 	stateSYS             // System level topic ($) 系统级主题($)
 )
 
-// NewMemProvider returns an new instance of the memTopics, which is implements the
-// TopicsProvider interface. memProvider is a hidden struct that stores the topic
-// subscriptions and retained messages in memory. The content is not persistend so
-// when the server goes, everything will be gone. Use with care.
 func NewMemProvider() *memTopics {
 	return &memTopics{
 		sroot: newRSNode(),
@@ -43,81 +39,80 @@ func NewMemProvider() *memTopics {
 	}
 }
 
-func (this *memTopics) Subscribe(subs topicsv52.Sub, sub interface{}) (byte, error) {
-	if !messagev52.ValidQos(subs.Qos) {
-		return messagev52.QosFailure, fmt.Errorf("Invalid QoS %d", subs.Qos)
+func (node *memTopics) Subscribe(subs topicsv2.Sub, sub interface{}) (byte, error) {
+	if !messagev2.ValidQos(subs.Qos) {
+		return messagev2.QosFailure, fmt.Errorf("invalid QoS %d", subs.Qos)
 	}
 
 	if sub == nil {
-		return messagev52.QosFailure, fmt.Errorf("Subscriber cannot be nil")
+		return messagev2.QosFailure, fmt.Errorf("subscriber cannot be nil")
 	}
 
-	this.smu.Lock()
-	defer this.smu.Unlock()
+	node.smu.Lock()
+	defer node.smu.Unlock()
 
 	if subs.Qos > consts.MaxQosAllowed {
 		subs.Qos = consts.MaxQosAllowed
 	}
 
-	if err := this.sroot.sinsert(subs, sub); err != nil {
-		return messagev52.QosFailure, err
+	if err := node.sroot.sinsert(subs, sub); err != nil {
+		return messagev2.QosFailure, err
 	}
 
 	return subs.Qos, nil
 }
 
-func (this *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
-	this.smu.Lock()
-	defer this.smu.Unlock()
+func (node *memTopics) Unsubscribe(topic []byte, sub interface{}) error {
+	node.smu.Lock()
+	defer node.smu.Unlock()
 
-	return this.sroot.sremove(topic, sub)
+	return node.sroot.sremove(topic, sub)
 }
 
-// Returned values will be invalidated by the next Subscribers call
-func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv52.Sub) error {
-	if !messagev52.ValidQos(qos) {
-		return fmt.Errorf("Invalid QoS %d", qos)
+func (node *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv2.Sub) error {
+	if !messagev2.ValidQos(qos) {
+		return fmt.Errorf("invalid QoS %d", qos)
 	}
 
-	this.smu.RLock()
-	defer this.smu.RUnlock()
+	node.smu.RLock()
+	defer node.smu.RUnlock()
 
 	*subs = (*subs)[0:0]
 	*qoss = (*qoss)[0:0]
 
-	return this.sroot.smatch(topic, qos, subs, qoss)
+	return node.sroot.smatch(topic, qos, subs, qoss)
 }
 
-func (this *memTopics) Retain(msg *messagev52.PublishMessage) error {
-	this.rmu.Lock()
-	defer this.rmu.Unlock()
+func (node *memTopics) Retain(msg *messagev2.PublishMessage) error {
+	node.rmu.Lock()
+	defer node.rmu.Unlock()
 
 	// So apparently, at least according to the MQTT Conformance/Interoperability
 	// Testing, that a payload of 0 means delete the retain messagev5.
 	// https://eclipse.org/paho/clients/testing/
 	if len(msg.Payload()) == 0 {
-		return this.rroot.rremove(msg.Topic())
+		return node.rroot.rremove(msg.Topic())
 	}
 
-	return this.rroot.rinsert(msg.Topic(), msg)
+	return node.rroot.rinsert(msg.Topic(), msg)
 }
 
-func (this *memTopics) Retained(topic []byte, msgs *[]*messagev52.PublishMessage) error {
-	this.rmu.RLock()
-	defer this.rmu.RUnlock()
+func (node *memTopics) Retained(topic []byte, msgs *[]*messagev2.PublishMessage) error {
+	node.rmu.RLock()
+	defer node.rmu.RUnlock()
 
-	return this.rroot.rmatch(topic, msgs)
+	return node.rroot.rmatch(topic, msgs)
 }
 
-func (this *memTopics) Close() error {
-	this.sroot = nil
-	this.rroot = nil
+func (node *memTopics) Close() error {
+	node.sroot = nil
+	node.rroot = nil
 	return nil
 }
 
 // subscrition nodes
 type rSnode struct {
-	// If this is the end of the topic string, then add subscribers here
+	// If node is the end of the topic string, then add subscribers here
 	subs []interface{}
 	qos  []byte
 
@@ -131,23 +126,23 @@ func newRSNode() *rSnode {
 	}
 }
 
-func (this *rSnode) sinsert(subs topicsv52.Sub, sub interface{}) error {
+func (node *rSnode) sinsert(subs topicsv2.Sub, sub interface{}) error {
 	// If there's no more topic levels, that means we are at the matching snode
 	// to insert the subscriber. So let's see if there's such subscriber,
 	// if so, update it. Otherwise insert it.
 	if len(subs.Topic) == 0 {
 		// Let's see if the subscriber is already on the list. If yes, update
 		// QoS and then return.
-		for i := range this.subs {
-			if equal(this.subs[i], sub) {
-				this.qos[i] = subs.Qos
+		for i := range node.subs {
+			if equal(node.subs[i], sub) {
+				node.qos[i] = subs.Qos
 				return nil
 			}
 		}
 
 		// Otherwise add.
-		this.subs = append(this.subs, sub)
-		this.qos = append(this.qos, subs.Qos)
+		node.subs = append(node.subs, sub)
+		node.qos = append(node.qos, subs.Qos)
 
 		return nil
 	}
@@ -164,10 +159,10 @@ func (this *rSnode) sinsert(subs topicsv52.Sub, sub interface{}) error {
 	level := string(ntl)
 
 	// Add snode if it doesn't already exist
-	n, ok := this.rsnodes[level]
+	n, ok := node.rsnodes[level]
 	if !ok {
 		n = newRSNode()
-		this.rsnodes[level] = n
+		node.rsnodes[level] = n
 	}
 	subs.Topic = rem
 	return n.sinsert(subs, sub)
@@ -175,23 +170,23 @@ func (this *rSnode) sinsert(subs topicsv52.Sub, sub interface{}) error {
 
 // This remove implementation ignores the QoS, as long as the subscriber
 // matches then it's removed
-func (this *rSnode) sremove(topic []byte, sub interface{}) error {
+func (node *rSnode) sremove(topic []byte, sub interface{}) error {
 	// If the topic is empty, it means we are at the final matching snode. If so,
 	// let's find the matching subscribers and remove them.
 	if len(topic) == 0 {
 		// If subscriber == nil, then it's signal to remove ALL subscribers
 		if sub == nil {
-			this.subs = this.subs[0:0]
-			this.qos = this.qos[0:0]
+			node.subs = node.subs[0:0]
+			node.qos = node.qos[0:0]
 			return nil
 		}
 
 		// If we find the subscriber then remove it from the list. Technically
 		// we just overwrite the slot by shifting all other items up by one.
-		for i := range this.subs {
-			if equal(this.subs[i], sub) {
-				this.subs = append(this.subs[:i], this.subs[i+1:]...)
-				this.qos = append(this.qos[:i], this.qos[i+1:]...)
+		for i := range node.subs {
+			if equal(node.subs[i], sub) {
+				node.subs = append(node.subs[:i], node.subs[i+1:]...)
+				node.qos = append(node.qos[:i], node.qos[i+1:]...)
 				return nil
 			}
 		}
@@ -211,7 +206,7 @@ func (this *rSnode) sremove(topic []byte, sub interface{}) error {
 	level := string(ntl)
 
 	// Find the snode that matches the topic level
-	n, ok := this.rsnodes[level]
+	n, ok := node.rsnodes[level]
 	if !ok {
 		return fmt.Errorf("memtopics/remove: No topic found")
 	}
@@ -224,7 +219,7 @@ func (this *rSnode) sremove(topic []byte, sub interface{}) error {
 	// If there are no more subscribers and snodes to the next level we just visited
 	// let's remove it
 	if len(n.subs) == 0 && len(n.rsnodes) == 0 {
-		delete(this.rsnodes, level)
+		delete(node.rsnodes, level)
 	}
 
 	return nil
@@ -234,11 +229,11 @@ func (this *rSnode) sremove(topic []byte, sub interface{}) error {
 // with no wildcards (publish topic), it returns a list of subscribers that subscribes
 // to the topic. For each of the level names, it's a match
 // - if there are subscribers to '#', then all the subscribers are added to result set
-func (this *rSnode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv52.Sub) error {
+func (node *rSnode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]topicsv2.Sub) error {
 	// If the topic is empty, it means we are at the final matching snode. If so,
 	// let's find the subscribers that match the qos and append them to the list.
 	if len(topic) == 0 {
-		this.matchQos(qos, subs, qoss)
+		node.matchQos(qos, subs, qoss)
 		return nil
 	}
 
@@ -250,7 +245,7 @@ func (this *rSnode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]
 
 	level := string(ntl)
 
-	for k, n := range this.rsnodes {
+	for k, n := range node.rsnodes {
 		// If the key is "#", then these subscribers are added to the result set
 		if k == consts.MWC {
 			n.matchQos(qos, subs, qoss)
@@ -266,8 +261,8 @@ func (this *rSnode) smatch(topic []byte, qos byte, subs *[]interface{}, qoss *[]
 
 // retained messagev5 nodes
 type rRnode struct {
-	// If this is the end of the topic string, then add retained messages here
-	msg *messagev52.PublishMessage
+	// If node is the end of the topic string, then add retained messages here
+	msg *messagev2.PublishMessage
 	buf []byte
 
 	// Otherwise add the next topic level here
@@ -280,28 +275,28 @@ func newRRNode() *rRnode {
 	}
 }
 
-func (this *rRnode) rinsert(topic []byte, msg *messagev52.PublishMessage) error {
+func (node *rRnode) rinsert(topic []byte, msg *messagev2.PublishMessage) error {
 	// If there's no more topic levels, that means we are at the matching rnode.
 	if len(topic) == 0 {
 		l := msg.Len()
 
 		// Let's reuse the buffer if there's enough space
-		if l > cap(this.buf) {
-			this.buf = make([]byte, l)
+		if l > cap(node.buf) {
+			node.buf = make([]byte, l)
 		} else {
-			this.buf = this.buf[0:l]
+			node.buf = node.buf[0:l]
 		}
 
-		if _, err := msg.Encode(this.buf); err != nil {
+		if _, err := msg.Encode(node.buf); err != nil {
 			return err
 		}
 
 		// Reuse the messagev5 if possible
-		if this.msg == nil {
-			this.msg = messagev52.NewPublishMessage()
+		if node.msg == nil {
+			node.msg = messagev2.NewPublishMessage()
 		}
 
-		if _, err := this.msg.Decode(this.buf); err != nil {
+		if _, err := node.msg.Decode(node.buf); err != nil {
 			return err
 		}
 
@@ -320,22 +315,22 @@ func (this *rRnode) rinsert(topic []byte, msg *messagev52.PublishMessage) error 
 	level := string(ntl)
 
 	// Add snode if it doesn't already exist
-	n, ok := this.rrnodes[level]
+	n, ok := node.rrnodes[level]
 	if !ok {
 		n = newRRNode()
-		this.rrnodes[level] = n
+		node.rrnodes[level] = n
 	}
 
 	return n.rinsert(rem, msg)
 }
 
 // Remove the retained messagev5 for the supplied topic
-func (this *rRnode) rremove(topic []byte) error {
+func (node *rRnode) rremove(topic []byte) error {
 	// If the topic is empty, it means we are at the final matching rnode. If so,
 	// let's remove the buffer and messagev5.
 	if len(topic) == 0 {
-		this.buf = nil
-		this.msg = nil
+		node.buf = nil
+		node.msg = nil
 		return nil
 	}
 
@@ -351,7 +346,7 @@ func (this *rRnode) rremove(topic []byte) error {
 	level := string(ntl)
 
 	// Find the rnode that matches the topic level
-	n, ok := this.rrnodes[level]
+	n, ok := node.rrnodes[level]
 	if !ok {
 		return fmt.Errorf("memtopics/rremove: No topic found")
 	}
@@ -363,7 +358,7 @@ func (this *rRnode) rremove(topic []byte) error {
 
 	// If there are no more rnodes to the next level we just visited let's remove it
 	if len(n.rrnodes) == 0 {
-		delete(this.rrnodes, level)
+		delete(node.rrnodes, level)
 	}
 
 	return nil
@@ -372,12 +367,12 @@ func (this *rRnode) rremove(topic []byte) error {
 // rmatch() finds the retained messages for the topic and qos provided. It's somewhat
 // of a reverse match compare to match() since the supplied topic can contain
 // wildcards, whereas the retained messagev5 topic is a full (no wildcard) topic.
-func (this *rRnode) rmatch(topic []byte, msgs *[]*messagev52.PublishMessage) error {
+func (node *rRnode) rmatch(topic []byte, msgs *[]*messagev2.PublishMessage) error {
 	// If the topic is empty, it means we are at the final matching rnode. If so,
 	// add the retained msg to the list.
 	if len(topic) == 0 {
-		if this.msg != nil {
-			*msgs = append(*msgs, this.msg)
+		if node.msg != nil {
+			*msgs = append(*msgs, node.msg)
 		}
 		return nil
 	}
@@ -391,18 +386,18 @@ func (this *rRnode) rmatch(topic []byte, msgs *[]*messagev52.PublishMessage) err
 	level := string(ntl)
 
 	if level == consts.MWC {
-		// If '#', add all retained messages starting this node
-		this.allRetained(msgs)
+		// If '#', add all retained messages starting node node
+		node.allRetained(msgs)
 	} else if level == consts.SWC {
-		// If '+', check all nodes at this level. Next levels must be matched.
-		for _, n := range this.rrnodes {
+		// If '+', check all nodes at node level. Next levels must be matched.
+		for _, n := range node.rrnodes {
 			if err := n.rmatch(rem, msgs); err != nil {
 				return err
 			}
 		}
 	} else {
 		// Otherwise, find the matching node, go to the next level
-		if n, ok := this.rrnodes[level]; ok {
+		if n, ok := node.rrnodes[level]; ok {
 			if err := n.rmatch(rem, msgs); err != nil {
 				return err
 			}
@@ -412,12 +407,12 @@ func (this *rRnode) rmatch(topic []byte, msgs *[]*messagev52.PublishMessage) err
 	return nil
 }
 
-func (this *rRnode) allRetained(msgs *[]*messagev52.PublishMessage) {
-	if this.msg != nil {
-		*msgs = append(*msgs, this.msg)
+func (node *rRnode) allRetained(msgs *[]*messagev2.PublishMessage) {
+	if node.msg != nil {
+		*msgs = append(*msgs, node.msg)
 	}
 
-	for _, n := range this.rrnodes {
+	for _, n := range node.rrnodes {
 		n.allRetained(msgs)
 	}
 }
@@ -476,21 +471,21 @@ func nextRTopicLevel(topic []byte) ([]byte, []byte, error) {
 }
 
 // The QoS of the payload messages sent in response to a subscription must be the
-// minimum of the QoS of the originally published messagev5 (in this case, it's the
-// qos parameter) and the maximum QoS granted by the server (in this case, it's
+// minimum of the QoS of the originally published messagev5 (in node case, it's the
+// qos parameter) and the maximum QoS granted by the server (in node case, it's
 // the QoS in the topic tree).
 //
 // It's also possible that even if the topic matches, the subscriber is not included
 // due to the QoS granted is lower than the published messagev5 QoS. For example,
-// if the client is granted only QoS 0, and the publish messagev5 is QoS 1, then this
+// if the client is granted only QoS 0, and the publish messagev5 is QoS 1, then node
 // client is not to be send the published messagev5.
-func (this *rSnode) matchQos(qos byte, subs *[]interface{}, qoss *[]topicsv52.Sub) {
-	for i, sub := range this.subs {
+func (node *rSnode) matchQos(qos byte, subs *[]interface{}, qoss *[]topicsv2.Sub) {
+	for i, sub := range node.subs {
 		// If the published QoS is higher than the subscriber QoS, then we skip the
 		// subscriber. Otherwise, add to the list.
-		if qos <= this.qos[i] {
+		if qos <= node.qos[i] {
 			*subs = append(*subs, sub)
-			*qoss = append(*qoss, topicsv52.Sub{Qos: qos})
+			*qoss = append(*qoss, topicsv2.Sub{Qos: qos})
 		}
 	}
 }
@@ -609,11 +604,7 @@ func nextTopicLevel(topic []byte) ([]byte, []byte, error) {
 		}
 	}
 
-	// If we got here that means we didn't hit the separator along the way, so the
-	// topic is either empty, or does not contain a separator. Either way, we return
-	// the full topic
 	//如果我们到了这里，那就意味着我们没有中途到达分隔符，所以
-	//主题要么为空，要么不包含分隔符。不管怎样，我们都会回来
-	//完整的主题
+	//主题要么为空，要么不包含分隔符。不管怎样，我们都会返回完整的主题
 	return topic, nil, nil
 }
