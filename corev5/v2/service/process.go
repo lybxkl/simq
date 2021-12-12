@@ -39,6 +39,16 @@ func (svc *service) processor() {
 	svc.wgStarted.Done()
 
 	for {
+		// 检查done是否关闭，如果关闭，退出
+		if svc.isDone() {
+			return
+		}
+		// 流控处理
+		if e := svc.streamController(); e != nil {
+			logger.Logger.Warn(e)
+			return
+		}
+
 		//了解接下来是什么消息以及消息的大小
 		mtype, total, err := svc.peekMessageSize()
 		if err != nil {
@@ -79,15 +89,17 @@ func (svc *service) processor() {
 			return
 		}
 
-		// 检查done是否关闭，如果关闭，退出
-		if svc.isDone() {
-			return
-		}
-
-		// 流控处理
-		if e := svc.streamController(); e != nil {
-			logger.Logger.Warn(e)
-			return
+		// 中间件处理消息，可桥接
+		for _, opt := range svc.middleware {
+			canSkipErr, middleWareErr := opt.Apply(msg)
+			if middleWareErr != nil {
+				if canSkipErr {
+					logger.Logger.Errorf("(%s) middlewrae deal msg %s error [skip]: %v", svc.cid(), msg, middleWareErr)
+				} else {
+					logger.Logger.Errorf("(%s) middlewrae deal msg %s error [no_skip]: %v", svc.cid(), msg, middleWareErr)
+					break
+				}
+			}
 		}
 	}
 }

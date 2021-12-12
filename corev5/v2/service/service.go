@@ -8,6 +8,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/middleware"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
 	"io"
@@ -118,6 +119,8 @@ type service struct {
 	MessageStore store.MessageStore
 	EventStore   store.EventStore
 	conFig       *config.SIConfig
+
+	middleware middleware.Options
 }
 
 // 运行接入的连接，会产生三个协程异步逻辑处理，当前不会阻塞

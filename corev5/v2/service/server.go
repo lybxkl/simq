@@ -18,6 +18,7 @@ import (
 	sessions_impl "gitee.com/Ljolan/si-mqtt/corev5/v2/sessions/impl"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
 	topics_impl "gitee.com/Ljolan/si-mqtt/corev5/v2/topics/impl"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/middleware"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/runtimex"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
@@ -111,6 +112,8 @@ type Server struct {
 	qoss []byte
 
 	close []io.Closer
+
+	middleware middleware.Options
 }
 
 //func (s *Server) TopicProvider() topics.Manager {
@@ -286,6 +289,8 @@ func (server *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		topicsMgr:         server.topicsMgr,
 		shareTopicMapNode: server.ShareTopicMapNode,
 		conFig:            server.ConFig,
+
+		middleware: server.middleware,
 	}
 	err = server.getSession(svc, req, resp)
 	if err != nil {
@@ -466,12 +471,25 @@ func (server *Server) checkAndInitConfiguration() error {
 
 		// cluster
 		server.runClusterComp()
+
+		// init middleware
+		server.initMiddleware(middleware.WithConsole())
+
 		// 打印启动banner
 		printBanner(server.Version)
 		return
 	})
 
 	return err
+}
+
+func (server *Server) initMiddleware(option ...middleware.Option) {
+	if server.middleware == nil {
+		server.middleware = make(middleware.Options, 0)
+	}
+	for i := 0; i < len(option); i++ {
+		server.middleware.Apply(option[i])
+	}
 }
 
 // 初始化存储
