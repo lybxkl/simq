@@ -35,6 +35,14 @@ func NewDisconnectMessage() *DisconnectMessage {
 	return msg
 }
 
+func NewDiscMessageWithCodeInfo(code ReasonCode, str []byte) *DisconnectMessage {
+	msg := &DisconnectMessage{}
+	msg.SetType(DISCONNECT)
+	msg.SetReasonCode(code)
+	msg.SetReasonStr(str)
+	return msg
+}
+
 func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 	total, err := this.header.decode(src)
 	if err != nil {

@@ -34,3 +34,13 @@ const (
 	StateSEP             // Topic level separator 主题水平分隔符
 	StateSYS             // System level topic ($) 系统级主题($)
 )
+
+const (
+	AutoIdPrefix     = "auto-"
+	KeepAlive        = 300
+	MaxQueueMessages = 100
+	SysInterval      = 10
+	ConnectTimeout   = 5
+	AckTimeout       = 20
+	TimeoutRetries   = 3
+)

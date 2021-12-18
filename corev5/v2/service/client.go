@@ -113,9 +113,7 @@ redirect:
 				panic("authplus is nil")
 			}
 			if !reflect.DeepEqual(au.AuthMethod(), authMethod) {
-				ds := message.NewDisconnectMessage()
-				ds.SetReasonCode(message.InvalidAuthenticationMethod)
-				ds.SetReasonStr([]byte("auth method is different from last time"))
+				ds := message.NewDiscMessageWithCodeInfo(message.InvalidAuthenticationMethod, []byte("auth method is different from last time"))
 				err = writeMessage(conn, ds)
 				if err != nil {
 					return err
@@ -124,9 +122,7 @@ redirect:
 			}
 			authContinueData, _, err := this.AuthPlus.Verify(au.AuthData())
 			if err != nil {
-				dis := message.NewDisconnectMessage()
-				dis.SetReasonCode(message.UnAuthorized)
-				dis.SetReasonStr([]byte(err.Error()))
+				dis := message.NewDiscMessageWithCodeInfo(message.UnAuthorized, []byte(err.Error()))
 				err = writeMessage(conn, dis)
 				return err
 			}

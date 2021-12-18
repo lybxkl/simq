@@ -1,9 +1,16 @@
 package message
 
+import "strings"
+
 /**
 属性，原因码
 字节表示1字节
 */
+
+type Code struct {
+	ReasonCode
+	info string
+}
 
 // 原因码
 type (
@@ -90,16 +97,16 @@ const (
 )
 
 // Value returns the value of the ReasonCode, which is just the byte representation
-func (this ReasonCode) Value() byte {
-	return byte(this)
+func (code ReasonCode) Value() byte {
+	return byte(code)
 }
-func (this ReasonCode) String() string {
-	return this.Desc()
+func (code ReasonCode) String() string {
+	return code.Desc()
 }
 
 // Desc returns the description of the ReasonCode
-func (this ReasonCode) Desc() string {
-	switch this {
+func (code ReasonCode) Desc() string {
+	switch code {
 	case 0:
 		return "Success, NormalDisconnected or Qos0"
 	case Qos1:
@@ -191,11 +198,25 @@ func (this ReasonCode) Desc() string {
 }
 
 // Valid checks to see if the ReasonCode is valid. Currently valid codes are <= 5
-func (this ReasonCode) Valid() bool {
-	return this <= 0xA2
+func (code ReasonCode) Valid() bool {
+	return code <= 0xA2
 }
 
 // Error returns the corresonding error string for the ReasonCode
-func (this ReasonCode) Error() string {
-	return this.Desc()
+func (code ReasonCode) Error() string {
+	return code.Desc()
+}
+
+func NewCodeErr(code ReasonCode, msg ...string) error {
+	info := ""
+	if len(msg) > 0 {
+		info = strings.Join(msg, ", ")
+	}
+	return &Code{
+		ReasonCode: code,
+		info:       info,
+	}
+}
+func (code *Code) Error() string {
+	return code.Desc() + ": " + code.info
 }

@@ -20,7 +20,7 @@ type console struct {
 }
 
 func (c *console) Apply(msg message.Message) (bool, error) {
-	fmt.Println(msg.Name())
+	fmt.Println("[middleware]==>", msg.Name())
 	return true, nil
 }
 

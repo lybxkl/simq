@@ -13,6 +13,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/auth"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/auth/authplus"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/consts"
 	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	sessions_impl "gitee.com/Ljolan/si-mqtt/corev5/v2/sessions/impl"
@@ -44,10 +45,6 @@ func GetServerName() string {
 	return serverName
 }
 
-// Server is a library implementation of the MQTT server that, as best it can, complies
-// with the MQTT 3.1 and 3.1.1 specs.
-// Server是MQTT服务器的一个库实现，它尽其所能遵守
-//使用MQTT 3.1和3.1.1规范。
 type Server struct {
 	Version string // 服务版本
 
@@ -248,7 +245,8 @@ func (server *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	}
 
 	defer func() {
-		if err != nil {
+		if err != nil && c != nil {
+			time.Sleep(10 * time.Millisecond)
 			_ = c.Close()
 		}
 	}()
@@ -269,7 +267,7 @@ func (server *Server) handleConnection(c io.Closer) (svc *service, err error) {
 
 	// 等待连接认证
 	req, resp, err := server.conAuth(conn)
-	if err != nil {
+	if err != nil || resp == nil {
 		return nil, err
 	}
 
@@ -336,6 +334,30 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 		}
 		return nil, nil, err
 	}
+
+	// 判断是否允许空client id
+	if len(req.ClientId()) == 0 && !server.ConFig.Broker.AllowZeroLengthClientId {
+		dis := messagev2.NewDisconnectMessage()
+		dis.SetReasonCode(messagev2.CustomerIdentifierInvalid)
+		dis.SetReasonStr([]byte("the length of the client ID cannot be zero"))
+		writeMessage(conn, dis)
+		return nil, nil, errors.New("the length of the client ID cannot be zero")
+	}
+	if server.ConFig.Broker.MaxKeepalive > 0 && req.KeepAlive() > server.ConFig.Broker.MaxKeepalive {
+		dis := messagev2.NewDisconnectMessage()
+		dis.SetReasonCode(messagev2.UnspecifiedError)
+		dis.SetReasonStr([]byte("the keepalive value exceeds the maximum value"))
+		writeMessage(conn, dis)
+		return nil, nil, errors.New("the keepalive value exceeds the maximum value")
+	}
+	if server.ConFig.Broker.MaxPacketSize > 0 && req.Len() > int(server.ConFig.Broker.MaxPacketSize) {
+		dis := messagev2.NewDisconnectMessage()
+		dis.SetReasonCode(messagev2.UnspecifiedError)
+		dis.SetReasonStr([]byte("exceeds the maximum package size"))
+		writeMessage(conn, dis)
+		return nil, nil, errors.New("exceeds the maximum package size")
+	}
+
 	svcConf := server.ConFig.DefaultConfig.Server
 	if svcConf.RedirectOpen { // 重定向
 		dis := messagev2.NewDisconnectMessage()
@@ -345,7 +367,7 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 			dis.SetReasonCode(messagev2.UseOtherServers)
 		}
 		dis.SetServerReference([]byte(svcConf.Redirects[0]))
-		err = writeMessage(conn, dis)
+		writeMessage(conn, dis)
 		return nil, nil, nil
 	}
 	// 版本
@@ -439,19 +461,19 @@ func (server *Server) checkAndInitConfiguration() error {
 
 	server.configOnce.Do(func() {
 		if server.KeepAlive == 0 {
-			server.KeepAlive = 300
+			server.KeepAlive = consts.KeepAlive
 		}
 
 		if server.ConnectTimeout == 0 {
-			server.ConnectTimeout = 5
+			server.ConnectTimeout = consts.ConnectTimeout
 		}
 
 		if server.AckTimeout == 0 {
-			server.AckTimeout = 20
+			server.AckTimeout = consts.AckTimeout
 		}
 
 		if server.TimeoutRetries == 0 {
-			server.TimeoutRetries = 3
+			server.TimeoutRetries = consts.TimeoutRetries
 		}
 
 		// store

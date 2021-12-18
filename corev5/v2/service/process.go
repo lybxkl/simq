@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	errDisconnect = errors.New("Disconnect")
+	errDisconnect = errors.New("disconnect") // 直接close的错误信号
 )
 
 // processor() reads messages from the incoming buffer and processes them
@@ -75,9 +75,15 @@ func (svc *service) processor() {
 		if err != nil {
 			if err != errDisconnect {
 				logger.Logger.Errorf("(%s) Error processing %s: %v", svc.cid(), msg, err)
-			} else {
-				return
+
+				var dis = messagev2.NewDiscMessageWithCodeInfo(messagev2.UnspecifiedError, []byte(err.Error()))
+				if reasonErr, ok := err.(*messagev2.Code); ok {
+					dis = messagev2.NewDiscMessageWithCodeInfo(reasonErr.ReasonCode, []byte(reasonErr.Error()))
+				}
+
+				writeMessage(svc.conn, dis)
 			}
+			return
 		}
 
 		// 我们应该提交缓冲区中的字节，这样我们才能继续
@@ -120,11 +126,13 @@ func (svc *service) streamController() error {
 	}
 	return nil
 }
+
 func (svc *service) sendBeyondQuota() (int, error) {
 	dis := messagev2.NewDisconnectMessage()
 	dis.SetReasonCode(messagev2.BeyondQuota)
 	return svc.sendByConn(dis)
 }
+
 func (svc *service) sendTooManyMessages() (int, error) {
 	dis := messagev2.NewDisconnectMessage()
 	dis.SetReasonCode(messagev2.TooManyMessages)
@@ -140,6 +148,7 @@ func (svc *service) sendByConn(msg messagev2.Message) (int, error) {
 	}
 	return svc.conn.(net.Conn).Write(b)
 }
+
 func (svc *service) processIncoming(msg messagev2.Message) error {
 	var err error = nil
 
@@ -155,6 +164,7 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 		svc.sign.AddQuota() // 增加配额
 		// For PUBACK messagev5, it means QoS 1, we should send to ack queue
 		if err = svc.sess.Pub1ack().Ack(msg); err != nil {
+			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 			break
 		}
 		svc.processAcked(svc.sess.Pub1ack())
@@ -165,13 +175,16 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 
 		// For PUBREC messagev5, it means QoS 2, we should send to ack queue, and send back PUBREL
 		if err = svc.sess.Pub2out().Ack(msg); err != nil {
+			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 			break
 		}
 
 		resp := messagev2.NewPubrelMessage()
 		resp.SetPacketId(msg.PacketId())
 		_, err = svc.writeMessage(resp)
-
+		if err != nil {
+			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
+		}
 	case *messagev2.PubrelMessage:
 		// For PUBREL messagev5, it means QoS 2, we should send to ack queue, and send back PUBCOMP
 		if err = svc.sess.Pub2in().Ack(msg); err != nil {
@@ -183,12 +196,15 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 		resp := messagev2.NewPubcompMessage()
 		resp.SetPacketId(msg.PacketId())
 		_, err = svc.writeMessage(resp)
-
+		if err != nil {
+			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
+		}
 	case *messagev2.PubcompMessage:
 		svc.sign.AddQuota() // 增加配额
 
 		// For PUBCOMP messagev5, it means QoS 2, we should send to ack queue
 		if err = svc.sess.Pub2out().Ack(msg); err != nil {
+			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 			break
 		}
 
@@ -216,7 +232,9 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 		// For PINGREQ messagev5, we should send back PINGRESP
 		resp := messagev2.NewPingrespMessage()
 		_, err = svc.writeMessage(resp)
-
+		if err != nil {
+			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
+		}
 	case *messagev2.PingrespMessage:
 		svc.sess.Pingack().Ack(msg)
 		svc.processAcked(svc.sess.Pingack())
@@ -233,7 +251,7 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 				// 如果CONNECT报文中的会话过期间隔为0，则客户端在DISCONNECT报文中设置非0会话过期间隔将造成协议错误（Protocol Error）
 				// 如果服务端收到这种非0会话过期间隔，则不会将其视为有效的DISCONNECT报文。
 				// TODO  服务端使用包含原因码为0x82（协议错误）的DISCONNECT报文
-				return errDisconnect // 这里暂时还是简单处理
+				return messagev2.NewCodeErr(messagev2.ProtocolError, fmt.Sprintf("(%s) message protocol error: session_ %d", svc.cid(), msg.SessionExpiryInterval()))
 			}
 			// TODO 需要更新过期间隔
 			svc.sess.Cmsg().SetSessionExpiryInterval(msg.SessionExpiryInterval())
@@ -245,7 +263,7 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 		return errDisconnect
 
 	default:
-		return fmt.Errorf("(%s) invalid messagev5 type %s.", svc.cid(), msg.Name())
+		return messagev2.NewCodeErr(messagev2.ProtocolError, fmt.Sprintf("(%s) invalid messagev5 type %s", svc.cid(), msg.Name()))
 	}
 
 	if err != nil {
@@ -363,14 +381,14 @@ func (svc *service) topicAliceIn(msg *messagev2.PublishMessage) error {
 			_ = msg.SetTopic(tp)
 			logger.Logger.Debugf("%v set topic by alice ==> topic：%v alice：%v", svc.cid(), tp, msg.TopicAlias())
 		} else {
-			return errors.New("protocol error")
+			return messagev2.NewCodeErr(messagev2.ProtocolError)
 		}
 	} else if msg.TopicAlias() > svc.sess.TopicAliasMax() {
-		return errors.New("protocol error")
+		return messagev2.NewCodeErr(messagev2.ProtocolError)
 	} else if msg.TopicAlias() > 0 && len(msg.Topic()) > 0 {
 		// 需要保存主题别名，只会与当前连接保存生命一致
 		if svc.sess.TopicAliasMax() < msg.TopicAlias() {
-			return errors.New("topic alias is not allowed or too large")
+			return messagev2.NewCodeErr(messagev2.InvalidTopicAlias, "topic alias is not allowed or too large")
 		}
 		svc.sess.AddTopicAlice(msg.Topic(), msg.TopicAlias())
 		logger.Logger.Debugf("%v save topic alice ==> topic：%v alice：%v", svc.cid(), msg.Topic(), msg.TopicAlias())
@@ -388,6 +406,10 @@ func (svc *service) topicAliceIn(msg *messagev2.PublishMessage) error {
 //如果QoS == 1，我们应该返回PUBACK，然后进行下一步
 //如果QoS == 2，我们需要将其放入ack队列中，发送回PUBREC
 func (svc *service) processPublish(msg *messagev2.PublishMessage) error {
+	if msg.Retain() && !svc.conFig.Broker.RetainAvailable {
+		return messagev2.NewCodeErr(messagev2.UnsupportedRetention, "unSupport retain message")
+	}
+
 	if err := svc.topicAliceIn(msg); err != nil {
 		return err
 	}
@@ -399,14 +421,17 @@ func (svc *service) processPublish(msg *messagev2.PublishMessage) error {
 		resp.SetPacketId(msg.PacketId())
 
 		_, err := svc.writeMessage(resp)
-		return err
+		if err != nil {
+			return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
+		}
+		return nil
 
 	case messagev2.QosAtLeastOnce:
 		resp := messagev2.NewPubackMessage()
 		resp.SetPacketId(msg.PacketId())
 
 		if _, err := svc.writeMessage(resp); err != nil {
-			return err
+			return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 		}
 
 		return svc.onPublish(msg)
@@ -415,10 +440,8 @@ func (svc *service) processPublish(msg *messagev2.PublishMessage) error {
 		return svc.onPublish(msg)
 	}
 
-	return fmt.Errorf("(%s) invalid messagev5 QoS %d.", svc.cid(), msg.QoS())
+	return messagev2.NewCodeErr(messagev2.UnsupportedQoSLevel, fmt.Sprintf("(%s) invalid message QoS %d.", svc.cid(), msg.QoS()))
 }
-
-var sharePrefix = []byte("$share/")
 
 // For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
 func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
@@ -453,12 +476,13 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 	case unSupport && len(tmpResCode) > 0:
 		_ = resp.AddReasonCodes(tmpResCode)
 		if _, err := svc.writeMessage(resp); err != nil {
+			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 			return err
 		}
 		return nil
 	case len(tmpResCode) == 0:
 		// 正常情况不会走到此处，在编解码处已经限制了至少有一个主题过滤器/订阅选项对
-		return ErrInvalidSubscriber
+		return messagev2.NewCodeErr(messagev2.InvalidMessage, ErrInvalidSubscriber.Error())
 	}
 
 	for i, t := range tps {
@@ -477,7 +501,7 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 		}
 		rqos, err := svc.topicsMgr.Subscribe(sub, &svc.onpub)
 		if err != nil {
-			return err
+			return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 		}
 		err = svc.sess.AddTopic(sub)
 		retcodes = append(retcodes, rqos)
@@ -489,14 +513,15 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 		if retainHandling == messagev2.NoSendRetain {
 			continue
 		} else if retainHandling == messagev2.CanSendRetain {
-			_ = svc.topicsMgr.Retained(t, &svc.rmsgs)
+			err = svc.topicsMgr.Retained(t, &svc.rmsgs)
+			if err != nil {
+				return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
+			}
 			logger.Logger.Debugf("(%s) topic = %s, retained count = %d", svc.cid(), t, len(svc.rmsgs))
 		} else if retainHandling == messagev2.NoExistSubSendRetain {
 			// 已存在订阅的情况下不发送保留消息是很有用的，比如重连完成时客户端不确定订阅是否在之前的会话连接中被创建。
-			oldTp, er := svc.sess.Topics()
-			if er != nil {
-				return er
-			}
+			oldTp, _ := svc.sess.Topics()
+
 			existThisTopic := false
 			for jk := 0; jk < len(oldTp); jk++ {
 				if len(oldTp[jk].Topic) != len(tp) {
@@ -514,7 +539,10 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 			END:
 			}
 			if !existThisTopic {
-				_ = svc.topicsMgr.Retained(t, &svc.rmsgs)
+				err = svc.topicsMgr.Retained(t, &svc.rmsgs)
+				if err != nil {
+					return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
+				}
 				logger.Logger.Debugf("(%s) topic = %s, retained count = %d", svc.cid(), t, len(svc.rmsgs))
 			}
 		}
@@ -526,11 +554,11 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 	}
 	logger.Logger.Infof("客户端：%s，订阅主题：%s，qos：%d，retained count = %d", svc.cid(), tps, qos, len(svc.rmsgs))
 	if err := resp.AddReasonCodes(retcodes); err != nil {
-		return err
+		return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 	}
 
 	if _, err := svc.writeMessage(resp); err != nil {
-		return err
+		return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 	}
 
 	svc.processToCluster(tps, msg)
@@ -543,8 +571,8 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 		}
 		if err := svc.publish(rm, nil); err != nil {
 			logger.Logger.Errorf("service/processSubscribe: Error publishing retained messagev5: %v", err)
-			rm.SetQoS(old)
-			return err
+			//rm.SetQoS(old)
+			//return err
 		}
 		rm.SetQoS(old)
 	}
@@ -554,9 +582,9 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 
 // For UNSUBSCRIBE messagev5, we should remove the subscriber, and send back UNSUBACK
 func (svc *service) processUnsubscribe(msg *messagev2.UnsubscribeMessage) error {
-	topics := msg.Topics()
+	tps := msg.Topics()
 
-	for _, t := range topics {
+	for _, t := range tps {
 		svc.topicsMgr.Unsubscribe(t, &svc.onpub)
 		svc.sess.RemoveTopic(string(t))
 	}
@@ -567,11 +595,11 @@ func (svc *service) processUnsubscribe(msg *messagev2.UnsubscribeMessage) error 
 
 	_, err := svc.writeMessage(resp)
 	if err != nil {
-		return err
+		return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 	}
 
-	svc.processToCluster(topics, msg)
-	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", svc.cid(), topics)
+	svc.processToCluster(tps, msg)
+	logger.Logger.Infof("客户端：%s 取消订阅主题：%s", svc.cid(), tps)
 	return nil
 }
 
@@ -783,7 +811,7 @@ func (svc *service) pubFn(msg *messagev2.PublishMessage, shareName string, onlyS
 	err := svc.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, shareName, onlyShare)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
-		return err
+		return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 	}
 
 	msg.SetRetain(false)
@@ -801,7 +829,7 @@ func (svc *service) pubFnPlus(msg *messagev2.PublishMessage) error {
 	err := svc.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, "", true)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
-		return err
+		return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 	}
 
 	msg.SetRetain(false)
@@ -819,7 +847,7 @@ func (svc *service) pubFnSys(msg *messagev2.PublishMessage) error {
 	err := svc.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, true, "", false)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
-		return err
+		return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 	}
 
 	msg.SetRetain(false)

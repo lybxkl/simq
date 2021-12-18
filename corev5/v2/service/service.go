@@ -126,7 +126,7 @@ type service struct {
 // 运行接入的连接，会产生三个协程异步逻辑处理，当前不会阻塞
 func (svc *service) start(resp *message.ConnackMessage) error {
 	var err error
-	svc.ccid = fmt.Sprintf("%d/%s", svc.id, svc.sess.IDs())
+	svc.ccid = fmt.Sprintf("%s%d/%s", svc.conFig.Broker.AutoIdPrefix, svc.id, svc.sess.IDs())
 
 	// Create the incoming ring buffer
 	svc.in, err = newBuffer(defaultBufferSize)
@@ -325,33 +325,41 @@ func (svc *service) stop() {
 	svc.out = nil
 }
 
+// 发布消息给客户端
 func (svc *service) publish(msg *message.PublishMessage, onComplete OnCompleteFunc) (err error) {
-	//glog.Logger.Debug("service/publish: Publishing %s", msg)
-	defer func() {
-		if err != nil {
-			return
-		}
-		_, err = svc.writeMessage(msg)
-		if err != nil {
-			err = fmt.Errorf("(%s) Error sending %s messagev5: %v", svc.cid(), msg.Name(), err)
-		}
-	}()
 
 	switch msg.QoS() {
 	case message.QosAtMostOnce:
-		if onComplete != nil {
-			return onComplete(msg, nil, nil)
+		_, err = svc.writeMessage(msg)
+		if err != nil {
+			err = message.NewCodeErr(message.ServiceBusy, fmt.Sprintf("(%s) Error sending %s message: %v", svc.cid(), msg.Name(), err))
 		}
-
-		return nil
-
+		if onComplete != nil {
+			err = onComplete(msg, nil, nil)
+			if err != nil {
+				return message.NewCodeErr(message.ServerUnavailable, err.Error())
+			}
+			return nil
+		}
 	case message.QosAtLeastOnce:
-		return svc.sess.Pub1ack().Wait(msg, onComplete)
-
+		err = svc.sess.Pub1ack().Wait(msg, onComplete)
+		if err != nil {
+			return message.NewCodeErr(message.ServerUnavailable, err.Error())
+		}
+		_, err = svc.writeMessage(msg)
+		if err != nil {
+			err = message.NewCodeErr(message.ServiceBusy, fmt.Sprintf("(%s) Error sending %s message: %v", svc.cid(), msg.Name(), err))
+		}
 	case message.QosExactlyOnce:
-		return svc.sess.Pub2out().Wait(msg, onComplete)
+		err = svc.sess.Pub2out().Wait(msg, onComplete)
+		if err != nil {
+			return message.NewCodeErr(message.ServerUnavailable, err.Error())
+		}
+		_, err = svc.writeMessage(msg)
+		if err != nil {
+			err = message.NewCodeErr(message.ServiceBusy, fmt.Sprintf("(%s) Error sending %s message: %v", svc.cid(), msg.Name(), err))
+		}
 	}
-
 	return nil
 }
 
@@ -362,7 +370,7 @@ func (svc *service) subscribe(msg *message.SubscribeMessage, onComplete OnComple
 
 	_, err := svc.writeMessage(msg)
 	if err != nil {
-		return fmt.Errorf("(%s) Error sending %s messagev5: %v", svc.cid(), msg.Name(), err)
+		return message.NewCodeErr(message.ServiceBusy, fmt.Sprintf("(%s) Error sending %s messagev5: %v", svc.cid(), msg.Name(), err))
 	}
 
 	var onc OnCompleteFunc = func(msg, ack message.Message, err error) error {
