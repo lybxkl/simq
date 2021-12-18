@@ -715,14 +715,6 @@ func (svc *service) sendShareToCluster(msg *messagev2.PublishMessage) {
 	})
 }
 
-func (svc *service) openCluster() bool {
-	return svc.clusterOpen
-}
-
-func (svc *service) openShare() bool {
-	return svc.conFig.OpenShare()
-}
-
 // 发送到集群其它节点去
 func (svc *service) sendCluster(message messagev2.Message) {
 	if !svc.openCluster() {
@@ -741,7 +733,7 @@ func (svc *service) sendCluster(message messagev2.Message) {
 
 // ClusterInToPub 集群节点发来的普通消息
 func (svc *service) ClusterInToPub(msg *messagev2.PublishMessage) error {
-	if !svc.clusterBelong {
+	if !svc.isCluster() {
 		return nil
 	}
 	if msg.Retain() {
@@ -756,7 +748,7 @@ func (svc *service) ClusterInToPub(msg *messagev2.PublishMessage) error {
 // ClusterInToPubShare 集群节点发来的共享主题消息，需要发送到特定的共享组 onlyShare = true
 // 和 普通节点 onlyShare = false
 func (svc *service) ClusterInToPubShare(msg *messagev2.PublishMessage, shareName string, onlyShare bool) error {
-	if !svc.clusterBelong {
+	if !svc.isCluster() {
 		return nil
 	}
 	if msg.Retain() {
@@ -770,7 +762,7 @@ func (svc *service) ClusterInToPubShare(msg *messagev2.PublishMessage, shareName
 
 // ClusterInToPubSys 集群节点发来的系统主题消息
 func (svc *service) ClusterInToPubSys(msg *messagev2.PublishMessage) error {
-	if !svc.clusterBelong {
+	if !svc.isCluster() {
 		return nil
 	}
 	if msg.Retain() {
@@ -793,23 +785,11 @@ func (svc *service) pubFn(msg *messagev2.PublishMessage, shareName string, onlyS
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
 		return err
 	}
+
 	msg.SetRetain(false)
 	logger.Logger.Debugf("(%s) publishing to topic %s and %s subscribers：%v", svc.cid(), msg.Topic(), shareName, len(subs))
 
-	for i, s := range subs {
-		if s != nil {
-			fn, ok := s.(*OnPublishFunc)
-			if !ok {
-				return fmt.Errorf("invalid onPublish Function")
-			} else {
-				err = (*fn)(copyMsg(msg, qoss[i].Qos), qoss[i], svc.cid(), onlyShare)
-				if err == io.EOF {
-					// TODO 断线了，是否对于qos=1和2的保存至离线消息
-				}
-			}
-		}
-	}
-	return nil
+	return svc.lookSend(msg, subs, qoss, onlyShare)
 }
 
 // 发送当前主题所有共享组
@@ -823,24 +803,11 @@ func (svc *service) pubFnPlus(msg *messagev2.PublishMessage) error {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
 		return err
 	}
+
 	msg.SetRetain(false)
 	logger.Logger.Debugf("(%s) Publishing to all shareName topic in %s to subscribers：%v", svc.cid(), msg.Topic(), subs)
 
-	for i, s := range subs {
-		if s != nil {
-			fn, ok := s.(*OnPublishFunc)
-			if !ok {
-				return fmt.Errorf("invalid onPublish Function")
-			} else {
-				err = (*fn)(copyMsg(msg, qoss[i].Qos), qoss[i], svc.cid(), true)
-				if err == io.EOF {
-					// TODO 断线了，是否对于qos=1和2的保存至离线消息
-				}
-				// TODO 出现其它错误，并没有停止
-			}
-		}
-	}
-	return nil
+	return svc.lookSend(msg, subs, qoss, true)
 }
 
 // 发送系统消息
@@ -854,24 +821,44 @@ func (svc *service) pubFnSys(msg *messagev2.PublishMessage) error {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
 		return err
 	}
+
 	msg.SetRetain(false)
 	logger.Logger.Debugf("(%s) publishing sys topic %s to subscribers：%v", svc.cid(), msg.Topic(), subs)
 
+	return svc.lookSend(msg, subs, qoss, false)
+}
+
+// 循环发送， todo 可丢到协程池处理
+func (svc *service) lookSend(msg *messagev2.PublishMessage, subs []interface{}, qoss []topics.Sub, onlyShare bool) error {
 	for i, s := range subs {
 		if s != nil {
 			fn, ok := s.(*OnPublishFunc)
 			if !ok {
 				return fmt.Errorf("invalid onPublish Function")
 			} else {
-				err = (*fn)(copyMsg(msg, qoss[i].Qos), qoss[i], svc.cid(), false)
+				err := (*fn)(copyMsg(msg, qoss[i].Qos), qoss[i], svc.cid(), onlyShare)
 				if err == io.EOF {
 					// TODO 断线了，是否对于qos=1和2的保存至离线消息
 				}
-				// TODO 出现其它错误，并没有停止
 			}
 		}
 	}
 	return nil
+}
+
+// 是否是集群server
+func (svc *service) isCluster() bool {
+	return svc.clusterBelong
+}
+
+// 是否开启集群
+func (svc *service) openCluster() bool {
+	return svc.clusterOpen
+}
+
+// 是否开启共享
+func (svc *service) openShare() bool {
+	return svc.conFig.OpenShare()
 }
 
 func copyMsg(msg *messagev2.PublishMessage, newQos byte) *messagev2.PublishMessage {
