@@ -55,7 +55,7 @@ type ConnectMessage struct {
 	topicAliasMax         uint16   // 主题别名最大值（Topic Alias Maximum）
 	requestRespInfo       byte     // 一个字节表示的 0 或 1, 请求响应信息
 	requestProblemInfo    byte     // 一个字节表示的 0 或 1 , 请求问题信息
-	userProperty          [][]byte // 用户属性，可变报头的
+	userProperty          [][]byte // 用户属性，可变报头的 , 每对属性都是串行放置 [k1][v1][k2][v2]
 	authMethod            []byte   // 认证方法
 	authData              []byte   // 认证数据
 
@@ -64,7 +64,7 @@ type ConnectMessage struct {
 	payloadFormatIndicator byte     // 载荷格式指示
 	willMsgExpiryInterval  uint32   // 遗嘱消息过期间隔
 	contentType            []byte   // 遗嘱内容类型 UTF-8 格式编码
-	willUserProperty       [][]byte // 用户属性，载荷遗嘱属性的
+	willUserProperty       [][]byte // 用户属性，载荷遗嘱属性的 , 每对属性都是串行放置 [k1][v1][k2][v2]
 	responseTopic          []byte   // 响应主题
 	correlationData        []byte   // 对比数据
 }
@@ -202,11 +202,9 @@ func (this *ConnectMessage) build() {
 	if this.requestProblemInfo != 1 {
 		propertiesLen += 2
 	}
-	for _, v := range this.userProperty {
-		propertiesLen += 1
-		propertiesLen += 2
-		propertiesLen += len(v)
-	}
+	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	propertiesLen += n
+
 	if len(this.authMethod) > 0 {
 		propertiesLen += 1
 		propertiesLen += 2
@@ -242,11 +240,10 @@ func (this *ConnectMessage) build() {
 		willPropertiesLen += 2
 		willPropertiesLen += len(this.contentType)
 	}
-	for _, v := range this.willUserProperty {
-		willPropertiesLen += 1
-		willPropertiesLen += 2
-		willPropertiesLen += len(v)
-	}
+
+	n = buildUserPropertyLen(this.willUserProperty) // 遗嘱用户属性
+	propertiesLen += n
+
 	if len(this.responseTopic) > 0 {
 		willPropertiesLen += 1
 		willPropertiesLen += 2
@@ -872,15 +869,8 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 		total++
 	}
 
-	for _, v1 := range this.userProperty {
-		dst[total] = UserProperty // 用户属性
-		total++
-		n, err = writeLPBytes(dst[total:], v1)
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
+	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	total += n
 
 	if len(this.authMethod) > 0 {
 		dst[total] = AuthenticationMethod // 认证方法
@@ -960,15 +950,9 @@ func (this *ConnectMessage) encodeMessage(dst []byte) (int, error) {
 				return total, err
 			}
 		}
-		for _, v1 := range this.willUserProperty {
-			dst[total] = UserProperty // 遗嘱用户属性
-			total++
-			n, err = writeLPBytes(dst[total:], v1)
-			total += n
-			if err != nil {
-				return total, err
-			}
-		}
+
+		n, err = writeUserProperty(dst[total:], this.willUserProperty) // 用户属性
+		total += n
 
 		n, err = writeLPBytes(dst[total:], this.willTopic) // 遗嘱主题
 		total += n
@@ -1052,12 +1036,9 @@ func (this *ConnectMessage) encodeMessageToBuf(dst *bytes.Buffer) (int, error) {
 		dst.WriteByte(this.requestProblemInfo) // 请求问题信息
 	}
 
-	for _, v1 := range this.userProperty {
-		dst.WriteByte(UserProperty) // 用户属性
-		_, err = writeToBufLPBytes(dst, v1)
-		if err != nil {
-			return dst.Len(), err
-		}
+	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	if err != nil {
+		return dst.Len(), err
 	}
 
 	if len(this.authMethod) > 0 {
@@ -1120,12 +1101,10 @@ func (this *ConnectMessage) encodeMessageToBuf(dst *bytes.Buffer) (int, error) {
 				return dst.Len(), err
 			}
 		}
-		for _, v1 := range this.willUserProperty {
-			dst.WriteByte(UserProperty)
-			_, err = writeToBufLPBytes(dst, v1) // 遗嘱用户属性
-			if err != nil {
-				return dst.Len(), err
-			}
+
+		_, err = writeUserPropertyByBuf(dst, this.willUserProperty) // 用户属性
+		if err != nil {
+			return dst.Len(), err
 		}
 
 		_, err = writeToBufLPBytes(dst, this.willTopic) // 遗嘱主题
@@ -1303,25 +1282,10 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 		this.requestProblemInfo = 0x01
 	}
 
-	if total < len(src) && src[total] == UserProperty {
-		total++
-		this.userProperty = make([][]byte, 0)
-		var up []byte
-		up, n, err = readLPBytes(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-		this.userProperty = append(this.userProperty, up)
-		for total < len(src) && src[total] == UserProperty {
-			total++
-			up, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.userProperty = append(this.userProperty, up)
-		}
+	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	total += n
+	if err != nil {
+		return total, err
 	}
 
 	if total < len(src) && src[total] == AuthenticationMethod { // 认证方法
@@ -1422,18 +1386,7 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				return total, ProtocolError
 			}
 		}
-		// TODO 此 if 是为了兼容MQTTX的连接包
-		if total < len(src) && src[total] == LoadFormatDescription { // 载荷格式指示
-			total++
-			this.payloadFormatIndicator = src[total]
-			total++
-			if this.payloadFormatIndicator != 0x00 && this.payloadFormatIndicator != 0x01 {
-				return total, ProtocolError
-			}
-			if total < len(src) && src[total] == LoadFormatDescription {
-				return total, ProtocolError
-			}
-		}
+
 		if total < len(src) && src[total] == ResponseTopic { // 响应主题的存在将遗嘱消息（Will Message）标识为一个请求报文
 			total++
 			this.responseTopic, n, err = readLPBytes(src[total:])
@@ -1456,25 +1409,11 @@ func (this *ConnectMessage) decodeMessage(src []byte) (int, error) {
 				return total, ProtocolError
 			}
 		}
-		if total < len(src) && src[total] == UserProperty { // 用户属性
-			total++
-			this.willUserProperty = make([][]byte, 0)
-			var tp []byte
-			tp, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.willUserProperty = append(this.willUserProperty, tp)
-			for total < len(src) && src[total] == UserProperty {
-				total++
-				tp, n, err = readLPBytes(src[total:])
-				total += n
-				if err != nil {
-					return total, err
-				}
-				this.willUserProperty = append(this.willUserProperty, tp)
-			}
+
+		this.willUserProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+		total += n
+		if err != nil {
+			return total, err
 		}
 
 	}

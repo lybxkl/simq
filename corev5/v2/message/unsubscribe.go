@@ -144,25 +144,10 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 			return total, err
 		}
 	}
-	if total < len(src) && src[total] == UserProperty {
-		total++
-		this.userProperty = make([][]byte, 0)
-		var uv []byte
-		uv, n, err = readLPBytes(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-		this.userProperty = append(this.userProperty, uv)
-		for total < len(src) && src[total] == UserProperty {
-			total++
-			uv, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.userProperty = append(this.userProperty, uv)
-		}
+	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	total += n
+	if err != nil {
+		return total, err
 	}
 	remlen := int(this.remlen) - (total - hn)
 	var t []byte
@@ -231,15 +216,10 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 	b := lbEncode(this.propertyLen)
 	copy(dst[total:], b)
 	total += len(b)
-	for i := 0; i < len(this.userProperty); i++ {
-		dst[total] = UserProperty
-		total++
-		n, err = writeLPBytes(dst[total:], this.userProperty[i])
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
+
+	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	total += n
+
 	for _, t := range this.topics {
 		n, err = writeLPBytes(dst[total:], t)
 		total += n
@@ -276,13 +256,11 @@ func (this *UnsubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 
 	dst.Write(lbEncode(this.propertyLen))
 
-	for i := 0; i < len(this.userProperty); i++ {
-		dst.WriteByte(UserProperty)
-		_, err = writeToBufLPBytes(dst, this.userProperty[i])
-		if err != nil {
-			return dst.Len(), err
-		}
+	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	if err != nil {
+		return dst.Len(), err
 	}
+
 	for _, t := range this.topics {
 		_, err = writeToBufLPBytes(dst, t)
 		if err != nil {
@@ -295,9 +273,10 @@ func (this *UnsubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 
 func (this *UnsubscribeMessage) build() {
 	total := 0
-	for _, t := range this.userProperty {
-		total += 1 + 2 + len(t)
-	}
+
+	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	total += n
+
 	this.propertyLen = uint32(total)
 
 	total += 2 // packet ID

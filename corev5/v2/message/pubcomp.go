@@ -60,25 +60,10 @@ func (this *PubcompMessage) decodeOther(src []byte, total, n int) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	if total < len(src) && src[total] == UserProperty {
-		total++
-		this.userProperty = make([][]byte, 0)
-		var uv []byte
-		uv, n, err = readLPBytes(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-		this.userProperty = append(this.userProperty, uv)
-		for total < len(src) && src[total] == UserProperty {
-			total++
-			uv, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.userProperty = append(this.userProperty, uv)
-		}
+	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	total += n
+	if err != nil {
+		return total, err
 	}
 	this.dirty = false
 	return total, nil

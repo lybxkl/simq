@@ -1,6 +1,7 @@
 package message
 
 import (
+	"bytes"
 	"errors"
 )
 
@@ -170,4 +171,98 @@ func ValidConnAckReasonCode(code ReasonCode) bool {
 	default:
 		return false
 	}
+}
+
+func decodeUserProperty(src []byte) ([][]byte, int, error) {
+	total := 0
+	var userProperty = make([][]byte, 0)
+	for total < len(src) && src[total] == UserProperty {
+		total++
+		tu, n, err := readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return userProperty, total, err
+		}
+		userProperty = append(userProperty, tu)
+
+		var tuAfter []byte
+		tuAfter, n, err = readLPBytes(src[total:])
+		total += n
+		if err != nil {
+			return userProperty, total, err
+		}
+		userProperty = append(userProperty, tuAfter)
+	}
+	return userProperty, total, nil
+}
+
+func writeUserProperty(dst []byte, userProperty [][]byte) (int, error) {
+	total := 0
+	for i := 0; i < len(userProperty); i += 2 {
+		dst[total] = UserProperty
+		total++
+		if len(userProperty[i]) == 0 {
+			dst[total], dst[total+1] = 0, 0
+			total += 2
+		} else {
+			n, err := writeLPBytes(dst[total:], userProperty[i])
+			total += n
+			if err != nil {
+				return total, err
+			}
+		}
+
+		if i == len(userProperty)-1 || len(userProperty[i+1]) == 0 { // 有一个空的值，直接两个0 0即可
+			dst[total], dst[total+1] = 0, 0
+			total += 2
+		} else {
+			n, err := writeLPBytes(dst[total:], userProperty[i+1])
+			total += n
+			if err != nil {
+				return total, err
+			}
+		}
+	}
+	return total, nil
+}
+
+func writeUserPropertyByBuf(dst *bytes.Buffer, userProperty [][]byte) (int, error) {
+	for i := 0; i < len(userProperty); i += 2 {
+		dst.WriteByte(UserProperty)
+		if len(userProperty[i]) == 0 {
+			dst.WriteByte(0)
+			dst.WriteByte(0)
+		} else {
+			_, err := writeToBufLPBytes(dst, userProperty[i])
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+		if i == len(userProperty)-1 || len(userProperty[i+1]) == 0 { // 有一个空的值，直接两个0 0即可
+			dst.WriteByte(0)
+			dst.WriteByte(0)
+		} else {
+			_, err := writeToBufLPBytes(dst, userProperty[i+1])
+			if err != nil {
+				return dst.Len(), err
+			}
+		}
+	}
+	return dst.Len(), nil
+}
+
+func buildUserPropertyLen(userProperty [][]byte) int {
+	total := 0
+	for i := 0; i < len(userProperty); i += 2 { // todo 超过接收端指定的最大报文长度，不能发送
+		total++
+		total += 2
+		if len(userProperty[i]) != 0 {
+			total += len(userProperty[i])
+		}
+		total += 2
+		if i < len(userProperty)-1 && len(userProperty[i+1]) != 0 {
+			total += len(userProperty[i+1])
+		}
+	}
+	return total
 }

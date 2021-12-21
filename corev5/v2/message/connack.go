@@ -121,11 +121,10 @@ func (this *ConnackMessage) build() {
 		propertiesLen += 2
 		propertiesLen += len(this.reasonStr)
 	}
-	for _, v := range this.userProperties { // 用户属性
-		propertiesLen++
-		propertiesLen += 2
-		propertiesLen += len(v)
-	}
+
+	n := buildUserPropertyLen(this.userProperties) // 用户属性
+	propertiesLen += n
+
 	if this.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
 		propertiesLen += 2
 	}
@@ -487,26 +486,13 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	if total < len(src) && src[total] == UserProperty { // 用户属性
-		total++
-		this.userProperties = make([][]byte, 0)
-		var up []byte
-		up, n, err = readLPBytes(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-		this.userProperties = append(this.userProperties, up)
-		for total < len(src) && src[total] == UserProperty {
-			total++
-			up, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.userProperties = append(this.userProperties, up)
-		}
+
+	this.userProperties, n, err = decodeUserProperty(src[total:]) // 用户属性
+	total += n
+	if err != nil {
+		return total, err
 	}
+
 	if total < len(src) && src[total] == WildcardSubscriptionAvailability { // 通配符订阅可用
 		total++
 		this.wildcardSubscriptionAvailable = src[total]
@@ -696,15 +682,10 @@ func (this *ConnackMessage) Encode(dst []byte) (int, error) {
 			return total, err
 		}
 	}
-	for _, v := range this.userProperties { // 用户属性
-		dst[total] = UserProperty
-		total++
-		n, err = writeLPBytes(dst[total:], v)
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
+
+	n, err = writeUserProperty(dst[total:], this.userProperties) // 用户属性
+	total += n
+
 	if this.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
 		dst[total] = WildcardSubscriptionAvailability
 		total++
@@ -838,13 +819,12 @@ func (this *ConnackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 			return dst.Len(), err
 		}
 	}
-	for _, v := range this.userProperties { // 用户属性
-		dst.WriteByte(UserProperty)
-		_, err = writeToBufLPBytes(dst, v)
-		if err != nil {
-			return dst.Len(), err
-		}
+
+	_, err = writeUserPropertyByBuf(dst, this.userProperties) // 用户属性
+	if err != nil {
+		return dst.Len(), err
 	}
+
 	if this.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
 		dst.WriteByte(WildcardSubscriptionAvailability)
 		dst.WriteByte(this.wildcardSubscriptionAvailable)

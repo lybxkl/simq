@@ -327,24 +327,10 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 			return 0, ProtocolError
 		}
 	}
-	if total < len(src) && src[total] == UserProperty { // 用户属性
-		total++
-		this.userProperty = make([][]byte, 0)
-		userP1, n1, err1 := readLPBytes(src[total:])
-		total += n1
-		if err1 != nil {
-			return total, err1
-		}
-		this.userProperty = append(this.userProperty, userP1)
-		for total < len(src) && src[total] == UserProperty {
-			total++
-			userP1, n1, err1 = readLPBytes(src[total:])
-			total += n1
-			if err1 != nil {
-				return total, err1
-			}
-			this.userProperty = append(this.userProperty, userP1)
-		}
+	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	total += n
+	if err != nil {
+		return total, err
 	}
 	if total < len(src) && src[total] == DefiningIdentifiers { // 订阅标识符
 		total++
@@ -470,17 +456,10 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 			return total, err
 		}
 	}
-	if len(this.userProperty) > 0 { // 用户属性
-		for i := 0; i < len(this.userProperty); i++ {
-			dst[total] = UserProperty
-			total++
-			n, err = writeLPBytes(dst[total:], this.userProperty[i])
-			total += n
-			if err != nil {
-				return total, err
-			}
-		}
-	}
+
+	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	total += n
+
 	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier < 168435455 { // 订阅标识符
 		dst[total] = DefiningIdentifiers
 		total++
@@ -571,15 +550,12 @@ func (this *PublishMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 			return dst.Len(), err
 		}
 	}
-	if len(this.userProperty) > 0 { // 用户属性
-		for i := 0; i < len(this.userProperty); i++ {
-			dst.WriteByte(UserProperty)
-			_, err = writeToBufLPBytes(dst, this.userProperty[i])
-			if err != nil {
-				return dst.Len(), err
-			}
-		}
+
+	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	if err != nil {
+		return dst.Len(), err
 	}
+
 	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier < 168435455 { // 订阅标识符
 		dst.WriteByte(DefiningIdentifiers)
 		dst.Write(lbEncode(this.subscriptionIdentifier))
@@ -624,13 +600,10 @@ func (this *PublishMessage) build() {
 		total += 2
 		total += len(this.correlationData)
 	}
-	if len(this.userProperty) > 0 { // 用户属性
-		for i := 0; i < len(this.userProperty); i++ {
-			total++
-			total += 2
-			total += len(this.userProperty[i])
-		}
-	}
+
+	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	total += n
+
 	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier < 168435455 { // 订阅标识符
 		total++
 		b1 := lbEncode(this.subscriptionIdentifier)

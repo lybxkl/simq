@@ -93,24 +93,13 @@ func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 			return total, err
 		}
 	}
-	if total < len(src) && src[total] == UserProperty {
-		total++
-		var up []byte
-		up, n, err = readLPBytes(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-		this.AddUserProperty(up)
-		for total < len(src) && src[total] == UserProperty {
-			up, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.AddUserProperty(up)
-		}
+
+	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	total += n
+	if err != nil {
+		return total, err
 	}
+
 	if total < len(src) && src[total] == ServerReference {
 		total++
 		this.serverReference, n, err = readLPBytes(src[total:])
@@ -172,15 +161,10 @@ func (this *DisconnectMessage) Encode(dst []byte) (int, error) {
 			return total, err
 		}
 	}
-	for i := 0; i < len(this.userProperty); i++ {
-		dst[total] = UserProperty
-		total++
-		n, err = writeLPBytes(dst[total:], this.userProperty[i])
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
+
+	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	total += n
+
 	if len(this.serverReference) > 0 {
 		dst[total] = ServerReference
 		total++
@@ -226,13 +210,12 @@ func (this *DisconnectMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 			return dst.Len(), err
 		}
 	}
-	for i := 0; i < len(this.userProperty); i++ {
-		dst.WriteByte(UserProperty)
-		_, err = writeToBufLPBytes(dst, this.userProperty[i])
-		if err != nil {
-			return dst.Len(), err
-		}
+
+	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	if err != nil {
+		return dst.Len(), err
 	}
+
 	if len(this.serverReference) > 0 {
 		dst.WriteByte(ServerReference)
 		_, err = writeToBufLPBytes(dst, this.serverReference)
@@ -253,11 +236,10 @@ func (this *DisconnectMessage) build() {
 		total += 2
 		total += len(this.reasonStr)
 	}
-	for i := 0; i < len(this.userProperty); i++ { // todo 超了就不发
-		total++
-		total += 2
-		total += len(this.userProperty[i])
-	}
+
+	n := buildUserPropertyLen(this.userProperty) // todo 超了就不发
+	total += n
+
 	if len(this.serverReference) > 0 {
 		total++
 		total += 2

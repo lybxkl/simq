@@ -18,7 +18,7 @@ type AuthMessage struct {
 	authMethod    []byte
 	authData      []byte
 	reasonStr     []byte   // 如果加上原因字符串之后的 AUTH 报文长度超出了接收端所指定的最大报文长度，则发送端不能发送此属性
-	userProperty  [][]byte // 如果加上用户属性之后的 AUTH 报文长度超出了接收端所指定的最大报文长度，则发送端不能发送此属性
+	userProperty  [][]byte // 如果加上用户属性之后的 AUTH 报文长度超出了接收端所指定的最大报文长度，则发送端不能发送此属性, 每对属性都是串行放置 [k1][v1][k2][v2]
 	// AUTH 报文没有有效载荷
 }
 
@@ -177,25 +177,10 @@ func (this *AuthMessage) Decode(src []byte) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	if total < len(src) && src[total] == UserProperty {
-		total++
-		var tu []byte
-		this.userProperty = make([][]byte, 0)
-		tu, n, err = readLPBytes(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-		this.userProperty = append(this.userProperty, tu)
-		for total < len(src) && src[total] == UserProperty {
-			total++
-			tu, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.userProperty = append(this.userProperty, tu)
-		}
+	this.userProperty, n, err = decodeUserProperty(src[total:])
+	total += n
+	if err != nil {
+		return total, err
 	}
 
 	this.dirty = false
@@ -272,16 +257,9 @@ func (this *AuthMessage) Encode(dst []byte) (int, error) {
 			return total, err
 		}
 	}
-	for i := 0; i < len(this.userProperty); i++ {
-		dst[total] = UserProperty
-		total++
-		n, err = writeLPBytes(dst[total:], this.userProperty[i])
-		total += n
-		if err != nil {
-			return total, err
-		}
-	}
-	return total, nil
+	n, err = writeUserProperty(dst[total:], this.userProperty)
+	total += n
+	return total, err
 }
 
 func (this *AuthMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
@@ -332,14 +310,7 @@ func (this *AuthMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 			return dst.Len(), err
 		}
 	}
-	for i := 0; i < len(this.userProperty); i++ {
-		dst.WriteByte(UserProperty)
-		_, err = writeToBufLPBytes(dst, this.userProperty[i])
-		if err != nil {
-			return dst.Len(), err
-		}
-	}
-	return dst.Len(), nil
+	return writeUserPropertyByBuf(dst, this.userProperty)
 }
 
 func (this *AuthMessage) build() {
@@ -361,11 +332,9 @@ func (this *AuthMessage) build() {
 		total += 2
 		total += len(this.reasonStr)
 	}
-	for i := 0; i < len(this.userProperty); i++ { // todo 超过接收端指定的最大报文长度，不能发送
-		total++
-		total += 2
-		total += len(this.userProperty[i])
-	}
+	n := buildUserPropertyLen(this.userProperty)
+	total += n
+
 	this.propertiesLen = uint32(total - 1)
 
 	if this.propertiesLen == 0 && this.reasonCode == Success {

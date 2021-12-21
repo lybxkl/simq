@@ -5,7 +5,7 @@ serverVersion = "5.0.1"
 
 [broker]
     # broker 监听的addr
-    tcpAddr = "tcp://:1884"
+    tcpAddr = "tcp://:1883"
     # 是否开启tls
     tcpTlsOpen = false
 

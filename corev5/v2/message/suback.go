@@ -140,25 +140,10 @@ func (this *SubackMessage) Decode(src []byte) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	if total < len(src) && src[total] == UserProperty {
-		total++
-		var tb []byte
-		this.userProperty = make([][]byte, 0)
-		tb, n, err = readLPBytes(src[total:])
-		total += n
-		if err != nil {
-			return total, err
-		}
-		this.userProperty = append(this.userProperty, tb)
-		for total < len(src) && src[total] == UserProperty {
-			total++
-			tb, n, err = readLPBytes(src[total:])
-			total += n
-			if err != nil {
-				return total, err
-			}
-			this.userProperty = append(this.userProperty, tb)
-		}
+	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	total += n
+	if err != nil {
+		return total, err
 	}
 
 	l := int(this.remlen) - (total - hn)
@@ -231,17 +216,9 @@ func (this *SubackMessage) Encode(dst []byte) (int, error) {
 			return total, err
 		}
 	}
-	if len(this.userProperty) > 0 {
-		for i := 0; i < len(this.userProperty); i++ {
-			dst[total] = UserProperty
-			total++
-			n, err = writeLPBytes(dst[total:], this.userProperty[i])
-			total += n
-			if err != nil {
-				return total, err
-			}
-		}
-	}
+
+	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	total += n
 
 	copy(dst[total:], this.reasonCodes)
 	total += len(this.reasonCodes)
@@ -286,14 +263,10 @@ func (this *SubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 			return dst.Len(), err
 		}
 	}
-	if len(this.userProperty) > 0 {
-		for i := 0; i < len(this.userProperty); i++ {
-			dst.WriteByte(UserProperty)
-			_, err = writeToBufLPBytes(dst, this.userProperty[i])
-			if err != nil {
-				return dst.Len(), err
-			}
-		}
+
+	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	if err != nil {
+		return dst.Len(), err
 	}
 
 	dst.Write(this.reasonCodes)
@@ -310,11 +283,10 @@ func (this *SubackMessage) build() {
 		total += 2
 		total += len(this.reasonStr)
 	}
-	for i := 0; i < len(this.userProperty); i++ {
-		total++
-		total += 2
-		total += len(this.userProperty[i])
-	}
+
+	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	total += n
+
 	this.propertiesLen = uint32(total - 2)
 	total += len(lbEncode(this.propertiesLen))
 	total += len(this.reasonCodes)
