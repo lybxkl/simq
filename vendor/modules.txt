@@ -68,6 +68,9 @@ github.com/panjf2000/ants/v2/internal
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
+# github.com/robfig/cron/v3 v3.0.1
+## explicit
+github.com/robfig/cron/v3
 # github.com/shirou/gopsutil v3.20.11+incompatible
 github.com/shirou/gopsutil/cpu
 github.com/shirou/gopsutil/internal/common

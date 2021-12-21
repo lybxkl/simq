@@ -19,6 +19,7 @@ import (
 	sessions_impl "gitee.com/Ljolan/si-mqtt/corev5/v2/sessions/impl"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
 	topics_impl "gitee.com/Ljolan/si-mqtt/corev5/v2/topics/impl"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/cron"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/middleware"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/runtimex"
 	"gitee.com/Ljolan/si-mqtt/logger"
@@ -621,6 +622,9 @@ func (server *Server) getSession(svc *service, req *messagev2.ConnectMessage, re
 			return err
 		}
 	}
+
+	// 取消任务
+	cron.DelayTaskManager.Cancel(string(req.ClientId()))
 
 	return nil
 }

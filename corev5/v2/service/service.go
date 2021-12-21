@@ -77,7 +77,8 @@ type service struct {
 
 	// sess是这个MQTT会话的会话对象。它跟踪会话变量
 	//比如ClientId, KeepAlive，用户名等
-	sess sessions.Session
+	sess        sessions.Session
+	hasSendWill bool // 防止重复发送遗嘱使用
 
 	//等待各种goroutines完成启动和停止
 	wgStarted sync.WaitGroup
@@ -307,11 +308,12 @@ func (svc *service) stop() {
 			}
 		}
 	}
-	//如果设置了遗嘱消息，则发送遗嘱消息
-	// Publish will messagev5 if WillFlag is set. Server side only.
+	//如果设置了遗嘱消息，则发送遗嘱消息，当是收到正常DisConnect消息产生的发送遗嘱消息行为，会在收到消息处处理
+	// Publish will messagev if WillFlag is set. Server side only.
 	if !svc.client && svc.sess.Cmsg().WillFlag() {
 		logger.Logger.Infof("(%s) service/stop: connection unexpectedly closed. Sending Will：.", svc.cid())
-		svc.onPublish(svc.sess.Will())
+		//svc.onPublish(svc.sess.Will())
+		svc.sendWillMsg()
 	}
 
 	// 直接删除session，重连时重新初始化

@@ -10,10 +10,12 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/bufpool"
+	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/cron"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"net"
 	"reflect"
+	"time"
 )
 
 var (
@@ -242,9 +244,17 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 	case *messagev2.DisconnectMessage:
 		logger.Logger.Debugf("client %v disconnect reason code: %s", svc.cid(), msg.ReasonCode())
 		// 0x04 包含遗嘱消息的断开  客户端希望断开但也需要服务端发布它的遗嘱消息。
-		if msg.ReasonCode() != messagev2.DisconnectionIncludesWill {
-			svc.sess.Cmsg().SetWillFlag(false)
+		switch msg.ReasonCode() {
+		case messagev2.DisconnectionIncludesWill:
+			// 发布遗嘱消息。或者延迟发布
+			svc.sendWillMsg()
+		case messagev2.Success:
+			// 服务端收到包含原因码为0x00（正常关闭） 的DISCONNECT报文之后删除了遗嘱消息
+			svc.sess.Cmsg().SetWillMessage(nil)
+		default:
+			svc.sess.Cmsg().SetWillMessage(nil)
 		}
+
 		// 判断是否需要重新设置session过期时间
 		if msg.SessionExpiryInterval() > 0 {
 			if svc.sess.Cmsg().SessionExpiryInterval() == 0 {
@@ -255,9 +265,9 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 			}
 			// TODO 需要更新过期间隔
 			svc.sess.Cmsg().SetSessionExpiryInterval(msg.SessionExpiryInterval())
-			err := svc.SessionStore.StoreSession(context.Background(), svc.cid(), svc.sess)
+			err = svc.SessionStore.StoreSession(context.Background(), svc.cid(), svc.sess)
 			if err != nil {
-				return err
+				return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 			}
 		}
 		return errDisconnect
@@ -271,6 +281,34 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 	}
 
 	return err
+}
+
+// 发送遗嘱消息
+func (svc *service) sendWillMsg() {
+	willMsg := svc.sess.Will()
+	if willMsg != nil && !svc.hasSendWill {
+		willMsgExpiry := svc.sess.Cmsg().WillMsgExpiryInterval()
+		if willMsgExpiry > 0 {
+			willMsg.SetMessageExpiryInterval(willMsgExpiry)
+		}
+		willMsgDelaySendTime := svc.sess.Cmsg().WillDelayInterval()
+		if willMsgDelaySendTime == 0 {
+			// 直接发送
+		} else {
+			// 延迟发送，在延迟发送前重新登录，需要取消发送
+		}
+		cron.DelayTaskManager.DelaySendWill(&cron.DelayWillTask{
+			ID:       cron.ID(svc.sess.ClientId()),
+			DealTime: time.Duration(willMsgDelaySendTime), // 为0还是由DelayTaskManager处理
+			Data:     willMsg,
+			Fn: func(data *messagev2.PublishMessage) {
+				logger.Logger.Debugf("%s send will message", svc.cid())
+				// 发送，只需要发送本地，集群的化，内部实现处理获取消息
+				svc.pubFn(data, "", false) // TODO 发送遗嘱嘱消息时是否需要处理共享订阅
+			},
+		})
+		svc.hasSendWill = true
+	}
 }
 
 func (svc *service) processAcked(ackq sessions.Ackqueue) {

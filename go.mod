@@ -13,6 +13,7 @@ require (
 	github.com/klauspost/compress v1.10.7 // indirect
 	github.com/onsi/gomega v1.14.0 // indirect
 	github.com/panjf2000/ants/v2 v2.4.6
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.7.0
 	github.com/valyala/fastrand v1.0.0
 	go.mongodb.org/mongo-driver v1.7.2
