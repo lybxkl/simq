@@ -25,6 +25,7 @@ serverVersion = "5.0.1"
     closeShareSub = false # 关闭共享订阅
 
     max_qos = 1
+    retain_available = false
 
 [cluster]
     # 是否开启集群模式

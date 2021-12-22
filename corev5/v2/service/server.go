@@ -339,24 +339,15 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 
 	// 判断是否允许空client id
 	if len(req.ClientId()) == 0 && !server.ConFig.Broker.AllowZeroLengthClientId {
-		dis := messagev2.NewDisconnectMessage()
-		dis.SetReasonCode(messagev2.CustomerIdentifierInvalid)
-		dis.SetReasonStr([]byte("the length of the client ID cannot be zero"))
-		writeMessage(conn, dis)
+		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.CustomerIdentifierInvalid, []byte("the length of the client ID cannot be zero")))
 		return nil, nil, errors.New("the length of the client ID cannot be zero")
 	}
 	if server.ConFig.Broker.MaxKeepalive > 0 && req.KeepAlive() > server.ConFig.Broker.MaxKeepalive {
-		dis := messagev2.NewDisconnectMessage()
-		dis.SetReasonCode(messagev2.UnspecifiedError)
-		dis.SetReasonStr([]byte("the keepalive value exceeds the maximum value"))
-		writeMessage(conn, dis)
+		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.UnspecifiedError, []byte("the keepalive value exceeds the maximum value")))
 		return nil, nil, errors.New("the keepalive value exceeds the maximum value")
 	}
-	if server.ConFig.Broker.MaxPacketSize > 0 && req.Len() > int(server.ConFig.Broker.MaxPacketSize) {
-		dis := messagev2.NewDisconnectMessage()
-		dis.SetReasonCode(messagev2.UnspecifiedError)
-		dis.SetReasonStr([]byte("exceeds the maximum package size"))
-		writeMessage(conn, dis)
+	if server.ConFig.Broker.MaxPacketSize > 0 && req.Len() > int(server.ConFig.Broker.MaxPacketSize) { // 包大小限制
+		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.MessageTooLong, []byte("exceeds the maximum package size")))
 		return nil, nil, errors.New("exceeds the maximum package size")
 	}
 	if server.ConFig.Broker.MaxQos < int(req.WillQos()) { // 遗嘱消息qos也需要遵循最大qos
@@ -364,6 +355,16 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 		return nil, nil, errors.New("exceeds the max qos: " + strconv.Itoa(server.ConFig.Broker.MaxQos))
 	}
 	resp.SetMaxQos(byte(server.ConFig.Broker.MaxQos)) // 设置最大qos等级
+
+	if server.ConFig.Broker.RetainAvailable { // 是否支持保留消息
+		resp.SetRetainAvailable(1)
+	} else {
+		if req.WillRetain() {
+			writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.UnsupportedRetention, nil))
+			return nil, nil, errors.New("unSupport retain message")
+		}
+		resp.SetRetainAvailable(0)
+	}
 
 	svcConf := server.ConFig.DefaultConfig.Server
 	if svcConf.RedirectOpen { // 重定向
