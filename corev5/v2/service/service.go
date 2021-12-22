@@ -68,6 +68,8 @@ type service struct {
 	timeoutRetries int
 
 	//客户端最大可接收包大小，在connect包内，但broker不处理，因为超过限制的报文将导致协议错误，客户端发送包含原因码0x95（报文过大）的DISCONNECT报文给broker
+	// 共享订阅的情况下，如果一条消息对于部分客户端来说太长而不能发送，服务端可以选择丢弃此消息或者把消息发送给剩余能够接收此消息的客户端。
+	// 非规范：服务端可以把那些没有发送就被丢弃的报文放在死信队列 上，或者执行其他诊断操作。具体的操作超出了5.0规范的范围。
 	// maxPackageSize int
 
 	conn io.Closer
