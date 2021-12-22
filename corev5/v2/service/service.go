@@ -67,6 +67,9 @@ type service struct {
 	//如果没有设置，则默认为3次重试。
 	timeoutRetries int
 
+	//客户端最大可接收包大小，在connect包内，但broker不处理，因为超过限制的报文将导致协议错误，客户端发送包含原因码0x95（报文过大）的DISCONNECT报文给broker
+	// maxPackageSize int
+
 	conn io.Closer
 
 	//会话管理器，用于跟踪所有客户端

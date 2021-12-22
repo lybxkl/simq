@@ -59,6 +59,11 @@ func (svc *service) processor() {
 			}
 			return
 		}
+		if total > int(svc.conFig.Broker.MaxPacketSize) {
+			writeMessage(svc.conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.MessageTooLong, nil))
+			logger.Logger.Errorf("(%s): message sent is too large", svc.cid())
+			return
+		}
 
 		msg, n, err := svc.peekMessage(mtype, total)
 		if err != nil {

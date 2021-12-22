@@ -350,6 +350,8 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.MessageTooLong, []byte("exceeds the maximum package size")))
 		return nil, nil, errors.New("exceeds the maximum package size")
 	}
+	resp.SetMaxPacketSize(server.ConFig.Broker.MaxPacketSize)
+
 	if server.ConFig.Broker.MaxQos < int(req.WillQos()) { // 遗嘱消息qos也需要遵循最大qos
 		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.UnsupportedQoSLevel, nil))
 		return nil, nil, errors.New("exceeds the max qos: " + strconv.Itoa(server.ConFig.Broker.MaxQos))

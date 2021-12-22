@@ -180,7 +180,7 @@ func getMessageBuffer(c io.Closer) ([]byte, error) {
 		}
 	}
 
-	// Get the remaining length of the messagev5
+	// Get the remaining length of the message
 	remlen, _ := binary.Uvarint(buf[1:])
 	buf = append(buf, make([]byte, remlen)...)
 

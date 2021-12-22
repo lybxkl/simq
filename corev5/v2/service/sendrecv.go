@@ -303,8 +303,8 @@ func (svc *service) readMessage(mtype messagev2.MessageType, total int) (message
 	return msg, n, err
 }
 
-// writeMessage() writes a messagev5 to the outgoing buffer
-//writeMessage()将消息写入传出缓冲区
+//writeMessage()将消息写入传出缓冲区，
+// 客户端限制的最大可接收包大小，由客户端执行处理，因为超过限制的报文将导致协议错误，客户端发送包含原因码0x95（报文过大）的DISCONNECT报文给broker
 func (svc *service) writeMessage(msg messagev2.Message) (int, error) {
 	var (
 		l    int = msg.Len()

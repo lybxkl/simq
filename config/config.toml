@@ -26,6 +26,7 @@ serverVersion = "5.0.1"
 
     max_qos = 1
     retain_available = false
+    max_packet_size = 400
 
 [cluster]
     # 是否开启集群模式

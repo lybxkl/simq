@@ -43,6 +43,9 @@ func init() {
 	if cfg.Broker.MaxQos > 2 || cfg.Broker.MaxQos < 1 {
 		cfg.Broker.MaxQos = 2
 	}
+	if cfg.Broker.MaxPacketSize <= 0 {
+		cfg.Broker.MaxPacketSize = 65535
+	}
 }
 
 type SIConfig struct {
@@ -85,7 +88,7 @@ type Broker struct {
 	MaxInflightBytes           int32  `toml:"max_inflight_bytes"`           // 对于Qos1/2, 表示最大正在处理的字节数，默认为0（无最大值）
 	MaxInflightMessages        int32  `toml:"max_inflight_messages"`        // 同时传输的消息最大数， qos>0
 	MaxKeepalive               uint16 `toml:"max_keepalive"`                // 允许最大值65535 单位为s, 默认5分钟
-	MaxPacketSize              int32  `toml:"max_packet_size"`              // 最大数据包大小，单位字节，超过会主动断开连接
+	MaxPacketSize              uint32 `toml:"max_packet_size"`              // 最大数据包大小，单位字节，超过会主动断开连接，默认65535
 	MaxQueueBytes              int64  `toml:"max_queue_bytes"`              // 最大消息队列的数量，超过会被丢弃，默认0-无最大值
 	MaxQueueMessages           int32  `toml:"max_queue_messages"`           // 超过max_inflight_messages的消息会被缓存到队列中，默认100
 	MessageSizeLimit           int32  `toml:"message_size_limit"`           // 允许发送的最大有效负载大小，默认0-无限制
