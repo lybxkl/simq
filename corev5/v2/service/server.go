@@ -28,6 +28,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -358,6 +359,11 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 		writeMessage(conn, dis)
 		return nil, nil, errors.New("exceeds the maximum package size")
 	}
+	if server.ConFig.Broker.MaxQos < int(req.WillQos()) { // 遗嘱消息qos也需要遵循最大qos
+		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.UnsupportedQoSLevel, nil))
+		return nil, nil, errors.New("exceeds the max qos: " + strconv.Itoa(server.ConFig.Broker.MaxQos))
+	}
+	resp.SetMaxQos(byte(server.ConFig.Broker.MaxQos)) // 设置最大qos等级
 
 	svcConf := server.ConFig.DefaultConfig.Server
 	if svcConf.RedirectOpen { // 重定向

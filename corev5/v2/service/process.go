@@ -444,6 +444,9 @@ func (svc *service) topicAliceIn(msg *messagev2.PublishMessage) error {
 //如果QoS == 1，我们应该返回PUBACK，然后进行下一步
 //如果QoS == 2，我们需要将其放入ack队列中，发送回PUBREC
 func (svc *service) processPublish(msg *messagev2.PublishMessage) error {
+	if svc.conFig.Broker.MaxQos < int(msg.QoS()) { // 判断是否是支持的qos等级，只会验证本broker内收到的，集群转发来的不会验证，前提是因为集群来的已经是验证过的
+		return messagev2.NewCodeErr(messagev2.UnsupportedQoSLevel, fmt.Sprintf("a maximum of qos %d is supported", svc.conFig.Broker.MaxQos))
+	}
 	if msg.Retain() && !svc.conFig.Broker.RetainAvailable {
 		return messagev2.NewCodeErr(messagev2.UnsupportedRetention, "unSupport retain message")
 	}

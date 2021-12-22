@@ -40,6 +40,9 @@ func init() {
 	if cfg.Broker.MaxKeepalive == 0 {
 		cfg.Broker.MaxKeepalive = consts.KeepAlive
 	}
+	if cfg.Broker.MaxQos > 2 || cfg.Broker.MaxQos < 1 {
+		cfg.Broker.MaxQos = 2
+	}
 }
 
 type SIConfig struct {
@@ -75,6 +78,7 @@ type Broker struct {
 	CloseShareSub bool   `toml:"closeShareSub"`
 
 	AllowZeroLengthClientId    bool   `toml:"allow_zero_length_clientId"`
+	MaxQos                     int    `toml:"max_qos"`                      // 支持的最大qos，默认2，不得低于1
 	AutoIdPrefix               string `toml:"auto_id_prefix"`               // 设置客户端id前缀， 默认auto-
 	PerListenerSettings        bool   `toml:"per_listener_settings"`        // 每个listener都需要配置参数
 	CheckRetainSource          bool   `toml:"check_retain_source"`          // 检查发送者是否有发送保留消息的权限，有则可以发送
