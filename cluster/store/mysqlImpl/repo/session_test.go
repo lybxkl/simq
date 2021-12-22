@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/config"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions/impl"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -17,7 +17,7 @@ func TestSessionStore(t *testing.T) {
 	ss.Start(ctx, config.GetConfig())
 	clientId := "aa"
 
-	msg := messagev52.NewConnectMessage()
+	msg := messagev2.NewConnectMessage()
 	msg.SetClientId([]byte(clientId))
 	msg.SetCleanSession(true)
 	msg.SetWillFlag(true)
@@ -54,7 +54,7 @@ func TestSessionStore(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Println(s.Cmsg())
 
-	pub := messagev52.NewPublishMessage()
+	pub := messagev2.NewPublishMessage()
 	pub.SetQoS(0x00)
 	pub.SetPacketId(123)
 	pub.SetContentType([]byte("type"))
@@ -99,7 +99,7 @@ func TestSessionStore(t *testing.T) {
 	sof, _, _ = ss.GetAllOfflineMsg(ctx, clientId)
 	fmt.Println(sof)
 
-	sub := messagev52.NewSubscribeMessage()
+	sub := messagev2.NewSubscribeMessage()
 	sub.SetPacketId(100)
 	sub.AddTopic([]byte("/a/b/#/c"), 1)
 	sub.SetTopicNoLocal([]byte("/a/b/#/c"), true)

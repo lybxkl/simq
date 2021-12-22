@@ -1,7 +1,7 @@
 package colong
 
 import (
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/logger"
 )
 
@@ -11,9 +11,9 @@ var (
 )
 
 type (
-	ClusterInToPub      func(msg1 *messagev52.PublishMessage) error
-	ClusterInToPubShare func(msg1 *messagev52.PublishMessage, shareName string, onlyShare bool) error
-	ClusterInToPubSys   func(msg1 *messagev52.PublishMessage) error
+	ClusterInToPub      func(msg1 *messagev2.PublishMessage) error
+	ClusterInToPubShare func(msg1 *messagev2.PublishMessage, shareName string, onlyShare bool) error
+	ClusterInToPubSys   func(msg1 *messagev2.PublishMessage) error
 )
 
 func SetSender(sd Sender) {
@@ -27,9 +27,9 @@ func GetSender() Sender {
 // shareName 共享主题组
 // targetNode 目标节点
 // 这两个参数用于集群共享主题消息发送到特定的节点，TODO 静态Getty启动 需要有 msg 节点发送确认
-func SendMsgToCluster(msg messagev52.Message, shareName, targetNode string, allSuccess func(message messagev52.Message),
-	oneNodeSendSucFunc func(name string, message messagev52.Message),
-	oneNodeSendFailFunc func(name string, message messagev52.Message)) {
+func SendMsgToCluster(msg messagev2.Message, shareName, targetNode string, allSuccess func(message messagev2.Message),
+	oneNodeSendSucFunc func(name string, message messagev2.Message),
+	oneNodeSendFailFunc func(name string, message messagev2.Message)) {
 	if sender == nil {
 		logger.Logger.Warnf("sender is nil")
 		return
@@ -45,11 +45,11 @@ func SendMsgToCluster(msg messagev52.Message, shareName, targetNode string, allS
 // Sender 只要实现此接口就可以通过SendMsgToCluster(...)方法发送集群消息
 type Sender interface {
 	// SendOneNode 主要是用来发送共享主题消息
-	SendOneNode(msg messagev52.Message, shareName, targetNode string,
-		oneNodeSendSucFunc func(name string, message messagev52.Message),
-		oneNodeSendFailFunc func(name string, message messagev52.Message))
+	SendOneNode(msg messagev2.Message, shareName, targetNode string,
+		oneNodeSendSucFunc func(name string, message messagev2.Message),
+		oneNodeSendFailFunc func(name string, message messagev2.Message))
 	// SendAllNode 发送除共享主题消息外的消息
-	SendAllNode(msg messagev52.Message, allSuccess func(message messagev52.Message),
-		oneNodeSendSucFunc func(name string, message messagev52.Message),
-		oneNodeSendFailFunc func(name string, message messagev52.Message))
+	SendAllNode(msg messagev2.Message, allSuccess func(message messagev2.Message),
+		oneNodeSendSucFunc func(name string, message messagev2.Message),
+		oneNodeSendFailFunc func(name string, message messagev2.Message))
 }

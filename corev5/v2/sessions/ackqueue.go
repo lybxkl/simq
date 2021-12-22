@@ -1,12 +1,12 @@
 package sessions
 
 import (
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 )
 
 type Ackqueue interface {
-	Wait(msg messagev52.Message, onComplete interface{}) error
-	Ack(msg messagev52.Message) error
+	Wait(msg messagev2.Message, onComplete interface{}) error
+	Ack(msg messagev2.Message) error
 	Acked() []Ackmsg
 	Size() int64
 	Len() int
@@ -15,11 +15,11 @@ type Ackqueue interface {
 type Ackmsg struct {
 	// Message type of the messagev5 waiting for ack
 	//等待ack消息的消息类型
-	Mtype messagev52.MessageType
+	Mtype messagev2.MessageType
 
 	// Current state of the ack-waiting messagev5
 	//等待ack-waiting消息的当前状态
-	State messagev52.MessageType
+	State messagev2.MessageType
 
 	// Packet ID of the messagev5. Every messagev5 that require ack'ing must have a valid
 	// packet ID. Messages that have messagev5 I

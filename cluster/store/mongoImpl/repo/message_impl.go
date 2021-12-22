@@ -7,7 +7,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/cluster/store/mongoImpl/orm/mongo"
 	"gitee.com/Ljolan/si-mqtt/cluster/store/mongoImpl/po"
 	"gitee.com/Ljolan/si-mqtt/config"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 )
 
 type MessageRepo struct {
@@ -28,7 +28,7 @@ func (m *MessageRepo) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (m *MessageRepo) StoreWillMessage(ctx context.Context, clientId string, message *messagev52.PublishMessage) error {
+func (m *MessageRepo) StoreWillMessage(ctx context.Context, clientId string, message *messagev2.PublishMessage) error {
 	return m.c.Save(ctx, "si_will", clientId, voToPo(clientId, message))
 }
 
@@ -36,7 +36,7 @@ func (m *MessageRepo) ClearWillMessage(ctx context.Context, clientId string) err
 	return m.c.Delete(ctx, "si_will", orm.Select{"_id": clientId})
 }
 
-func (m *MessageRepo) GetWillMessage(ctx context.Context, clientId string) (*messagev52.PublishMessage, error) {
+func (m *MessageRepo) GetWillMessage(ctx context.Context, clientId string) (*messagev2.PublishMessage, error) {
 	ret := make([]po.Message, 0)
 	err := m.c.Get(ctx, "si_will", orm.Select{"_id": clientId}, &ret)
 	if err != nil || len(ret) == 0 {
@@ -45,7 +45,7 @@ func (m *MessageRepo) GetWillMessage(ctx context.Context, clientId string) (*mes
 	return poToVo(ret[0]), nil
 }
 
-func (m *MessageRepo) StoreRetainMessage(ctx context.Context, topic string, message *messagev52.PublishMessage) error {
+func (m *MessageRepo) StoreRetainMessage(ctx context.Context, topic string, message *messagev2.PublishMessage) error {
 	rt := voToPo(topic, message)
 	rt.ClientId = ""
 	return m.c.Save(ctx, "si_retain", topic, rt)
@@ -55,7 +55,7 @@ func (m *MessageRepo) ClearRetainMessage(ctx context.Context, topic string) erro
 	return m.c.Delete(ctx, "si_retain", orm.Select{"_id": topic})
 }
 
-func (m *MessageRepo) GetRetainMessage(ctx context.Context, topic string) (*messagev52.PublishMessage, error) {
+func (m *MessageRepo) GetRetainMessage(ctx context.Context, topic string) (*messagev2.PublishMessage, error) {
 	ret := make([]po.Message, 0)
 	err := m.c.Get(ctx, "si_retain", orm.Select{"_id": topic}, &ret)
 	if err != nil || len(ret) == 0 {
@@ -64,20 +64,20 @@ func (m *MessageRepo) GetRetainMessage(ctx context.Context, topic string) (*mess
 	return poToVo(ret[0]), nil
 }
 
-func (m *MessageRepo) GetAllRetainMsg(ctx context.Context) ([]*messagev52.PublishMessage, error) {
+func (m *MessageRepo) GetAllRetainMsg(ctx context.Context) ([]*messagev2.PublishMessage, error) {
 	data := make([]po.Message, 0)
 	err := m.c.Get(ctx, "si_retain", orm.Select{}, &data)
 	if err != nil || len(data) == 0 {
 		return nil, err
 	}
-	ret := make([]*messagev52.PublishMessage, len(data))
+	ret := make([]*messagev2.PublishMessage, len(data))
 	for i := 0; i < len(ret); i++ {
 		ret[i] = poToVo(data[i])
 	}
 	return ret, nil
 }
 
-func voToPo(id string, message *messagev52.PublishMessage) po.Message {
+func voToPo(id string, message *messagev2.PublishMessage) po.Message {
 	up := message.UserProperty()
 	var ups []string
 	if up != nil && len(up) >= 0 {
@@ -103,8 +103,8 @@ func voToPo(id string, message *messagev52.PublishMessage) po.Message {
 		ContentType:     string(message.ContentType()),
 	}
 }
-func poToVo(message po.Message) *messagev52.PublishMessage {
-	pub := messagev52.NewPublishMessage()
+func poToVo(message po.Message) *messagev2.PublishMessage {
+	pub := messagev2.NewPublishMessage()
 	pub.SetMtypeFlags(message.Mtypeflags)
 	_ = pub.SetTopic([]byte(message.Topic))
 	_ = pub.SetQoS(message.Qos)

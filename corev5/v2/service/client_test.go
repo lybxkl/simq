@@ -3,7 +3,7 @@ package service
 import (
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/auth/authplus"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
 	logger2 "gitee.com/Ljolan/si-mqtt/logger"
 	"github.com/stretchr/testify/require"
@@ -29,7 +29,7 @@ func TestExampleClient(t *testing.T) {
 	c := &Client{}
 	c.AuthPlus = vp
 	// Creates a new MQTT CONNECT messagev5 and sets the proper parameters
-	msg := messagev52.NewConnectMessage()
+	msg := messagev2.NewConnectMessage()
 	msg.SetWillQos(1)
 	msg.SetVersion(5)
 	msg.SetCleanSession(true)
@@ -49,11 +49,11 @@ func TestExampleClient(t *testing.T) {
 
 	// Creates a new PUBLISH messagev5 with the appropriate contents for publishing
 
-	submsg := messagev52.NewSubscribeMessage()
+	submsg := messagev2.NewSubscribeMessage()
 	submsg.AddTopic([]byte("abc/#"), 1)
 	//submsg.SetTopicNoLocal([]byte("abc"), true)
 	fmt.Println("====== >>> Subscribe")
-	err = c.Subscribe(submsg, func(msg, ack messagev52.Message, err error) error {
+	err = c.Subscribe(submsg, func(msg, ack messagev2.Message, err error) error {
 		if err != nil {
 			fmt.Println(err)
 		} else {
@@ -61,7 +61,7 @@ func TestExampleClient(t *testing.T) {
 			fmt.Println(ack)
 		}
 		return nil
-	}, func(msg *messagev52.PublishMessage, sub topics.Sub, sender string, shareMsg bool) error {
+	}, func(msg *messagev2.PublishMessage, sub topics.Sub, sender string, shareMsg bool) error {
 		fmt.Println("===<<<>>>", msg.String())
 		if msg.SubscriptionIdentifier() > 0 {
 			// ...
@@ -77,7 +77,7 @@ func TestExampleClient(t *testing.T) {
 	// Publishes to the server by sending the messagev5
 	fmt.Println("====== >>> Publish")
 	for i := 0; i < 100; i++ {
-		pubmsg := messagev52.NewPublishMessage()
+		pubmsg := messagev2.NewPublishMessage()
 		pubmsg.SetTopic([]byte("abc"))
 		pubmsg.SetPayload([]byte("1234567890"))
 		pubmsg.SetQoS(1)
@@ -86,7 +86,7 @@ func TestExampleClient(t *testing.T) {
 		if pubmsg.QoS() > 0 {
 			pubmsg.SetPacketId(uint16(atomic.AddUint32(&pkid, 1)))
 		}
-		err = c.Publish(pubmsg, func(msg, ack messagev52.Message, err error) error {
+		err = c.Publish(pubmsg, func(msg, ack messagev2.Message, err error) error {
 			if err != nil {
 				fmt.Println(err)
 			} else {
@@ -99,7 +99,7 @@ func TestExampleClient(t *testing.T) {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	pubmsg := messagev52.NewPublishMessage()
+	pubmsg := messagev2.NewPublishMessage()
 	pubmsg.SetTopic([]byte("abc"))
 	pubmsg.SetPayload([]byte("1234567890"))
 	pubmsg.SetQoS(1)
@@ -109,7 +109,7 @@ func TestExampleClient(t *testing.T) {
 		pubmsg.SetPacketId(uint16(atomic.AddUint32(&pkid, 1)))
 	}
 	fmt.Println("====== >>> Publish")
-	err = c.Publish(pubmsg, func(msg, ack messagev52.Message, err error) error {
+	err = c.Publish(pubmsg, func(msg, ack messagev2.Message, err error) error {
 		if err != nil {
 			fmt.Println(err)
 		} else {
@@ -136,7 +136,7 @@ func TestExampleClientSub(t *testing.T) {
 	vp := authplus.NewDefaultAuth()
 	c.AuthPlus = vp
 	// Creates a new MQTT CONNECT messagev5 and sets the proper parameters
-	msg := messagev52.NewConnectMessage()
+	msg := messagev2.NewConnectMessage()
 	msg.SetWillQos(1)
 	msg.SetVersion(5)
 	msg.SetCleanSession(true)
@@ -153,7 +153,7 @@ func TestExampleClientSub(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(10 * time.Millisecond)
 	// Creates a new SUBSCRIBE messagev5 to subscribe to topic "abc"
-	submsg := messagev52.NewSubscribeMessage()
+	submsg := messagev2.NewSubscribeMessage()
 	submsg.AddTopic([]byte("abc"), 2)
 
 	// Subscribes to the topic by sending the messagev5. The first nil in the function
@@ -162,7 +162,7 @@ func TestExampleClientSub(t *testing.T) {
 	// OnPublishFunc that handles any messages send to the client because of this
 	// subscription. Nil means we are ignoring any PUBLISH messages for this topic.
 	fmt.Println("====== >>> Subscribe")
-	err = c.Subscribe(submsg, func(msg, ack messagev52.Message, err error) error {
+	err = c.Subscribe(submsg, func(msg, ack messagev2.Message, err error) error {
 		if err != nil {
 			fmt.Println(err)
 		} else {
@@ -170,7 +170,7 @@ func TestExampleClientSub(t *testing.T) {
 			fmt.Println(ack)
 		}
 		return nil
-	}, func(msg *messagev52.PublishMessage, sub topics.Sub, sender string, shareMsg bool) error {
+	}, func(msg *messagev2.PublishMessage, sub topics.Sub, sender string, shareMsg bool) error {
 		fmt.Println("===<<<>>>", msg.String())
 		if msg.SubscriptionIdentifier() > 0 {
 			// ...
@@ -184,9 +184,9 @@ func TestExampleClientSub(t *testing.T) {
 	time.Sleep(10 * time.Second)
 
 	fmt.Println("====== >>> Unsubscribe")
-	unsubmsg := messagev52.NewUnsubscribeMessage()
+	unsubmsg := messagev2.NewUnsubscribeMessage()
 	unsubmsg.AddTopic([]byte("abc"))
-	err = c.Unsubscribe(unsubmsg, func(msg, ack messagev52.Message, err error) error {
+	err = c.Unsubscribe(unsubmsg, func(msg, ack messagev2.Message, err error) error {
 		if err != nil {
 			fmt.Println(err)
 		} else {

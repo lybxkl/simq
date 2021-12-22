@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 )
 
 // CMsgType 前4位用来表示类型，和mqtt消息类型一样处理
@@ -34,20 +34,20 @@ type WrapCMsg interface {
 	Type() CMsgType
 	Tag() []string
 	Share() bool
-	Msg() messagev52.Message
+	Msg() messagev2.Message
 	Status() map[string]string // 状态数据，自定义
 	CloseSessions() []string   // 需要断开连接并删除的session，client ids
 
-	SetShare(shareName string, msg messagev52.Message)
+	SetShare(shareName string, msg messagev2.Message)
 	AddTag(tag string)
-	SetMsg(msg messagev52.Message)
+	SetMsg(msg messagev2.Message)
 	Len() int
 }
 type wrapCMsgImpl struct {
 	cmsgtype byte
 	tag      []string // 一个字节开头表示，和mqtt协议内协同的UTF-8字符串数据
 	status   map[string]string
-	msg      messagev52.Message // mqtt报文
+	msg      messagev2.Message // mqtt报文
 }
 
 func NewWrapCMsgImpl(msgType CMsgType) WrapCMsg {
@@ -78,7 +78,7 @@ func (w *wrapCMsgImpl) CloseSessions() []string {
 }
 
 // IsShare 如果是共享消息，tag只能有共享组名称，且一个
-func (w *wrapCMsgImpl) SetShare(shareName string, msg messagev52.Message) {
+func (w *wrapCMsgImpl) SetShare(shareName string, msg messagev2.Message) {
 	w.tag = []string{shareName}
 	w.cmsgtype |= 14 // tag位和msg位和share位都为1
 	w.SetMsg(msg)
@@ -87,7 +87,7 @@ func (w *wrapCMsgImpl) AddTag(tag string) {
 	w.tag = append(w.tag, tag)
 	w.cmsgtype |= 2
 }
-func (w *wrapCMsgImpl) SetMsg(msg messagev52.Message) {
+func (w *wrapCMsgImpl) SetMsg(msg messagev2.Message) {
 	w.msg = msg
 	w.cmsgtype |= 4
 }
@@ -197,7 +197,7 @@ func DecodeCMsg(b []byte) (WrapCMsg, int, error) {
 		}
 
 		tmpn := 0
-		mtype := messagev52.MessageType(b[total] >> 4)
+		mtype := messagev2.MessageType(b[total] >> 4)
 		tmpn++
 
 		msglen, n, err := lbDecode(b[total+tmpn:])
@@ -242,7 +242,7 @@ func (w *wrapCMsgImpl) Tag() []string {
 	return w.tag
 }
 
-func (w *wrapCMsgImpl) Msg() messagev52.Message {
+func (w *wrapCMsgImpl) Msg() messagev2.Message {
 	return w.msg
 }
 

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"gitee.com/Ljolan/si-mqtt/cluster"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"net"
 	"strconv"
 	"strings"
@@ -85,7 +85,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	cname := session.GetAttribute(Cname)
 	if cname == nil {
 		switch pkg := msg.(type) {
-		case *messagev52.ConnectMessage: // 直接使用connec报文中的用户属性传递节点连接数据，简单方便
+		case *messagev2.ConnectMessage: // 直接使用connec报文中的用户属性传递节点连接数据，简单方便
 			h.connectAuth(session, pkg)
 		default:
 			session.Close()
@@ -94,16 +94,16 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 	}
 	// TODO 消息是否需要确认？
 	switch pkg := msg.(type) {
-	case *messagev52.ConnectMessage: // 直接使用connec报文中的用户属性传递节点连接数据，简单方便
+	case *messagev2.ConnectMessage: // 直接使用connec报文中的用户属性传递节点连接数据，简单方便
 		//h.connectAuth(session, pkg)
-	case *messagev52.PingreqMessage:
+	case *messagev2.PingreqMessage:
 		submit(func() {
 			_, err := session.WriteBytes(pingresp)
 			if err != nil {
 				log.Errorf("OnMessage PingreqMessage: session{%s} write bytes err: {%v}", session.Stat(), err)
 			}
 		})
-	case *messagev52.PublishMessage:
+	case *messagev2.PublishMessage:
 		// 本地发送
 		submit(func() {
 			if pkg1.Share() {
@@ -122,7 +122,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 				}
 			}
 		})
-	case *messagev52.SubscribeMessage:
+	case *messagev2.SubscribeMessage:
 		// 更新【本地订阅树】  与 【主题与节点的映射】
 		submit(func() {
 			tpk := pkg.Topics()
@@ -142,7 +142,7 @@ func (h *serverMessageHandler) OnMessage(session getty.Session, m interface{}) {
 				}
 			}
 		})
-	case *messagev52.UnsubscribeMessage:
+	case *messagev2.UnsubscribeMessage:
 		submit(func() {
 			tpk := pkg.Topics()
 			node := cname.(string)
@@ -207,7 +207,7 @@ func parseAddr(addr string) error {
 	}
 	return nil
 }
-func (this *serverMessageHandler) connectAuth(session getty.Session, pkg *messagev52.ConnectMessage) {
+func (this *serverMessageHandler) connectAuth(session getty.Session, pkg *messagev2.ConnectMessage) {
 	clientNodeId := string(pkg.ClientId())
 	if clientNodeId == "" {
 		log.Errorf("client node connect info error, %v", pkg)

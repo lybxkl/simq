@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gitee.com/Ljolan/si-mqtt/config"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -31,8 +31,8 @@ func TestMessgae(t *testing.T) {
 	require.NoError(t, ms.ClearWillMessage(ctx, "/a/b/c"))
 }
 
-func NewPub(topic string) *messagev52.PublishMessage {
-	pub := messagev52.NewPublishMessage()
+func NewPub(topic string) *messagev2.PublishMessage {
+	pub := messagev2.NewPublishMessage()
 	pub.SetQoS(0x00)
 	pub.SetPacketId(123)
 	pub.SetContentType([]byte("type"))

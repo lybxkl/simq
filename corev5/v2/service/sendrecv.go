@@ -3,7 +3,7 @@ package service
 import (
 	"encoding/binary"
 	"fmt"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"io"
 	"net"
@@ -161,7 +161,7 @@ func (svc *service) sender() {
 // the next messagev5 and returns the type and size.
 // peekMessageSize()读取，但不提交，足够的字节来确定大小
 //下一条消息，并返回类型和大小。
-func (svc *service) peekMessageSize() (messagev52.MessageType, int, error) {
+func (svc *service) peekMessageSize() (messagev2.MessageType, int, error) {
 	var (
 		b   []byte
 		err error
@@ -215,7 +215,7 @@ func (svc *service) peekMessageSize() (messagev52.MessageType, int, error) {
 	//消息的总长度是remlen + 1 (msg类型)+ m (remlen字节)
 	total := int(remlen) + 1 + m
 
-	mtype := messagev52.MessageType(b[0] >> 4)
+	mtype := messagev2.MessageType(b[0] >> 4)
 
 	return mtype, total, err
 }
@@ -224,12 +224,12 @@ func (svc *service) peekMessageSize() (messagev52.MessageType, int, error) {
 // This means the buffer still thinks the bytes are not read yet.
 // peekMessage()从缓冲区读取消息，但是没有提交字节。
 //这意味着缓冲区仍然认为字节还没有被读取。
-func (svc *service) peekMessage(mtype messagev52.MessageType, total int) (messagev52.Message, int, error) {
+func (svc *service) peekMessage(mtype messagev2.MessageType, total int) (messagev2.Message, int, error) {
 	var (
 		b    []byte
 		err  error
 		i, n int
-		msg  messagev52.Message
+		msg  messagev2.Message
 	)
 
 	if svc.in == nil {
@@ -264,12 +264,12 @@ func (svc *service) peekMessage(mtype messagev52.MessageType, total int) (messag
 
 // readMessage() reads and copies a messagev5 from the buffer. The buffer bytes are
 // committed as a result of the read.
-func (svc *service) readMessage(mtype messagev52.MessageType, total int) (messagev52.Message, int, error) {
+func (svc *service) readMessage(mtype messagev2.MessageType, total int) (messagev2.Message, int, error) {
 	var (
 		b   []byte
 		err error
 		n   int
-		msg messagev52.Message
+		msg messagev2.Message
 	)
 
 	if svc.in == nil {
@@ -305,7 +305,7 @@ func (svc *service) readMessage(mtype messagev52.MessageType, total int) (messag
 
 // writeMessage() writes a messagev5 to the outgoing buffer
 //writeMessage()将消息写入传出缓冲区
-func (svc *service) writeMessage(msg messagev52.Message) (int, error) {
+func (svc *service) writeMessage(msg messagev2.Message) (int, error) {
 	var (
 		l    int = msg.Len()
 		m, n int

@@ -3,7 +3,7 @@ package mongo
 import (
 	"context"
 	"gitee.com/Ljolan/si-mqtt/cluster/stat/colong"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 )
 
 type dbSender struct {
@@ -28,21 +28,21 @@ func (this *dbSender) Close() error {
 	return nil
 }
 
-func (this *dbSender) SendOneNode(msg messagev52.Message,
+func (this *dbSender) SendOneNode(msg messagev2.Message,
 	shareName, targetNode string,
-	oneNodeSendSucFunc func(name string, message messagev52.Message),
-	oneNodeSendFailFunc func(name string, message messagev52.Message)) {
+	oneNodeSendSucFunc func(name string, message messagev2.Message),
+	oneNodeSendFailFunc func(name string, message messagev2.Message)) {
 	var e error
 	switch msg := msg.(type) {
-	case *messagev52.PublishMessage:
+	case *messagev2.PublishMessage:
 		if targetNode != "" && shareName != "" {
 			e = this.c.SaveSharePub(context.TODO(), "cluster_msg", targetNode, shareName, msg)
 		} else {
 			e = this.c.SavePub(context.TODO(), "cluster_msg", msg)
 		}
-	case *messagev52.SubscribeMessage:
+	case *messagev2.SubscribeMessage:
 		e = this.c.SaveSub(context.TODO(), "cluster_msg", msg)
-	case *messagev52.UnsubscribeMessage:
+	case *messagev2.UnsubscribeMessage:
 		e = this.c.SaveUnSub(context.TODO(), "cluster_msg", msg)
 	}
 	if e != nil {
@@ -56,17 +56,17 @@ func (this *dbSender) SendOneNode(msg messagev52.Message,
 	}
 }
 
-func (this *dbSender) SendAllNode(msg messagev52.Message,
-	allSuccess func(message messagev52.Message),
-	oneNodeSendSucFunc func(name string, message messagev52.Message),
-	oneNodeSendFailFunc func(name string, message messagev52.Message)) {
+func (this *dbSender) SendAllNode(msg messagev2.Message,
+	allSuccess func(message messagev2.Message),
+	oneNodeSendSucFunc func(name string, message messagev2.Message),
+	oneNodeSendFailFunc func(name string, message messagev2.Message)) {
 	var e error
 	switch msg := msg.(type) {
-	case *messagev52.PublishMessage:
+	case *messagev2.PublishMessage:
 		e = this.c.SavePub(context.TODO(), "cluster_msg", msg)
-	case *messagev52.SubscribeMessage:
+	case *messagev2.SubscribeMessage:
 		e = this.c.SaveSub(context.TODO(), "cluster_msg", msg)
-	case *messagev52.UnsubscribeMessage:
+	case *messagev2.UnsubscribeMessage:
 		e = this.c.SaveUnSub(context.TODO(), "cluster_msg", msg)
 	}
 	if e != nil {

@@ -1,7 +1,7 @@
 package consts
 
 import (
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 )
 
 const (
@@ -24,7 +24,7 @@ const (
 
 const (
 	// MaxQosAllowed is the maximum QOS supported by this server
-	MaxQosAllowed = messagev52.QosExactlyOnce
+	MaxQosAllowed = messagev2.QosExactlyOnce
 )
 
 const (

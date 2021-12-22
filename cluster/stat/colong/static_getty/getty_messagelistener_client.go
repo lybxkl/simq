@@ -1,7 +1,7 @@
 package static_getty
 
 import (
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"github.com/apache/dubbo-getty"
 )
 
@@ -26,7 +26,7 @@ func SetSessionOnOpen(listener getty.EventListener, fuc func(name string, sessio
 }
 func (h *messageHandler) OnOpen(session getty.Session) error {
 	log.Infof("OnOpen session{%s} open", session.Stat())
-	msg := messagev52.NewConnectMessage()
+	msg := messagev2.NewConnectMessage()
 	msg.SetVersion(5)
 	msg.SetClientId([]byte(h.curName))
 	msg.AddUserProperty([]byte("addr:127.0.0.1:8080"))
@@ -58,10 +58,10 @@ func (h *messageHandler) OnMessage(session getty.Session, m interface{}) {
 		return
 	}
 	switch pkg := pkg.(type) {
-	case *messagev52.PingrespMessage:
+	case *messagev2.PingrespMessage:
 		// log.Infof("%s", pkg)
-	case *messagev52.ConnackMessage:
-		if pkg.ReasonCode() == messagev52.Success {
+	case *messagev2.ConnackMessage:
+		if pkg.ReasonCode() == messagev2.Success {
 			// 此时才可以发送消息
 			h.SetAuthOk(session, true)
 			if h.SessionOnOpen != nil {
@@ -76,7 +76,7 @@ func (h *messageHandler) OnMessage(session getty.Session, m interface{}) {
 var ping []byte
 
 func init() {
-	pi := messagev52.NewPingreqMessage()
+	pi := messagev2.NewPingreqMessage()
 	ping, _ = wrapperPub(pi)
 }
 func (h *messageHandler) OnCron(session getty.Session) {

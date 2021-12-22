@@ -3,7 +3,7 @@ package impl
 import (
 	"errors"
 	"fmt"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"math"
 	"sync"
@@ -109,29 +109,29 @@ func (d *ackqueue) Size() int64 {
 // ack messagev5 to be received.
 // Wait()将消息复制到一个等待队列中，并等待相应的消息
 // ack消息被接收。
-func (this *ackqueue) Wait(msg messagev52.Message, onComplete interface{}) error {
+func (this *ackqueue) Wait(msg messagev2.Message, onComplete interface{}) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	switch msg := msg.(type) {
-	case *messagev52.PublishMessage:
-		if msg.QoS() == messagev52.QosAtMostOnce {
+	case *messagev2.PublishMessage:
+		if msg.QoS() == messagev2.QosAtMostOnce {
 			//return fmt.Errorf("QoS 0 messages don't require ack")
 			return errWaitMessage
 		}
 
 		this.insert(msg.PacketId(), msg, onComplete)
 
-	case *messagev52.SubscribeMessage:
+	case *messagev2.SubscribeMessage:
 		this.insert(msg.PacketId(), msg, onComplete)
 
-	case *messagev52.UnsubscribeMessage:
+	case *messagev2.UnsubscribeMessage:
 		this.insert(msg.PacketId(), msg, onComplete)
 
-	case *messagev52.PingreqMessage:
+	case *messagev2.PingreqMessage:
 		this.ping = sessions.Ackmsg{
-			Mtype:      messagev52.PINGREQ,
-			State:      messagev52.RESERVED,
+			Mtype:      messagev2.PINGREQ,
+			State:      messagev2.RESERVED,
 			OnComplete: onComplete,
 		}
 
@@ -142,16 +142,16 @@ func (this *ackqueue) Wait(msg messagev52.Message, onComplete interface{}) error
 	return nil
 }
 
-const MQ_TAG_CLU = messagev52.RESERVED2
+const MQ_TAG_CLU = messagev2.RESERVED2
 
 // Ack() takes the ack messagev5 supplied and updates the status of messages waiting.
 // Ack()获取提供的Ack消息并更新消息等待的状态。
-func (this *ackqueue) Ack(msg messagev52.Message) error {
+func (this *ackqueue) Ack(msg messagev2.Message) error {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
 	switch msg.Type() {
-	case messagev52.PUBACK, messagev52.PUBREC, messagev52.PUBREL, messagev52.PUBCOMP, messagev52.SUBACK, messagev52.UNSUBACK:
+	case messagev2.PUBACK, messagev2.PUBREC, messagev2.PUBREL, messagev2.PUBCOMP, messagev2.SUBACK, messagev2.UNSUBACK:
 		// Check to see if the messagev5 w/ the same packet ID is in the queue
 		//查看是否有相同的数据包ID在队列中
 		i, ok := this.emap[msg.PacketId()]
@@ -174,9 +174,9 @@ func (this *ackqueue) Ack(msg messagev52.Message) error {
 			//glog.Debugf("Cannot ack %s messagev5 with packet ID %d", msg.Type(), msg.PacketId())
 		}
 
-	case messagev52.PINGRESP:
-		if this.ping.Mtype == messagev52.PINGREQ {
-			this.ping.State = messagev52.PINGRESP
+	case messagev2.PINGRESP:
+		if this.ping.Mtype == messagev2.PINGREQ {
+			this.ping.State = messagev2.PINGRESP
 		}
 
 	default:
@@ -194,7 +194,7 @@ func (this *ackqueue) Acked() []sessions.Ackmsg {
 
 	this.ackdone = this.ackdone[0:0]
 
-	if this.ping.State == messagev52.PINGRESP {
+	if this.ping.State == messagev2.PINGRESP {
 		this.ackdone = append(this.ackdone, this.ping)
 		this.ping = sessions.Ackmsg{}
 	}
@@ -202,7 +202,7 @@ func (this *ackqueue) Acked() []sessions.Ackmsg {
 FORNOTEMPTY:
 	for !this.empty() {
 		switch this.ring[this.head].State {
-		case messagev52.PUBACK, messagev52.PUBREL, messagev52.PUBCOMP, messagev52.SUBACK, messagev52.UNSUBACK:
+		case messagev2.PUBACK, messagev2.PUBREL, messagev2.PUBCOMP, messagev2.SUBACK, messagev2.UNSUBACK:
 			this.ackdone = append(this.ackdone, this.ring[this.head])
 			this.removeHead()
 		// TODO 之所以没有 messagev5.PUBREC，是因为在收到PUBCOMP后依旧会替换掉this.ring中那个位置的PUBCRC，到头来最终是执行的PUBCOMP
@@ -214,7 +214,7 @@ FORNOTEMPTY:
 	return this.ackdone
 }
 
-func (this *ackqueue) insert(pktid uint16, msg messagev52.Message, onComplete interface{}) error {
+func (this *ackqueue) insert(pktid uint16, msg messagev2.Message, onComplete interface{}) error {
 	if this.full() {
 		this.grow()
 	}
@@ -226,7 +226,7 @@ func (this *ackqueue) insert(pktid uint16, msg messagev52.Message, onComplete in
 		// sessions.Ackmsg
 		am := sessions.Ackmsg{
 			Mtype:      msg.Type(),
-			State:      messagev52.RESERVED,
+			State:      messagev2.RESERVED,
 			Pktid:      msg.PacketId(),
 			Msgbuf:     make([]byte, ml),
 			OnComplete: onComplete,
@@ -243,7 +243,7 @@ func (this *ackqueue) insert(pktid uint16, msg messagev52.Message, onComplete in
 	} else {
 		// If packet w/ pktid already exist, then this must be a PUBLISH messagev5
 		// Other messagev5 types should never send with the same packet ID
-		pm, ok := msg.(*messagev52.PublishMessage)
+		pm, ok := msg.(*messagev2.PublishMessage)
 		if !ok {
 			return fmt.Errorf("ack/insert: duplicate packet ID for %s messagev5", msg.Name())
 		}

@@ -3,7 +3,7 @@ package impl
 import (
 	"context"
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
 	"gitee.com/Ljolan/si-mqtt/logger"
@@ -14,7 +14,7 @@ type dbSession struct {
 	sessionStore store.SessionStore
 	messageStore store.MessageStore
 	memSession   *session
-	offline      []messagev52.Message
+	offline      []messagev2.Message
 }
 
 func NewDBSession(id string) sessions.Session {
@@ -31,7 +31,7 @@ func (d *dbSession) SetStore(sessionStore store.SessionStore, messageStore store
 }
 
 // 此dbsession的init不会有topic数据来
-func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionInitTopic) error {
+func (d *dbSession) Init(msg *messagev2.ConnectMessage, _ ...sessions.SessionInitTopic) error {
 	cid := string(msg.ClientId())
 	ctx := context.Background()
 	// 拉取订阅
@@ -64,7 +64,7 @@ func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionIn
 	}
 	for i := 0; i < len(info); i++ {
 		// 如果超过int64一半 会导致panic
-		_ = d.memSession.pub2in.Wait(info[i], func(msg, ack messagev52.Message, err error) {
+		_ = d.memSession.pub2in.Wait(info[i], func(msg, ack messagev2.Message, err error) {
 			if err != nil {
 				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
 			} else {
@@ -78,9 +78,9 @@ func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionIn
 		logger.Logger.Errorf("get client: %v all outflow message error: %v", cid, err)
 	}
 	for i := 0; i < len(outflow); i++ {
-		if of := outflow[i].(*messagev52.PublishMessage); of.QoS() == 2 {
+		if of := outflow[i].(*messagev2.PublishMessage); of.QoS() == 2 {
 			// 如果超过int64一半 会导致panic
-			_ = d.memSession.pub2out.Wait(of, func(msg, ack messagev52.Message, err error) {
+			_ = d.memSession.pub2out.Wait(of, func(msg, ack messagev2.Message, err error) {
 				if err != nil {
 					logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
 				} else {
@@ -89,7 +89,7 @@ func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionIn
 			})
 		} else {
 			// 如果超过int64一半 会导致panic
-			_ = d.memSession.pub1ack.Wait(of, func(msg, ack messagev52.Message, err error) {
+			_ = d.memSession.pub1ack.Wait(of, func(msg, ack messagev2.Message, err error) {
 				if err != nil {
 					logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
 				} else {
@@ -104,10 +104,10 @@ func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionIn
 		logger.Logger.Errorf("get client: %v all outflow2 message error: %v", cid, err)
 	}
 	for i := 0; i < len(outflow2); i++ {
-		outflow2ack := messagev52.NewPublishMessage()
+		outflow2ack := messagev2.NewPublishMessage()
 		outflow2ack.SetPacketId(outflow2[i])
 		// 如果超过int64一半 会导致panic
-		_ = d.memSession.pub2out.Wait(outflow2ack, func(msg, ack messagev52.Message, err error) {
+		_ = d.memSession.pub2out.Wait(outflow2ack, func(msg, ack messagev2.Message, err error) {
 			if err != nil {
 				logger.Logger.Debugf("发送成功：%v,%v,%v", msg, ack, err)
 			} else {
@@ -134,10 +134,10 @@ func (d *dbSession) Init(msg *messagev52.ConnectMessage, _ ...sessions.SessionIn
 
 	return nil
 }
-func (d *dbSession) OfflineMsg() []messagev52.Message {
+func (d *dbSession) OfflineMsg() []messagev2.Message {
 	return d.offline
 }
-func (d *dbSession) Update(msg *messagev52.ConnectMessage) error {
+func (d *dbSession) Update(msg *messagev2.ConnectMessage) error {
 	cid := string(msg.ClientId())
 	ctx := context.Background()
 	err := d.sessionStore.StoreSession(ctx, cid, NewMemSessionByCon(msg))
@@ -157,7 +157,7 @@ func (this *dbSession) GetTopicAlice(topic []byte) (uint16, bool) {
 	return this.memSession.GetTopicAlice(topic)
 }
 func (d *dbSession) AddTopic(subs topics.Sub) error {
-	sub := messagev52.NewSubscribeMessage()
+	sub := messagev2.NewSubscribeMessage()
 	err := sub.AddTopicAll(subs.Topic, subs.Qos, subs.NoLocal, subs.RetainAsPublished, byte(subs.RetainHandling))
 	if err != nil {
 		return err
@@ -196,11 +196,11 @@ func (d *dbSession) IDs() []byte {
 	return d.memSession.IDs()
 }
 
-func (d *dbSession) Cmsg() *messagev52.ConnectMessage {
+func (d *dbSession) Cmsg() *messagev2.ConnectMessage {
 	return d.memSession.Cmsg()
 }
 
-func (d *dbSession) Will() *messagev52.PublishMessage {
+func (d *dbSession) Will() *messagev2.PublishMessage {
 	return d.memSession.Will()
 }
 
@@ -309,10 +309,10 @@ func (d *dbSession) SetUserProperty(up []string) {
 func (d *dbSession) SetOfflineTime(i int64) {
 	d.memSession.SetOfflineTime(i)
 }
-func (this *dbSession) SetWill(will *messagev52.PublishMessage) {
+func (this *dbSession) SetWill(will *messagev2.PublishMessage) {
 	this.memSession.SetWill(will)
 }
 
-func (this *dbSession) SetSub(sub *messagev52.SubscribeMessage) {
+func (this *dbSession) SetSub(sub *messagev2.SubscribeMessage) {
 	this.memSession.SetSub(sub)
 }

@@ -3,7 +3,7 @@ package mongo
 import (
 	"context"
 	"fmt"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -92,7 +92,7 @@ func (p *MessagePo) IsUnSub() bool {
 	return false
 }
 
-func (m *mongoOrm) SaveSub(ctx context.Context, tab string, msg *messagev52.SubscribeMessage) error {
+func (m *mongoOrm) SaveSub(ctx context.Context, tab string, msg *messagev2.SubscribeMessage) error {
 	var (
 		sub        = &Sub{}
 		subOrUnSub = 1
@@ -109,7 +109,7 @@ func (m *mongoOrm) SaveSub(ctx context.Context, tab string, msg *messagev52.Subs
 	})
 	return err
 }
-func (m *mongoOrm) SaveUnSub(ctx context.Context, tab string, msg *messagev52.UnsubscribeMessage) error {
+func (m *mongoOrm) SaveUnSub(ctx context.Context, tab string, msg *messagev2.UnsubscribeMessage) error {
 	var (
 		sub        = &Sub{}
 		subOrUnSub = 2
@@ -126,7 +126,7 @@ func (m *mongoOrm) SaveUnSub(ctx context.Context, tab string, msg *messagev52.Un
 	})
 	return err
 }
-func (m *mongoOrm) SavePub(ctx context.Context, tab string, msg *messagev52.PublishMessage) error {
+func (m *mongoOrm) SavePub(ctx context.Context, tab string, msg *messagev2.PublishMessage) error {
 	_, err := m.db.Collection(tab).InsertOne(ctx, &MessagePo{
 		Sender: m.nodeName,
 		Msg:    voToPo("", msg),
@@ -134,7 +134,7 @@ func (m *mongoOrm) SavePub(ctx context.Context, tab string, msg *messagev52.Publ
 	})
 	return err
 }
-func (m *mongoOrm) SaveSharePub(ctx context.Context, tab string, target, shareName string, msg *messagev52.PublishMessage) error {
+func (m *mongoOrm) SaveSharePub(ctx context.Context, tab string, target, shareName string, msg *messagev2.PublishMessage) error {
 	_, err := m.db.Collection(tab).InsertOne(ctx, &MessagePo{
 		Sender:    m.nodeName,
 		Target:    target,
@@ -185,7 +185,7 @@ type Message struct {
 	ContentType     string   `bson:"content_type"`     // 内容类型 UTF-8编码
 }
 
-func voToPo(id string, message *messagev52.PublishMessage) *Message {
+func voToPo(id string, message *messagev2.PublishMessage) *Message {
 	up := message.UserProperty()
 	var ups []string
 	if up != nil && len(up) >= 0 {
@@ -211,8 +211,8 @@ func voToPo(id string, message *messagev52.PublishMessage) *Message {
 		ContentType:     string(message.ContentType()),
 	}
 }
-func poToVo(message *Message) *messagev52.PublishMessage {
-	pub := messagev52.NewPublishMessage()
+func poToVo(message *Message) *messagev2.PublishMessage {
+	pub := messagev2.NewPublishMessage()
 	pub.SetMtypeFlags(message.Mtypeflags)
 	_ = pub.SetTopic([]byte(message.Topic))
 	_ = pub.SetQoS(message.Qos)

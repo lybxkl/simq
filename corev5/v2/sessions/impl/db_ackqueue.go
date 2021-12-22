@@ -3,7 +3,7 @@ package impl
 import (
 	"context"
 	"gitee.com/Ljolan/si-mqtt/cluster/store"
-	messagev52 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
+	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"time"
@@ -80,23 +80,23 @@ func (d *dbAckqueue) Size() int64 {
 func (d *dbAckqueue) Len() int {
 	return d.memAQ.Len()
 }
-func (d *dbAckqueue) Wait(msg messagev52.Message, onComplete interface{}) (err error) {
+func (d *dbAckqueue) Wait(msg messagev2.Message, onComplete interface{}) (err error) {
 	switch msg := msg.(type) {
-	case *messagev52.PublishMessage:
-		if msg.QoS() == messagev52.QosAtMostOnce {
+	case *messagev2.PublishMessage:
+		if msg.QoS() == messagev2.QosAtMostOnce {
 			//return fmt.Errorf("QoS 0 messages don't require ack")
 			return errWaitMessage
-		} else if msg.QoS() == messagev52.QosExactlyOnce && d.isIn {
+		} else if msg.QoS() == messagev2.QosExactlyOnce && d.isIn {
 			err = d.sessionStore.CacheInflowMsg(context.Background(), d.clientId, msg)
-		} else if msg.QoS() == messagev52.QosExactlyOnce && !d.isIn {
+		} else if msg.QoS() == messagev2.QosExactlyOnce && !d.isIn {
 			err = d.sessionStore.CacheOutflowMsg(context.Background(), d.clientId, msg)
-		} else if msg.QoS() == messagev52.QosAtLeastOnce && !d.isIn {
+		} else if msg.QoS() == messagev2.QosAtLeastOnce && !d.isIn {
 			err = d.sessionStore.CacheOutflowMsg(context.Background(), d.clientId, msg)
 		}
-	case *messagev52.SubscribeMessage:
+	case *messagev2.SubscribeMessage:
 		err = d.sessionStore.StoreSubscription(context.Background(), d.clientId, msg)
-	case *messagev52.UnsubscribeMessage:
-	case *messagev52.PingreqMessage:
+	case *messagev2.UnsubscribeMessage:
+	case *messagev2.PingreqMessage:
 	default:
 		return errWaitMessage
 	}
@@ -106,14 +106,14 @@ func (d *dbAckqueue) Wait(msg messagev52.Message, onComplete interface{}) (err e
 	return d.memAQ.Wait(msg, onComplete)
 }
 
-func (d *dbAckqueue) Ack(msg messagev52.Message) (err error) {
+func (d *dbAckqueue) Ack(msg messagev2.Message) (err error) {
 	switch msg.Type() {
-	case messagev52.PUBACK:
+	case messagev2.PUBACK:
 		// 服务端下发qos=1的消息的回应
 		// 需要删除db中的数据 // TODO 批量删除
 		_, err = d.sessionStore.ReleaseOutflowMsg(context.Background(), d.clientId, msg.PacketId())
 		//d.cachePkId <- msg.PacketId()
-	case messagev52.PUBREC:
+	case messagev2.PUBREC:
 		// 服务端下发的qos=2的第一次回应
 		// 删除消息，插入过程消息 // TODO 批量删除
 		_, err = d.sessionStore.ReleaseOutflowMsg(context.Background(), d.clientId, msg.PacketId())
@@ -122,16 +122,16 @@ func (d *dbAckqueue) Ack(msg messagev52.Message) (err error) {
 			return err
 		}
 		err = d.sessionStore.CacheOutflowSecMsgId(context.Background(), d.clientId, msg.PacketId())
-	case messagev52.PUBREL:
+	case messagev2.PUBREL:
 		// 服务端收到的qos=2的第二次回应
 		// 删除过程消息 // TODO 批量删除
 		_, err = d.sessionStore.ReleaseInflowMsg(context.Background(), d.clientId, msg.PacketId())
-	case messagev52.PUBCOMP:
+	case messagev2.PUBCOMP:
 		// 服务端下发的qos=2的第二次回应
 		// 删除过程消息 // TODO 批量删除
 		err = d.sessionStore.ReleaseOutflowSecMsgId(context.Background(), d.clientId, msg.PacketId())
 		//d.cachePkId <- msg.PacketId()
-	case messagev52.PINGRESP:
+	case messagev2.PINGRESP:
 	default:
 		return errAckMessage
 	}
