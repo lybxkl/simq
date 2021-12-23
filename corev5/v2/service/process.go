@@ -122,9 +122,13 @@ func (svc *service) processor() {
 func (svc *service) delRequestRespInfo(message messagev2.Message) {
 	if svc.sess.Cmsg().RequestProblemInfo() == 0 {
 		if cl, ok := message.(messagev2.CleanReqProblemInfo); ok {
-			cl.SetReasonStr(nil)
-			cl.SetUserProperties(nil)
-			logger.Logger.Debugf("(%s)去除请求问题信息: %s", svc.cid(), message.Type())
+			switch message.Type() {
+			case messagev2.CONNACK, messagev2.DISCONNECT, messagev2.PUBLISH:
+			default:
+				cl.SetReasonStr(nil)
+				cl.SetUserProperties(nil)
+				logger.Logger.Debugf("(%s)去除请求问题信息: %s", svc.cid(), message.Type())
+			}
 		}
 	}
 }

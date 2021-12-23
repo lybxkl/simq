@@ -246,6 +246,11 @@ func (connAckMsg *ConnackMessage) UserProperties() [][]byte {
 	return connAckMsg.userProperties
 }
 
+func (connAckMsg *ConnackMessage) SetUserProperties(userProperty [][]byte) {
+	connAckMsg.userProperties = userProperty
+	connAckMsg.dirty = true
+}
+
 func (connAckMsg *ConnackMessage) AddUserProperties(userProperty [][]byte) {
 	connAckMsg.userProperties = append(connAckMsg.userProperties, userProperty...)
 	connAckMsg.dirty = true
