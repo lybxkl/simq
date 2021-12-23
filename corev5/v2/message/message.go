@@ -98,6 +98,14 @@ type Message interface {
 	Len() int
 }
 
+// CleanReqProblemInfo 当连接消息中请求问题信息为0，则需要去除部分数据再发送
+// connectAck 和 disconnect中可不去除
+type CleanReqProblemInfo interface {
+	Message
+	SetReasonStr(nilStr []byte)
+	SetUserProperties(nilUserPro [][]byte)
+}
+
 const (
 	// RESERVED is a reserved value and should be considered an invalid message type
 	// RESERVED是一个保留值，应该被认为是一个无效的消息类型

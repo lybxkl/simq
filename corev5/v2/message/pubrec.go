@@ -1,12 +1,15 @@
 package message
 
-type PubrecMessage struct {
-	PubackMessage
-}
+var (
+	_ Message             = (*PubrecMessage)(nil)
+	_ CleanReqProblemInfo = (*PubrecMessage)(nil)
+)
 
 // A PUBREC Packet is the response to a PUBLISH Packet with QoS 2. It is the second
 // packet of the QoS 2 protocol exchange.
-var _ Message = (*PubrecMessage)(nil)
+type PubrecMessage struct {
+	PubackMessage
+}
 
 // NewPubrecMessage creates a new PUBREC message.
 func NewPubrecMessage() *PubrecMessage {
@@ -15,34 +18,35 @@ func NewPubrecMessage() *PubrecMessage {
 
 	return msg
 }
-func (this *PubrecMessage) Decode(src []byte) (int, error) {
+
+func (pubRec *PubrecMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	n, err := this.header.decode(src[total:])
+	n, err := pubRec.header.decode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
-	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = CopyLen(src[total:total+2], 2)
+	//pubRec.packetId = binary.BigEndian.Uint16(src[total:])
+	pubRec.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
-	if this.RemainingLength() == 2 {
-		this.reasonCode = Success
+	if pubRec.RemainingLength() == 2 {
+		pubRec.reasonCode = Success
 		return total, nil
 	}
-	return this.decodeOther(src, total, n)
+	return pubRec.decodeOther(src, total, n)
 }
 
 // 从可变包头中原因码开始处理
-func (this *PubrecMessage) decodeOther(src []byte, total, n int) (int, error) {
+func (pubRec *PubrecMessage) decodeOther(src []byte, total, n int) (int, error) {
 	var err error
-	this.reasonCode = ReasonCode(src[total])
+	pubRec.reasonCode = ReasonCode(src[total])
 	total++
-	if !ValidPubRecReasonCode(this.reasonCode) {
+	if !ValidPubRecReasonCode(pubRec.reasonCode) {
 		return total, ProtocolError
 	}
 	if total < len(src) && len(src[total:]) > 0 {
-		this.propertyLen, n, err = lbDecode(src[total:])
+		pubRec.propertyLen, n, err = lbDecode(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -50,7 +54,7 @@ func (this *PubrecMessage) decodeOther(src []byte, total, n int) (int, error) {
 	}
 	if total < len(src) && src[total] == ReasonString {
 		total++
-		this.reasonStr, n, err = readLPBytes(src[total:])
+		pubRec.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -59,11 +63,11 @@ func (this *PubrecMessage) decodeOther(src []byte, total, n int) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	pubRec.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
 	}
-	this.dirty = false
+	pubRec.dirty = false
 	return total, nil
 }

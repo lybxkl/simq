@@ -20,9 +20,9 @@ type DisconnectMessage struct {
 	userProperty          [][]byte // 用户属性如果加上之后的报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此用户属性
 }
 
-func (d *DisconnectMessage) String() string {
+func (dis *DisconnectMessage) String() string {
 	return fmt.Sprintf("header: %v, reasonCode=%s, propertyLen=%v, sessionExpiryInterval=%v, reasonStr=%v, serverReference=%s, userProperty=%s",
-		d.header, d.reasonCode, d.propertyLen, d.sessionExpiryInterval, d.reasonStr, d.serverReference, d.userProperty)
+		dis.header, dis.reasonCode, dis.propertyLen, dis.sessionExpiryInterval, dis.reasonStr, dis.serverReference, dis.userProperty)
 }
 
 var _ Message = (*DisconnectMessage)(nil)
@@ -43,28 +43,28 @@ func NewDiscMessageWithCodeInfo(code ReasonCode, str []byte) *DisconnectMessage 
 	return msg
 }
 
-func (this *DisconnectMessage) Decode(src []byte) (int, error) {
-	total, err := this.header.decode(src)
+func (dis *DisconnectMessage) Decode(src []byte) (int, error) {
+	total, err := dis.header.decode(src)
 	if err != nil {
 		return total, err
 	}
-	if this.remlen == 0 {
-		this.reasonCode = Success
+	if dis.remlen == 0 {
+		dis.reasonCode = Success
 		return total, nil
 	}
-	this.reasonCode = ReasonCode(src[total])
+	dis.reasonCode = ReasonCode(src[total])
 	total++
 
-	if !ValidDisconnectReasonCode(this.reasonCode) {
+	if !ValidDisconnectReasonCode(dis.reasonCode) {
 		return total, ProtocolError
 	}
 
-	if this.remlen < 2 {
-		this.propertyLen = 0
+	if dis.remlen < 2 {
+		dis.propertyLen = 0
 		return total, nil
 	}
 	var n int
-	this.propertyLen, n, err = lbDecode(src[total:])
+	dis.propertyLen, n, err = lbDecode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
@@ -72,9 +72,9 @@ func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 
 	if total < len(src) && src[total] == SessionExpirationInterval {
 		total++
-		this.sessionExpiryInterval = binary.BigEndian.Uint32(src)
+		dis.sessionExpiryInterval = binary.BigEndian.Uint32(src)
 		total += 4
-		if this.sessionExpiryInterval == 0 {
+		if dis.sessionExpiryInterval == 0 {
 			return total, ProtocolError
 		}
 		if total < len(src) && src[total] == SessionExpirationInterval {
@@ -84,7 +84,7 @@ func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 
 	if total < len(src) && src[total] == ReasonString {
 		total++
-		this.reasonStr, n, err = readLPBytes(src[total:])
+		dis.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -94,7 +94,7 @@ func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 		}
 	}
 
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	dis.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
@@ -102,7 +102,7 @@ func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 
 	if total < len(src) && src[total] == ServerReference {
 		total++
-		this.serverReference, n, err = readLPBytes(src[total:])
+		dis.serverReference, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -114,61 +114,61 @@ func (this *DisconnectMessage) Decode(src []byte) (int, error) {
 	return total, nil
 }
 
-func (this *DisconnectMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("disconnect/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (dis *DisconnectMessage) Encode(dst []byte) (int, error) {
+	if !dis.dirty {
+		if len(dst) < len(dis.dbuf) {
+			return 0, fmt.Errorf("disconnect/Encode: Insufficient buffer size. Expecting %d, got %d.", len(dis.dbuf), len(dst))
 		}
 
-		return copy(dst, this.dbuf), nil
+		return copy(dst, dis.dbuf), nil
 	}
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := dis.msglen()
+	hl := dis.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := dis.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	total, err := this.header.encode(dst)
+	total, err := dis.header.encode(dst)
 	if err != nil {
 		return total, err
 	}
-	if this.reasonCode == Success && this.remlen == 0 {
+	if dis.reasonCode == Success && dis.remlen == 0 {
 		return total, nil
 	}
-	dst[total] = this.reasonCode.Value()
+	dst[total] = dis.reasonCode.Value()
 	total++
 
-	n := copy(dst[total:], lbEncode(this.propertyLen))
+	n := copy(dst[total:], lbEncode(dis.propertyLen))
 	total += n
 
-	if this.sessionExpiryInterval > 0 {
+	if dis.sessionExpiryInterval > 0 {
 		dst[total] = SessionExpirationInterval
 		total++
-		binary.BigEndian.PutUint32(dst[total:], this.sessionExpiryInterval)
+		binary.BigEndian.PutUint32(dst[total:], dis.sessionExpiryInterval)
 		total += 4
 	}
-	if len(this.reasonStr) > 0 {
+	if len(dis.reasonStr) > 0 {
 		dst[total] = ReasonString
 		total++
-		n, err = writeLPBytes(dst[total:], this.reasonStr)
+		n, err = writeLPBytes(dst[total:], dis.reasonStr)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
 
-	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	n, err = writeUserProperty(dst[total:], dis.userProperty) // 用户属性
 	total += n
 
-	if len(this.serverReference) > 0 {
+	if len(dis.serverReference) > 0 {
 		dst[total] = ServerReference
 		total++
-		n, err = writeLPBytes(dst[total:], this.serverReference)
+		n, err = writeLPBytes(dst[total:], dis.serverReference)
 		total += n
 		if err != nil {
 			return total, err
@@ -177,48 +177,48 @@ func (this *DisconnectMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 
-func (this *DisconnectMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (dis *DisconnectMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !dis.dirty {
+		return dst.Write(dis.dbuf)
 	}
 
-	ml := this.msglen()
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	ml := dis.msglen()
+	if err := dis.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := dis.header.encodeToBuf(dst)
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	if this.reasonCode == Success && this.remlen == 0 {
+	if dis.reasonCode == Success && dis.remlen == 0 {
 		return dst.Len(), nil
 	}
-	dst.WriteByte(this.reasonCode.Value())
+	dst.WriteByte(dis.reasonCode.Value())
 
-	dst.Write(lbEncode(this.propertyLen))
+	dst.Write(lbEncode(dis.propertyLen))
 
-	if this.sessionExpiryInterval > 0 {
+	if dis.sessionExpiryInterval > 0 {
 		dst.WriteByte(SessionExpirationInterval)
-		_ = BigEndianPutUint32(dst, this.sessionExpiryInterval)
+		_ = BigEndianPutUint32(dst, dis.sessionExpiryInterval)
 	}
-	if len(this.reasonStr) > 0 {
+	if len(dis.reasonStr) > 0 {
 		dst.WriteByte(ReasonString)
-		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		_, err = writeToBufLPBytes(dst, dis.reasonStr)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
 
-	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	_, err = writeUserPropertyByBuf(dst, dis.userProperty) // 用户属性
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	if len(this.serverReference) > 0 {
+	if len(dis.serverReference) > 0 {
 		dst.WriteByte(ServerReference)
-		_, err = writeToBufLPBytes(dst, this.serverReference)
+		_, err = writeToBufLPBytes(dst, dis.serverReference)
 		if err != nil {
 			return dst.Len(), err
 		}
@@ -226,104 +226,106 @@ func (this *DisconnectMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 	return dst.Len(), nil
 }
 
-func (this *DisconnectMessage) build() {
+func (dis *DisconnectMessage) build() {
 	total := 0
-	if this.sessionExpiryInterval > 0 {
+	if dis.sessionExpiryInterval > 0 {
 		total += 5
 	}
-	if len(this.reasonStr) > 0 { // todo 超了就不发
+	if len(dis.reasonStr) > 0 { // todo 超了就不发
 		total++
 		total += 2
-		total += len(this.reasonStr)
+		total += len(dis.reasonStr)
 	}
 
-	n := buildUserPropertyLen(this.userProperty) // todo 超了就不发
+	n := buildUserPropertyLen(dis.userProperty) // todo 超了就不发
 	total += n
 
-	if len(this.serverReference) > 0 {
+	if len(dis.serverReference) > 0 {
 		total++
 		total += 2
-		total += len(this.serverReference)
+		total += len(dis.serverReference)
 	}
-	this.propertyLen = uint32(total)
-	if this.reasonCode == Success && this.propertyLen == 0 {
-		_ = this.SetRemainingLength(0)
+	dis.propertyLen = uint32(total)
+	if dis.reasonCode == Success && dis.propertyLen == 0 {
+		_ = dis.SetRemainingLength(0)
 		return
 	}
 	// 加 1 是断开原因码
-	_ = this.SetRemainingLength(uint32(1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
+	_ = dis.SetRemainingLength(uint32(1 + int(dis.propertyLen) + len(lbEncode(dis.propertyLen))))
 }
-func (this *DisconnectMessage) msglen() int {
-	this.build()
-	return int(this.remlen)
+
+func (dis *DisconnectMessage) msglen() int {
+	dis.build()
+	return int(dis.remlen)
 }
-func (this *DisconnectMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+
+func (dis *DisconnectMessage) Len() int {
+	if !dis.dirty {
+		return len(dis.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := dis.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := dis.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return dis.header.msglen() + ml
 }
-func (this *DisconnectMessage) ReasonCode() ReasonCode {
-	return this.reasonCode
-}
-
-func (this *DisconnectMessage) SetReasonCode(reasonCode ReasonCode) {
-	this.reasonCode = reasonCode
-	this.dirty = true
+func (dis *DisconnectMessage) ReasonCode() ReasonCode {
+	return dis.reasonCode
 }
 
-func (this *DisconnectMessage) PropertyLen() uint32 {
-	return this.propertyLen
+func (dis *DisconnectMessage) SetReasonCode(reasonCode ReasonCode) {
+	dis.reasonCode = reasonCode
+	dis.dirty = true
 }
 
-func (this *DisconnectMessage) SetPropertyLen(propertyLen uint32) {
-	this.propertyLen = propertyLen
-	this.dirty = true
+func (dis *DisconnectMessage) PropertyLen() uint32 {
+	return dis.propertyLen
 }
 
-func (this *DisconnectMessage) SessionExpiryInterval() uint32 {
-	return this.sessionExpiryInterval
+func (dis *DisconnectMessage) SetPropertyLen(propertyLen uint32) {
+	dis.propertyLen = propertyLen
+	dis.dirty = true
 }
 
-func (this *DisconnectMessage) SetSessionExpiryInterval(sessionExpiryInterval uint32) {
-	this.sessionExpiryInterval = sessionExpiryInterval
-	this.dirty = true
+func (dis *DisconnectMessage) SessionExpiryInterval() uint32 {
+	return dis.sessionExpiryInterval
 }
 
-func (this *DisconnectMessage) ReasonStr() []byte {
-	return this.reasonStr
+func (dis *DisconnectMessage) SetSessionExpiryInterval(sessionExpiryInterval uint32) {
+	dis.sessionExpiryInterval = sessionExpiryInterval
+	dis.dirty = true
 }
 
-func (this *DisconnectMessage) SetReasonStr(reasonStr []byte) {
-	this.reasonStr = reasonStr
-	this.dirty = true
+func (dis *DisconnectMessage) ReasonStr() []byte {
+	return dis.reasonStr
 }
 
-func (this *DisconnectMessage) ServerReference() []byte {
-	return this.serverReference
+func (dis *DisconnectMessage) SetReasonStr(reasonStr []byte) {
+	dis.reasonStr = reasonStr
+	dis.dirty = true
 }
 
-func (this *DisconnectMessage) SetServerReference(serverReference []byte) {
-	this.serverReference = serverReference
-	this.dirty = true
+func (dis *DisconnectMessage) ServerReference() []byte {
+	return dis.serverReference
 }
 
-func (this *DisconnectMessage) UserProperty() [][]byte {
-	return this.userProperty
+func (dis *DisconnectMessage) SetServerReference(serverReference []byte) {
+	dis.serverReference = serverReference
+	dis.dirty = true
 }
 
-func (this *DisconnectMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperty = append(this.userProperty, userProperty...)
-	this.dirty = true
+func (dis *DisconnectMessage) UserProperty() [][]byte {
+	return dis.userProperty
 }
-func (this *DisconnectMessage) AddUserProperty(userProperty []byte) {
-	this.userProperty = append(this.userProperty, userProperty)
-	this.dirty = true
+
+func (dis *DisconnectMessage) AddUserPropertys(userProperty [][]byte) {
+	dis.userProperty = append(dis.userProperty, userProperty...)
+	dis.dirty = true
+}
+func (dis *DisconnectMessage) AddUserProperty(userProperty []byte) {
+	dis.userProperty = append(dis.userProperty, userProperty)
+	dis.dirty = true
 }

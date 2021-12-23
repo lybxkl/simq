@@ -117,6 +117,18 @@ func (svc *service) processor() {
 	}
 }
 
+// 当连接消息中请求问题信息为0，则需要去除部分数据再发送
+// connectAck 和 disconnect中可不去除
+func (svc *service) delRequestRespInfo(message messagev2.Message) {
+	if svc.sess.Cmsg().RequestProblemInfo() == 0 {
+		if cl, ok := message.(messagev2.CleanReqProblemInfo); ok {
+			cl.SetReasonStr(nil)
+			cl.SetUserProperties(nil)
+			logger.Logger.Debugf("(%s)去除请求问题信息: %s", svc.cid(), message.Type())
+		}
+	}
+}
+
 // 流控
 func (svc *service) streamController() error {
 	// 监控流量

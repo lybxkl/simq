@@ -24,26 +24,26 @@ func NewPingreqMessage() *PingreqMessage {
 	return msg
 }
 
-func (this *PingreqMessage) Decode(src []byte) (int, error) {
-	return this.header.decode(src)
+func (ping *PingreqMessage) Decode(src []byte) (int, error) {
+	return ping.header.decode(src)
 }
 
-func (this *PingreqMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("pingreqMessage/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (ping *PingreqMessage) Encode(dst []byte) (int, error) {
+	if !ping.dirty {
+		if len(dst) < len(ping.dbuf) {
+			return 0, fmt.Errorf("pingreqMessage/Encode: Insufficient buffer size. Expecting %d, got %d.", len(ping.dbuf), len(dst))
 		}
 
-		return copy(dst, this.dbuf), nil
+		return copy(dst, ping.dbuf), nil
 	}
 
-	return this.header.encode(dst)
+	return ping.header.encode(dst)
 }
 
-func (this *PingreqMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (ping *PingreqMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !ping.dirty {
+		return dst.Write(ping.dbuf)
 	}
 
-	return this.header.encodeToBuf(dst)
+	return ping.header.encodeToBuf(dst)
 }

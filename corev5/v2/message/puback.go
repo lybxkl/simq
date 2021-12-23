@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+var (
+	_ Message             = (*PubackMessage)(nil)
+	_ CleanReqProblemInfo = (*PubackMessage)(nil)
+)
+
 // PubackMessage A PUBACK Packet is the response to a PUBLISH Packet with QoS level 1.
 type PubackMessage struct {
 	header
@@ -16,48 +21,6 @@ type PubackMessage struct {
 	userProperty [][]byte // 用户属性如果加上原因字符串之后的PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此用户属性
 }
 
-func (this *PubackMessage) ReasonCode() ReasonCode {
-	return this.reasonCode
-}
-
-func (this *PubackMessage) SetReasonCode(reasonCode ReasonCode) {
-	this.reasonCode = reasonCode
-	this.dirty = true
-}
-
-func (this *PubackMessage) PropertyLen() uint32 {
-	return this.propertyLen
-}
-
-func (this *PubackMessage) SetPropertyLen(propertyLen uint32) {
-	this.propertyLen = propertyLen
-	this.dirty = true
-}
-
-func (this *PubackMessage) ReasonStr() []byte {
-	return this.reasonStr
-}
-
-func (this *PubackMessage) SetReasonStr(reasonStr []byte) {
-	this.reasonStr = reasonStr
-	this.dirty = true
-}
-
-func (this *PubackMessage) UserProperty() [][]byte {
-	return this.userProperty
-}
-
-func (this *PubackMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperty = append(this.userProperty, userProperty...)
-	this.dirty = true
-}
-func (this *PubackMessage) AddUserProperty(userProperty []byte) {
-	this.userProperty = append(this.userProperty, userProperty)
-	this.dirty = true
-}
-
-var _ Message = (*PubackMessage)(nil)
-
 // NewPubackMessage creates a new PUBACK message.
 func NewPubackMessage() *PubackMessage {
 	msg := &PubackMessage{}
@@ -66,54 +29,100 @@ func NewPubackMessage() *PubackMessage {
 	return msg
 }
 
-func (this PubackMessage) String() string {
-	return fmt.Sprintf("%s, Packet ID=%d, Reason Code=%v, PropertyLen=%v, "+
-		"Reason String=%s, User Property=%s",
-		this.header, this.packetId, this.reasonCode, this.propertyLen, this.reasonStr, this.userProperty)
+func (pubAck *PubackMessage) ReasonCode() ReasonCode {
+	return pubAck.reasonCode
 }
 
-func (this *PubackMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+func (pubAck *PubackMessage) SetReasonCode(reasonCode ReasonCode) {
+	pubAck.reasonCode = reasonCode
+	pubAck.dirty = true
+}
+
+func (pubAck *PubackMessage) PropertyLen() uint32 {
+	return pubAck.propertyLen
+}
+
+func (pubAck *PubackMessage) SetPropertyLen(propertyLen uint32) {
+	pubAck.propertyLen = propertyLen
+	pubAck.dirty = true
+}
+
+func (pubAck *PubackMessage) ReasonStr() []byte {
+	return pubAck.reasonStr
+}
+
+func (pubAck *PubackMessage) SetReasonStr(reasonStr []byte) {
+	pubAck.reasonStr = reasonStr
+	pubAck.dirty = true
+}
+
+func (pubAck *PubackMessage) UserProperty() [][]byte {
+	return pubAck.userProperty
+}
+
+func (pubAck *PubackMessage) SetUserProperties(userProperty [][]byte) {
+	pubAck.userProperty = userProperty
+	pubAck.dirty = true
+}
+
+func (pubAck *PubackMessage) AddUserPropertys(userProperty [][]byte) {
+	pubAck.userProperty = append(pubAck.userProperty, userProperty...)
+	pubAck.dirty = true
+}
+
+func (pubAck *PubackMessage) AddUserProperty(userProperty []byte) {
+	pubAck.userProperty = append(pubAck.userProperty, userProperty)
+	pubAck.dirty = true
+}
+
+func (pubAck PubackMessage) String() string {
+	return fmt.Sprintf("%s, Packet ID=%d, Reason Code=%v, PropertyLen=%v, "+
+		"Reason String=%s, User Property=%s",
+		pubAck.header, pubAck.packetId, pubAck.reasonCode, pubAck.propertyLen, pubAck.reasonStr, pubAck.userProperty)
+}
+
+func (pubAck *PubackMessage) Len() int {
+	if !pubAck.dirty {
+		return len(pubAck.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := pubAck.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := pubAck.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return pubAck.header.msglen() + ml
 }
 
-func (this *PubackMessage) Decode(src []byte) (int, error) {
+func (pubAck *PubackMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	n, err := this.header.decode(src[total:])
+	n, err := pubAck.header.decode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
-	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = CopyLen(src[total:total+2], 2)
+	//pubAck.packetId = binary.BigEndian.Uint16(src[total:])
+	pubAck.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
-	if this.RemainingLength() == 2 {
-		this.reasonCode = Success
+	if pubAck.RemainingLength() == 2 {
+		pubAck.reasonCode = Success
 		return total, nil
 	}
-	return this.decodeOther(src, total, n)
+	return pubAck.decodeOther(src, total, n)
 }
 
 // 从可变包头中原因码开始处理
-func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
+func (pubAck *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 	var err error
-	this.reasonCode = ReasonCode(src[total])
+	pubAck.reasonCode = ReasonCode(src[total])
 	total++
-	if !ValidPubAckReasonCode(this.reasonCode) {
+	if !ValidPubAckReasonCode(pubAck.reasonCode) {
 		return total, ProtocolError
 	}
 	if total < len(src) && len(src[total:]) > 0 {
-		this.propertyLen, n, err = lbDecode(src[total:])
+		pubAck.propertyLen, n, err = lbDecode(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -121,7 +130,7 @@ func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 	}
 	if total < len(src) && src[total] == ReasonString {
 		total++
-		this.reasonStr, n, err = readLPBytes(src[total:])
+		pubAck.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -130,149 +139,149 @@ func (this *PubackMessage) decodeOther(src []byte, total, n int) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	pubAck.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
 	}
-	this.dirty = false
+	pubAck.dirty = false
 	return total, nil
 }
 
-func (this *PubackMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("pubxxx/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (pubAck *PubackMessage) Encode(dst []byte) (int, error) {
+	if !pubAck.dirty {
+		if len(dst) < len(pubAck.dbuf) {
+			return 0, fmt.Errorf("pubxxx/Encode: Insufficient buffer size. Expecting %d, got %d.", len(pubAck.dbuf), len(dst))
 		}
-		return copy(dst, this.dbuf), nil
+		return copy(dst, pubAck.dbuf), nil
 	}
 
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := pubAck.msglen()
+	hl := pubAck.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("pubxxx/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := pubAck.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
 	total := 0
 
-	n, err := this.header.encode(dst[total:])
+	n, err := pubAck.header.encode(dst[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
 
 	// 可变报头
-	if copy(dst[total:total+2], this.packetId) != 2 {
+	if copy(dst[total:total+2], pubAck.packetId) != 2 {
 		dst[total], dst[total+1] = 0, 0
 	}
 	total += 2
-	if this.header.remlen == 2 && this.reasonCode == Success {
+	if pubAck.header.remlen == 2 && pubAck.reasonCode == Success {
 		return total, nil
 	}
-	dst[total] = this.reasonCode.Value()
+	dst[total] = pubAck.reasonCode.Value()
 	total++
-	if this.propertyLen > 0 {
-		b := lbEncode(this.propertyLen)
+	if pubAck.propertyLen > 0 {
+		b := lbEncode(pubAck.propertyLen)
 		copy(dst[total:], b)
 		total += len(b)
 	} else {
 		return total, nil
 	}
 	// TODO 下面两个在PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此原因字符串
-	if len(this.reasonStr) > 0 {
+	if len(pubAck.reasonStr) > 0 {
 		dst[total] = ReasonString
 		total++
-		n, err = writeLPBytes(dst[total:], this.reasonStr)
+		n, err = writeLPBytes(dst[total:], pubAck.reasonStr)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
 
-	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	n, err = writeUserProperty(dst[total:], pubAck.userProperty) // 用户属性
 	total += n
 	return total, nil
 }
 
-func (this *PubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (pubAck *PubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !pubAck.dirty {
+		return dst.Write(pubAck.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := pubAck.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := pubAck.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := pubAck.header.encodeToBuf(dst)
 	if err != nil {
 		return dst.Len(), err
 	}
 
 	// 可变报头
-	if len(this.packetId) == 2 {
-		dst.Write(this.packetId)
+	if len(pubAck.packetId) == 2 {
+		dst.Write(pubAck.packetId)
 	} else {
 		dst.Write([]byte{0, 0})
 	}
 
-	if this.header.remlen == 2 && this.reasonCode == Success {
+	if pubAck.header.remlen == 2 && pubAck.reasonCode == Success {
 		return dst.Len(), nil
 	}
-	dst.WriteByte(this.reasonCode.Value())
+	dst.WriteByte(pubAck.reasonCode.Value())
 
-	if this.propertyLen > 0 {
-		dst.Write(lbEncode(this.propertyLen))
+	if pubAck.propertyLen > 0 {
+		dst.Write(lbEncode(pubAck.propertyLen))
 	} else {
 		return dst.Len(), nil
 	}
 	// TODO 下面两个在PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此原因字符串
-	if len(this.reasonStr) > 0 {
+	if len(pubAck.reasonStr) > 0 {
 		dst.WriteByte(ReasonString)
-		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		_, err = writeToBufLPBytes(dst, pubAck.reasonStr)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
 
-	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	_, err = writeUserPropertyByBuf(dst, pubAck.userProperty) // 用户属性
 	if err != nil {
 		return dst.Len(), err
 	}
 	return dst.Len(), nil
 }
 
-func (this *PubackMessage) build() {
+func (pubAck *PubackMessage) build() {
 	total := 0
-	if len(this.reasonStr) > 0 {
+	if len(pubAck.reasonStr) > 0 {
 		total++
 		total += 2
-		total += len(this.reasonStr)
+		total += len(pubAck.reasonStr)
 	}
 
-	n := buildUserPropertyLen(this.userProperty)
+	n := buildUserPropertyLen(pubAck.userProperty)
 	total += n
 
-	this.propertyLen = uint32(total)
+	pubAck.propertyLen = uint32(total)
 	// 2 是报文标识符，2字节
 	// 1 是原因码
-	if this.propertyLen == 0 && this.reasonCode == Success {
-		_ = this.SetRemainingLength(uint32(2))
+	if pubAck.propertyLen == 0 && pubAck.reasonCode == Success {
+		_ = pubAck.SetRemainingLength(uint32(2))
 		return
 	}
-	if this.propertyLen == 0 && this.reasonCode != Success {
-		_ = this.SetRemainingLength(uint32(2 + 1))
+	if pubAck.propertyLen == 0 && pubAck.reasonCode != Success {
+		_ = pubAck.SetRemainingLength(uint32(2 + 1))
 		return
 	}
-	_ = this.SetRemainingLength(uint32(2 + 1 + int(this.propertyLen) + len(lbEncode(this.propertyLen))))
+	_ = pubAck.SetRemainingLength(uint32(2 + 1 + int(pubAck.propertyLen) + len(lbEncode(pubAck.propertyLen))))
 }
-func (this *PubackMessage) msglen() int {
-	this.build()
-	return int(this.remlen)
+func (pubAck *PubackMessage) msglen() int {
+	pubAck.build()
+	return int(pubAck.remlen)
 }

@@ -6,6 +6,11 @@ import (
 	"sync/atomic"
 )
 
+var (
+	_ Message             = (*SubscribeMessage)(nil)
+	_ CleanReqProblemInfo = (*SubscribeMessage)(nil)
+)
+
 // SubscribeMessage The SUBSCRIBE Packet is sent from the Client to the Server to create one or more
 // Subscriptions. Each Subscription registers a Client’s interest in one or more
 // Topics. The Server sends PUBLISH Packets to the Client in order to forward
@@ -54,58 +59,6 @@ type SubscribeMessage struct {
 	// 订阅选项的第6和7比特为将来所保留。服务端必须把此保留位非0的SUBSCRIBE报文当做无效报文
 }
 
-// Clone 简单克隆部分数据
-func (this *SubscribeMessage) Clone() []*SubscribeMessage {
-	ret := make([]*SubscribeMessage, 0, len(this.topics))
-	for i := 0; i < len(this.topics); i++ {
-		sub := NewSubscribeMessage()
-		sub.userProperty = this.userProperty
-		sub.subscriptionIdentifier = this.subscriptionIdentifier
-
-		sub.topics = [][]byte{this.topics[0]}
-		sub.qos = []byte{this.qos[0]}
-		sub.retainHandling = []byte{this.retainHandling[0]}
-		sub.retainAsPub = []byte{this.retainAsPub[0]}
-		sub.noLocal = []byte{this.noLocal[0]}
-
-		ret = append(ret, sub)
-	}
-	return ret
-}
-
-func (this *SubscribeMessage) PropertiesLen() uint32 {
-	return this.propertiesLen
-}
-
-func (this *SubscribeMessage) SetPropertiesLen(propertiesLen uint32) {
-	this.propertiesLen = propertiesLen
-	this.dirty = true
-}
-
-func (this *SubscribeMessage) SubscriptionIdentifier() uint32 {
-	return this.subscriptionIdentifier
-}
-
-func (this *SubscribeMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
-	this.subscriptionIdentifier = subscriptionIdentifier
-	this.dirty = true
-}
-
-func (this *SubscribeMessage) UserProperty() [][]byte {
-	return this.userProperty
-}
-
-func (this *SubscribeMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperty = append(this.userProperty, userProperty...)
-	this.dirty = true
-}
-func (this *SubscribeMessage) AddUserProperty(userProperty []byte) {
-	this.userProperty = append(this.userProperty, userProperty)
-	this.dirty = true
-}
-
-var _ Message = (*SubscribeMessage)(nil)
-
 // NewSubscribeMessage creates a new SUBSCRIBE message.
 func NewSubscribeMessage() *SubscribeMessage {
 	msg := &SubscribeMessage{}
@@ -114,26 +67,85 @@ func NewSubscribeMessage() *SubscribeMessage {
 	return msg
 }
 
-func (this SubscribeMessage) String() string {
-	msgstr := fmt.Sprintf("%s, Packet ID=%d", this.header, this.PacketId())
-	msgstr = fmt.Sprintf("%s, PropertiesLen=%v, Subscription Identifier=%v, User Properties=%v", msgstr, this.PropertiesLen(), this.subscriptionIdentifier, this.UserProperty())
+// Clone 简单克隆部分数据
+func (sub *SubscribeMessage) Clone() []*SubscribeMessage {
+	ret := make([]*SubscribeMessage, 0, len(sub.topics))
+	for i := 0; i < len(sub.topics); i++ {
+		subClone := NewSubscribeMessage()
+		subClone.userProperty = sub.userProperty
+		subClone.subscriptionIdentifier = sub.subscriptionIdentifier
 
-	for i, t := range this.topics {
+		subClone.topics = [][]byte{sub.topics[0]}
+		subClone.qos = []byte{sub.qos[0]}
+		subClone.retainHandling = []byte{sub.retainHandling[0]}
+		subClone.retainAsPub = []byte{sub.retainAsPub[0]}
+		subClone.noLocal = []byte{sub.noLocal[0]}
+
+		ret = append(ret, sub)
+	}
+	return ret
+}
+
+func (sub *SubscribeMessage) PropertiesLen() uint32 {
+	return sub.propertiesLen
+}
+
+func (sub *SubscribeMessage) SetPropertiesLen(propertiesLen uint32) {
+	sub.propertiesLen = propertiesLen
+	sub.dirty = true
+}
+
+func (sub *SubscribeMessage) SubscriptionIdentifier() uint32 {
+	return sub.subscriptionIdentifier
+}
+
+func (sub *SubscribeMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
+	sub.subscriptionIdentifier = subscriptionIdentifier
+	sub.dirty = true
+}
+
+func (sub *SubscribeMessage) UserProperty() [][]byte {
+	return sub.userProperty
+}
+
+func (sub *SubscribeMessage) SetReasonStr(reasonStr []byte) {
+}
+
+func (sub *SubscribeMessage) SetUserProperties(userProperty [][]byte) {
+	sub.userProperty = userProperty
+	sub.dirty = true
+}
+
+func (sub *SubscribeMessage) AddUserPropertys(userProperty [][]byte) {
+	sub.userProperty = append(sub.userProperty, userProperty...)
+	sub.dirty = true
+}
+
+func (sub *SubscribeMessage) AddUserProperty(userProperty []byte) {
+	sub.userProperty = append(sub.userProperty, userProperty)
+	sub.dirty = true
+}
+
+func (sub SubscribeMessage) String() string {
+	msgstr := fmt.Sprintf("%s, Packet ID=%d", sub.header, sub.PacketId())
+	msgstr = fmt.Sprintf("%s, PropertiesLen=%v, Subscription Identifier=%v, User Properties=%v", msgstr, sub.PropertiesLen(), sub.subscriptionIdentifier, sub.UserProperty())
+
+	for i, t := range sub.topics {
 		msgstr = fmt.Sprintf("%s, Topic[%d]=%q，Qos：%d，noLocal：%d，Retain As Publish：%d，RetainHandling：%d",
-			msgstr, i, string(t), this.qos[i], this.noLocal[i], this.retainAsPub[i], this.retainHandling[i])
+			msgstr, i, string(t), sub.qos[i], sub.noLocal[i], sub.retainAsPub[i], sub.retainHandling[i])
 	}
 
 	return msgstr
 }
 
 // Topics returns a list of topics sent by the Client.
-func (this *SubscribeMessage) Topics() [][]byte {
-	return this.topics
+func (sub *SubscribeMessage) Topics() [][]byte {
+	return sub.topics
 }
 
 // AddTopic adds a single topic to the message, along with the corresponding QoS.
 // An error is returned if QoS is invalid.
-func (this *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
+func (sub *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
 	if !ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -142,7 +154,7 @@ func (this *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
 	var t []byte
 	var found bool
 
-	for i, t = range this.topics {
+	for i, t = range sub.topics {
 		if bytes.Equal(t, topic) {
 			found = true
 			break
@@ -150,20 +162,20 @@ func (this *SubscribeMessage) AddTopic(topic []byte, qos byte) error {
 	}
 
 	if found {
-		this.qos[i] = qos
+		sub.qos[i] = qos
 		return nil
 	}
 
-	this.topics = append(this.topics, topic)
-	this.qos = append(this.qos, qos)
-	this.noLocal = append(this.noLocal, 0)
-	this.retainAsPub = append(this.retainAsPub, 0)
-	this.retainHandling = append(this.retainHandling, 0)
-	this.dirty = true
+	sub.topics = append(sub.topics, topic)
+	sub.qos = append(sub.qos, qos)
+	sub.noLocal = append(sub.noLocal, 0)
+	sub.retainAsPub = append(sub.retainAsPub, 0)
+	sub.retainHandling = append(sub.retainHandling, 0)
+	sub.dirty = true
 
 	return nil
 }
-func (this *SubscribeMessage) AddTopicAll(topic []byte, qos byte, noLocal, retainAsPub bool, retainHandling byte) error {
+func (sub *SubscribeMessage) AddTopicAll(topic []byte, qos byte, noLocal, retainAsPub bool, retainHandling byte) error {
 	if !ValidQos(qos) {
 		return fmt.Errorf("Invalid QoS %d", qos)
 	}
@@ -175,7 +187,7 @@ func (this *SubscribeMessage) AddTopicAll(topic []byte, qos byte, noLocal, retai
 	var t []byte
 	var found bool
 
-	for i, t = range this.topics {
+	for i, t = range sub.topics {
 		if bytes.Equal(t, topic) {
 			found = true
 			break
@@ -183,37 +195,37 @@ func (this *SubscribeMessage) AddTopicAll(topic []byte, qos byte, noLocal, retai
 	}
 
 	if found {
-		this.qos[i] = qos
+		sub.qos[i] = qos
 		return nil
 	}
 
-	this.topics = append(this.topics, topic)
-	this.qos = append(this.qos, qos)
+	sub.topics = append(sub.topics, topic)
+	sub.qos = append(sub.qos, qos)
 	if noLocal {
-		this.noLocal = append(this.noLocal, 1)
+		sub.noLocal = append(sub.noLocal, 1)
 	} else {
-		this.noLocal = append(this.noLocal, 0)
+		sub.noLocal = append(sub.noLocal, 0)
 	}
 	if retainAsPub {
-		this.retainAsPub = append(this.retainAsPub, 1)
+		sub.retainAsPub = append(sub.retainAsPub, 1)
 	} else {
-		this.retainAsPub = append(this.retainAsPub, 0)
+		sub.retainAsPub = append(sub.retainAsPub, 0)
 	}
 
-	this.retainHandling = append(this.retainHandling, retainHandling)
-	this.dirty = true
+	sub.retainHandling = append(sub.retainHandling, retainHandling)
+	sub.dirty = true
 
 	return nil
 }
 
 // RemoveTopic removes a single topic from the list of existing ones in the message.
 // If topic does not exist it just does nothing.
-func (this *SubscribeMessage) RemoveTopic(topic []byte) {
+func (sub *SubscribeMessage) RemoveTopic(topic []byte) {
 	var i int
 	var t []byte
 	var found bool
 
-	for i, t = range this.topics {
+	for i, t = range sub.topics {
 		if bytes.Equal(t, topic) {
 			found = true
 			break
@@ -221,19 +233,19 @@ func (this *SubscribeMessage) RemoveTopic(topic []byte) {
 	}
 
 	if found {
-		this.topics = append(this.topics[:i], this.topics[i+1:]...)
-		this.qos = append(this.qos[:i], this.qos[i+1:]...)
-		this.noLocal = append(this.noLocal[:i], this.noLocal[i+1:]...)
-		this.retainAsPub = append(this.retainAsPub[:i], this.retainAsPub[i+1:]...)
-		this.retainHandling = append(this.retainHandling[:i], this.retainHandling[i+1:]...)
+		sub.topics = append(sub.topics[:i], sub.topics[i+1:]...)
+		sub.qos = append(sub.qos[:i], sub.qos[i+1:]...)
+		sub.noLocal = append(sub.noLocal[:i], sub.noLocal[i+1:]...)
+		sub.retainAsPub = append(sub.retainAsPub[:i], sub.retainAsPub[i+1:]...)
+		sub.retainHandling = append(sub.retainHandling[:i], sub.retainHandling[i+1:]...)
 	}
 
-	this.dirty = true
+	sub.dirty = true
 }
 
 // TopicExists checks to see if a topic exists in the list.
-func (this *SubscribeMessage) TopicExists(topic []byte) bool {
-	for _, t := range this.topics {
+func (sub *SubscribeMessage) TopicExists(topic []byte) bool {
+	for _, t := range sub.topics {
 		if bytes.Equal(t, topic) {
 			return true
 		}
@@ -244,134 +256,134 @@ func (this *SubscribeMessage) TopicExists(topic []byte) bool {
 
 // TopicQos returns the QoS level of a topic. If topic does not exist, QosFailure
 // is returned.
-func (this *SubscribeMessage) TopicQos(topic []byte) byte {
-	for i, t := range this.topics {
+func (sub *SubscribeMessage) TopicQos(topic []byte) byte {
+	for i, t := range sub.topics {
 		if bytes.Equal(t, topic) {
-			return this.qos[i]
+			return sub.qos[i]
 		}
 	}
 
 	return QosFailure
 }
-func (this *SubscribeMessage) TopicNoLocal(topic []byte) bool {
-	for i, t := range this.topics {
+func (sub *SubscribeMessage) TopicNoLocal(topic []byte) bool {
+	for i, t := range sub.topics {
 		if bytes.Equal(t, topic) {
-			return this.noLocal[i] > 0
+			return sub.noLocal[i] > 0
 		}
 	}
 	return false
 }
-func (this *SubscribeMessage) SetTopicNoLocal(topic []byte, noLocal bool) {
-	for i, t := range this.topics {
+func (sub *SubscribeMessage) SetTopicNoLocal(topic []byte, noLocal bool) {
+	for i, t := range sub.topics {
 		if bytes.Equal(t, topic) {
 			if noLocal {
-				this.noLocal[i] = 1
+				sub.noLocal[i] = 1
 			} else {
-				this.noLocal[i] = 0
+				sub.noLocal[i] = 0
 			}
-			this.dirty = true
+			sub.dirty = true
 			return
 		}
 	}
 }
-func (this *SubscribeMessage) TopicRetainAsPublished(topic []byte) bool {
-	for i, t := range this.topics {
+func (sub *SubscribeMessage) TopicRetainAsPublished(topic []byte) bool {
+	for i, t := range sub.topics {
 		if bytes.Equal(t, topic) {
-			return this.retainAsPub[i] > 0
+			return sub.retainAsPub[i] > 0
 		}
 	}
 	return false
 }
-func (this *SubscribeMessage) SetTopicRetainAsPublished(topic []byte, rap bool) {
-	for i, t := range this.topics {
+func (sub *SubscribeMessage) SetTopicRetainAsPublished(topic []byte, rap bool) {
+	for i, t := range sub.topics {
 		if bytes.Equal(t, topic) {
 			if rap {
-				this.retainAsPub[i] = 1
+				sub.retainAsPub[i] = 1
 			} else {
-				this.retainAsPub[i] = 0
+				sub.retainAsPub[i] = 0
 			}
-			this.dirty = true
+			sub.dirty = true
 			return
 		}
 	}
 }
-func (this *SubscribeMessage) TopicRetainHandling(topic []byte) RetainHandling {
-	for i, t := range this.topics {
+func (sub *SubscribeMessage) TopicRetainHandling(topic []byte) RetainHandling {
+	for i, t := range sub.topics {
 		if bytes.Equal(t, topic) {
-			return RetainHandling(this.retainHandling[i])
+			return RetainHandling(sub.retainHandling[i])
 		}
 	}
 	return CanSendRetain
 }
-func (this *SubscribeMessage) SetTopicRetainHandling(topic []byte, hand RetainHandling) {
-	for i, t := range this.topics {
+func (sub *SubscribeMessage) SetTopicRetainHandling(topic []byte, hand RetainHandling) {
+	for i, t := range sub.topics {
 		if bytes.Equal(t, topic) {
-			this.retainHandling[i] = byte(hand)
-			this.dirty = true
+			sub.retainHandling[i] = byte(hand)
+			sub.dirty = true
 			return
 		}
 	}
 }
 
 // Qos returns the list of QoS current in the message.
-func (this *SubscribeMessage) Qos() []byte {
-	return this.qos
+func (sub *SubscribeMessage) Qos() []byte {
+	return sub.qos
 }
 
-func (this *SubscribeMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+func (sub *SubscribeMessage) Len() int {
+	if !sub.dirty {
+		return len(sub.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := sub.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := sub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return sub.header.msglen() + ml
 }
 
-func (this *SubscribeMessage) Decode(src []byte) (int, error) {
+func (sub *SubscribeMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	hn, err := this.header.decode(src[total:])
+	hn, err := sub.header.decode(src[total:])
 	total += hn
 	if err != nil {
 		return total, err
 	}
 
-	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = CopyLen(src[total:total+2], 2)
+	//sub.packetId = binary.BigEndian.Uint16(src[total:])
+	sub.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
 	var n int
-	this.propertiesLen, n, err = lbDecode(src[total:])
+	sub.propertiesLen, n, err = lbDecode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
-	if int(this.propertiesLen) > len(src[total:]) {
+	if int(sub.propertiesLen) > len(src[total:]) {
 		return total, ProtocolError
 	}
 	if total < len(src) && src[total] == DefiningIdentifiers {
 		total++
-		this.subscriptionIdentifier, n, err = lbDecode(src[total:])
+		sub.subscriptionIdentifier, n, err = lbDecode(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
-		if this.subscriptionIdentifier == 0 || src[total] == DefiningIdentifiers {
+		if sub.subscriptionIdentifier == 0 || src[total] == DefiningIdentifiers {
 			return total, ProtocolError
 		}
 	}
 
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	sub.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	remlen := int(this.remlen) - (total - hn)
+	remlen := int(sub.remlen) - (total - hn)
 	var t []byte
 	for remlen > 0 {
 		t, n, err = readLPBytes(src[total:])
@@ -380,15 +392,15 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 			return total, err
 		}
 
-		this.topics = append(this.topics, t)
+		sub.topics = append(sub.topics, t)
 
-		this.qos = append(this.qos, src[total]&3)
+		sub.qos = append(sub.qos, src[total]&3)
 		if src[total]&3 == 3 {
 			return 0, ProtocolError
 		}
-		this.noLocal = append(this.noLocal, (src[total]&4)>>2)
-		this.retainAsPub = append(this.retainAsPub, (src[total]&8)>>3)
-		this.retainHandling = append(this.retainHandling, (src[total]&48)>>4)
+		sub.noLocal = append(sub.noLocal, (src[total]&4)>>2)
+		sub.retainAsPub = append(sub.retainAsPub, (src[total]&8)>>3)
+		sub.retainHandling = append(sub.retainHandling, (src[total]&48)>>4)
 		if (src[total]&48)>>4 == 3 {
 			return 0, ProtocolError
 		}
@@ -400,68 +412,68 @@ func (this *SubscribeMessage) Decode(src []byte) (int, error) {
 		remlen = remlen - n - 1
 	}
 
-	if len(this.topics) == 0 {
+	if len(sub.topics) == 0 {
 		return 0, ProtocolError //fmt.Errorf("subscribe/Decode: Empty topic list")
 	}
 
-	this.dirty = false
+	sub.dirty = false
 
 	return total, nil
 }
 
-func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (sub *SubscribeMessage) Encode(dst []byte) (int, error) {
+	if !sub.dirty {
+		if len(dst) < len(sub.dbuf) {
+			return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(sub.dbuf), len(dst))
 		}
 
-		return copy(dst, this.dbuf), nil
+		return copy(dst, sub.dbuf), nil
 	}
 
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := sub.msglen()
+	hl := sub.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("subscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := sub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
 	total := 0
 
-	n, err := this.header.encode(dst[total:])
+	n, err := sub.header.encode(dst[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	if this.PacketId() == 0 {
-		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
-		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if sub.PacketId() == 0 {
+		sub.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//sub.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 	}
 
-	n = copy(dst[total:], this.packetId)
-	//binary.BigEndian.PutUint16(dst[total:], this.packetId)
+	n = copy(dst[total:], sub.packetId)
+	//binary.BigEndian.PutUint16(dst[total:], sub.packetId)
 	total += n
 
-	tb := lbEncode(this.propertiesLen)
+	tb := lbEncode(sub.propertiesLen)
 	copy(dst[total:], tb)
 	total += len(tb)
 
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+	if sub.subscriptionIdentifier > 0 && sub.subscriptionIdentifier <= 268435455 {
 		dst[total] = DefiningIdentifiers
 		total++
-		tb = lbEncode(this.subscriptionIdentifier)
+		tb = lbEncode(sub.subscriptionIdentifier)
 		copy(dst[total:], tb)
 		total += len(tb)
 	}
 
-	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	n, err = writeUserProperty(dst[total:], sub.userProperty) // 用户属性
 	total += n
 
-	for i, t := range this.topics {
+	for i, t := range sub.topics {
 		n, err = writeLPBytes(dst[total:], t)
 		total += n
 		if err != nil {
@@ -469,10 +481,10 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 		}
 		// 订阅选项
 		subOp := byte(0)
-		subOp |= this.qos[i]
-		subOp |= this.noLocal[i] << 2
-		subOp |= this.retainAsPub[i] << 3
-		subOp |= this.retainHandling[i] << 4
+		subOp |= sub.qos[i]
+		subOp |= sub.noLocal[i] << 2
+		subOp |= sub.retainAsPub[i] << 3
+		subOp |= sub.retainHandling[i] << 4
 		dst[total] = subOp
 		total++
 	}
@@ -480,78 +492,78 @@ func (this *SubscribeMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 
-func (this *SubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (sub *SubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !sub.dirty {
+		return dst.Write(sub.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := sub.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := sub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := sub.header.encodeToBuf(dst)
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	if this.PacketId() == 0 {
-		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
-		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if sub.PacketId() == 0 {
+		sub.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//sub.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 	}
 
-	dst.Write(this.packetId)
+	dst.Write(sub.packetId)
 
-	dst.Write(lbEncode(this.propertiesLen))
+	dst.Write(lbEncode(sub.propertiesLen))
 
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+	if sub.subscriptionIdentifier > 0 && sub.subscriptionIdentifier <= 268435455 {
 		dst.WriteByte(DefiningIdentifiers)
-		dst.Write(lbEncode(this.subscriptionIdentifier))
+		dst.Write(lbEncode(sub.subscriptionIdentifier))
 	}
 
-	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	_, err = writeUserPropertyByBuf(dst, sub.userProperty) // 用户属性
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	for i, t := range this.topics {
+	for i, t := range sub.topics {
 		_, err = writeToBufLPBytes(dst, t)
 		if err != nil {
 			return dst.Len(), err
 		}
 		// 订阅选项
 		subOp := byte(0)
-		subOp |= this.qos[i]
-		subOp |= this.noLocal[i] << 2
-		subOp |= this.retainAsPub[i] << 3
-		subOp |= this.retainHandling[i] << 4
+		subOp |= sub.qos[i]
+		subOp |= sub.noLocal[i] << 2
+		subOp |= sub.retainAsPub[i] << 3
+		subOp |= sub.retainHandling[i] << 4
 		dst.WriteByte(subOp)
 	}
 
 	return dst.Len(), nil
 }
 
-func (this *SubscribeMessage) build() {
+func (sub *SubscribeMessage) build() {
 	// packet ID
 	total := 2
 
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier <= 268435455 {
+	if sub.subscriptionIdentifier > 0 && sub.subscriptionIdentifier <= 268435455 {
 		total++
-		total += len(lbEncode(this.subscriptionIdentifier))
+		total += len(lbEncode(sub.subscriptionIdentifier))
 	}
 
-	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	n := buildUserPropertyLen(sub.userProperty) // 用户属性
 	total += n
 
-	this.propertiesLen = uint32(total - 2)
-	total += len(lbEncode(this.propertiesLen))
-	for _, t := range this.topics {
+	sub.propertiesLen = uint32(total - 2)
+	total += len(lbEncode(sub.propertiesLen))
+	for _, t := range sub.topics {
 		total += 2 + len(t) + 1
 	}
-	_ = this.SetRemainingLength(uint32(total))
+	_ = sub.SetRemainingLength(uint32(total))
 }
-func (this *SubscribeMessage) msglen() int {
-	this.build()
-	return int(this.remlen)
+func (sub *SubscribeMessage) msglen() int {
+	sub.build()
+	return int(sub.remlen)
 }

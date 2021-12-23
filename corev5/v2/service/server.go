@@ -393,6 +393,18 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 		//设置默认的keepalive数，五分钟
 		req.SetKeepAlive(uint16(server.KeepAlive))
 	}
+
+	if req.RequestProblemInfo() == 0 {
+		// 值为0，表示服务端不能返回响应信息 [MQTT-3.1.2-28]。
+		// 值为1，表示服务端可以在CONNACK报文中返回响应信息, 但是服务端也可以不返回
+
+		// 如果请求问题信息的值为0，服务端可以选择在CONNACK或DISCONNECT报文中返回原因字符串（Reason String）或用户属性（User Properties），
+		// 但不能在除PUBLISH，CONNACK或DISCONNECT之外的报文中发送原因字符串（Reason String）或用户属性（User Properties） [MQTT3.1.2-29]。
+		// 如果此值为0，并且在除PUBLISH，CONNACK或DISCONNECT之外的报文中收到了原因字符串（Reason String）或用户属性（User Properties），
+		// 客户端将发送一个包含原因码0x82（协议错误）的DISCONNECT报文给服务端
+		//resp.SetReasonStr(nil)
+		//resp.SetUserProperties(nil)
+	}
 	return req, resp, nil
 }
 

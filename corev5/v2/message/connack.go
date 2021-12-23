@@ -53,7 +53,7 @@ func NewConnackMessage() *ConnackMessage {
 }
 
 // String returns a string representation of the CONNACK message
-func (this ConnackMessage) String() string {
+func (connAckMsg ConnackMessage) String() string {
 	return fmt.Sprintf("Header==>> \t%s\nVariable header==>> \tSession Present=%t\tReason code=%s\t"+
 		"Properties\t\t"+
 		"Length=%v\t\tSession Expiry Interval=%v\t\tReceive Maximum=%v\t\tMaximum QoS=%v\t\t"+
@@ -61,318 +61,319 @@ func (this ConnackMessage) String() string {
 		"Topic Alias Max=%v\t\tReason Str=%v\t\tUser Properties=%v\t\t"+
 		"Wildcard Subscription Available=%b\t\tSubscription Identifier Available=%b\t\tShared Subscription Available=%b\t\tServer Keep Alive=%v\t\t"+
 		"Response Information=%v\t\tServer Reference=%v\t\tAuth Method=%v\t\tAuth Data=%v\t",
-		this.header,
+		connAckMsg.header,
 
-		this.sessionPresent, this.reasonCode,
+		connAckMsg.sessionPresent, connAckMsg.reasonCode,
 
-		this.propertiesLen,
-		this.sessionExpiryInterval,
-		this.receiveMaximum,
-		this.maxQos,
-		this.retainAvailable,
-		this.maxPacketSize,
-		this.assignedIdentifier,
-		this.topicAliasMax,
-		this.reasonStr,
-		this.userProperties,
+		connAckMsg.propertiesLen,
+		connAckMsg.sessionExpiryInterval,
+		connAckMsg.receiveMaximum,
+		connAckMsg.maxQos,
+		connAckMsg.retainAvailable,
+		connAckMsg.maxPacketSize,
+		connAckMsg.assignedIdentifier,
+		connAckMsg.topicAliasMax,
+		connAckMsg.reasonStr,
+		connAckMsg.userProperties,
 
-		this.wildcardSubscriptionAvailable,
-		this.subscriptionIdentifierAvailable,
-		this.sharedSubscriptionAvailable,
-		this.serverKeepAlive,
-		this.responseInformation,
-		this.serverReference,
-		this.authMethod,
-		this.authData,
+		connAckMsg.wildcardSubscriptionAvailable,
+		connAckMsg.subscriptionIdentifierAvailable,
+		connAckMsg.sharedSubscriptionAvailable,
+		connAckMsg.serverKeepAlive,
+		connAckMsg.responseInformation,
+		connAckMsg.serverReference,
+		connAckMsg.authMethod,
+		connAckMsg.authData,
 	)
 }
-func (this *ConnackMessage) build() {
+func (connAckMsg *ConnackMessage) build() {
 	propertiesLen := 0
 	// 属性
-	if this.sessionExpiryInterval > 0 { // 会话过期间隔
+	if connAckMsg.sessionExpiryInterval > 0 { // 会话过期间隔
 		propertiesLen += 5
 	}
-	if this.receiveMaximum > 0 && this.receiveMaximum < 65535 { // 接收最大值
+	if connAckMsg.receiveMaximum > 0 && connAckMsg.receiveMaximum < 65535 { // 接收最大值
 		propertiesLen += 3
 	} else {
-		this.receiveMaximum = 65535
+		connAckMsg.receiveMaximum = 65535
 	}
-	if this.maxQos > 0 { // 最大服务质量，正常都会编码
+	if connAckMsg.maxQos > 0 { // 最大服务质量，正常都会编码
 		propertiesLen += 2
 	}
-	if this.retainAvailable != 1 { // 保留可用
+	if connAckMsg.retainAvailable != 1 { // 保留可用
 		propertiesLen += 2
 	}
-	if this.maxPacketSize > 0 { // 最大报文长度
+	if connAckMsg.maxPacketSize > 0 { // 最大报文长度
 		propertiesLen += 5
 	} else {
-		// todo this.maxPacketSize = ?
+		// todo connAckMsg.maxPacketSize = ?
 	}
-	if len(this.assignedIdentifier) > 0 { // 分配客户标识符
+	if len(connAckMsg.assignedIdentifier) > 0 { // 分配客户标识符
 		propertiesLen++
 		propertiesLen += 2
-		propertiesLen += len(this.assignedIdentifier)
+		propertiesLen += len(connAckMsg.assignedIdentifier)
 	}
-	if this.topicAliasMax > 0 { // 主题别名最大值
+	if connAckMsg.topicAliasMax > 0 { // 主题别名最大值
 		propertiesLen += 3
 	}
-	if len(this.reasonStr) > 0 { // 原因字符串
+	if len(connAckMsg.reasonStr) > 0 { // 原因字符串
 		propertiesLen++
 		propertiesLen += 2
-		propertiesLen += len(this.reasonStr)
+		propertiesLen += len(connAckMsg.reasonStr)
 	}
 
-	n := buildUserPropertyLen(this.userProperties) // 用户属性
+	n := buildUserPropertyLen(connAckMsg.userProperties) // 用户属性
 	propertiesLen += n
 
-	if this.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
+	if connAckMsg.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
 		propertiesLen += 2
 	}
-	if this.subscriptionIdentifierAvailable != 1 { // 订阅标识符可用
+	if connAckMsg.subscriptionIdentifierAvailable != 1 { // 订阅标识符可用
 		propertiesLen += 2
 	}
-	if this.sharedSubscriptionAvailable != 1 { // 共享订阅可用
+	if connAckMsg.sharedSubscriptionAvailable != 1 { // 共享订阅可用
 		propertiesLen += 2
 	}
-	if this.serverKeepAlive > 0 { // 服务端保持连接
+	if connAckMsg.serverKeepAlive > 0 { // 服务端保持连接
 		propertiesLen += 3
 	}
-	if len(this.responseInformation) > 0 { // 响应信息
+	if len(connAckMsg.responseInformation) > 0 { // 响应信息
 		propertiesLen++
 		propertiesLen += 2
-		propertiesLen += len(this.responseInformation)
+		propertiesLen += len(connAckMsg.responseInformation)
 	}
-	if len(this.serverReference) > 0 { // 服务端参考
+	if len(connAckMsg.serverReference) > 0 { // 服务端参考
 		propertiesLen++
 		propertiesLen += 2
-		propertiesLen += len(this.serverReference)
+		propertiesLen += len(connAckMsg.serverReference)
 	}
-	if len(this.authMethod) > 0 { // 认证方法
+	if len(connAckMsg.authMethod) > 0 { // 认证方法
 		propertiesLen++
 		propertiesLen += 2
-		propertiesLen += len(this.authMethod)
+		propertiesLen += len(connAckMsg.authMethod)
 	}
-	if len(this.authData) > 0 { // 认证数据
+	if len(connAckMsg.authData) > 0 { // 认证数据
 		propertiesLen++
 		propertiesLen += 2
-		propertiesLen += len(this.authData)
+		propertiesLen += len(connAckMsg.authData)
 	}
-	this.propertiesLen = uint32(propertiesLen)
+	connAckMsg.propertiesLen = uint32(propertiesLen)
 	// 两个 1 分别是连接确认标志和连接原因码
-	_ = this.SetRemainingLength(uint32(1 + 1 + propertiesLen + len(lbEncode(this.propertiesLen))))
+	_ = connAckMsg.SetRemainingLength(uint32(1 + 1 + propertiesLen + len(lbEncode(connAckMsg.propertiesLen))))
 }
-func (this *ConnackMessage) PropertiesLen() uint32 {
-	return this.propertiesLen
-}
-
-func (this *ConnackMessage) SetPropertiesLen(propertiesLen uint32) {
-	this.propertiesLen = propertiesLen
-	this.dirty = true
+func (connAckMsg *ConnackMessage) PropertiesLen() uint32 {
+	return connAckMsg.propertiesLen
 }
 
-func (this *ConnackMessage) SessionExpiryInterval() uint32 {
-	return this.sessionExpiryInterval
+func (connAckMsg *ConnackMessage) SetPropertiesLen(propertiesLen uint32) {
+	connAckMsg.propertiesLen = propertiesLen
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetSessionExpiryInterval(sessionExpiryInterval uint32) {
-	this.sessionExpiryInterval = sessionExpiryInterval
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SessionExpiryInterval() uint32 {
+	return connAckMsg.sessionExpiryInterval
 }
 
-func (this *ConnackMessage) ReceiveMaximum() uint16 {
-	return this.receiveMaximum
+func (connAckMsg *ConnackMessage) SetSessionExpiryInterval(sessionExpiryInterval uint32) {
+	connAckMsg.sessionExpiryInterval = sessionExpiryInterval
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetReceiveMaximum(receiveMaximum uint16) {
-	this.receiveMaximum = receiveMaximum
-	this.dirty = true
+func (connAckMsg *ConnackMessage) ReceiveMaximum() uint16 {
+	return connAckMsg.receiveMaximum
 }
 
-func (this *ConnackMessage) MaxQos() byte {
-	return this.maxQos
+func (connAckMsg *ConnackMessage) SetReceiveMaximum(receiveMaximum uint16) {
+	connAckMsg.receiveMaximum = receiveMaximum
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetMaxQos(maxQos byte) {
-	this.maxQos = maxQos
-	this.dirty = true
+func (connAckMsg *ConnackMessage) MaxQos() byte {
+	return connAckMsg.maxQos
 }
 
-func (this *ConnackMessage) RetainAvailable() byte {
-	return this.retainAvailable
+func (connAckMsg *ConnackMessage) SetMaxQos(maxQos byte) {
+	connAckMsg.maxQos = maxQos
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetRetainAvailable(retainAvailable byte) {
-	this.retainAvailable = retainAvailable
-	this.dirty = true
+func (connAckMsg *ConnackMessage) RetainAvailable() byte {
+	return connAckMsg.retainAvailable
 }
 
-func (this *ConnackMessage) MaxPacketSize() uint32 {
-	return this.maxPacketSize
+func (connAckMsg *ConnackMessage) SetRetainAvailable(retainAvailable byte) {
+	connAckMsg.retainAvailable = retainAvailable
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetMaxPacketSize(maxPacketSize uint32) {
-	this.maxPacketSize = maxPacketSize
-	this.dirty = true
+func (connAckMsg *ConnackMessage) MaxPacketSize() uint32 {
+	return connAckMsg.maxPacketSize
 }
 
-func (this *ConnackMessage) AssignedIdentifier() []byte {
-	return this.assignedIdentifier
+func (connAckMsg *ConnackMessage) SetMaxPacketSize(maxPacketSize uint32) {
+	connAckMsg.maxPacketSize = maxPacketSize
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetAssignedIdentifier(assignedIdentifier []byte) {
-	this.assignedIdentifier = assignedIdentifier
-	this.dirty = true
+func (connAckMsg *ConnackMessage) AssignedIdentifier() []byte {
+	return connAckMsg.assignedIdentifier
 }
 
-func (this *ConnackMessage) TopicAliasMax() uint16 {
-	return this.topicAliasMax
+func (connAckMsg *ConnackMessage) SetAssignedIdentifier(assignedIdentifier []byte) {
+	connAckMsg.assignedIdentifier = assignedIdentifier
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetTopicAliasMax(topicAliasMax uint16) {
-	this.topicAliasMax = topicAliasMax
-	this.dirty = true
+func (connAckMsg *ConnackMessage) TopicAliasMax() uint16 {
+	return connAckMsg.topicAliasMax
 }
 
-func (this *ConnackMessage) ReasonStr() []byte {
-	return this.reasonStr
+func (connAckMsg *ConnackMessage) SetTopicAliasMax(topicAliasMax uint16) {
+	connAckMsg.topicAliasMax = topicAliasMax
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetReasonStr(reasonStr []byte) {
-	this.reasonStr = reasonStr
-	this.dirty = true
+func (connAckMsg *ConnackMessage) ReasonStr() []byte {
+	return connAckMsg.reasonStr
 }
 
-func (this *ConnackMessage) UserProperties() [][]byte {
-	return this.userProperties
+func (connAckMsg *ConnackMessage) SetReasonStr(reasonStr []byte) {
+	connAckMsg.reasonStr = reasonStr
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperties = append(this.userProperties, userProperty...)
-	this.dirty = true
-}
-func (this *ConnackMessage) AddUserProperty(userProperty []byte) {
-	this.userProperties = append(this.userProperties, userProperty)
-	this.dirty = true
+func (connAckMsg *ConnackMessage) UserProperties() [][]byte {
+	return connAckMsg.userProperties
 }
 
-func (this *ConnackMessage) WildcardSubscriptionAvailable() byte {
-	return this.wildcardSubscriptionAvailable
+func (connAckMsg *ConnackMessage) AddUserProperties(userProperty [][]byte) {
+	connAckMsg.userProperties = append(connAckMsg.userProperties, userProperty...)
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SetWildcardSubscriptionAvailable(wildcardSubscriptionAvailable byte) {
-	this.wildcardSubscriptionAvailable = wildcardSubscriptionAvailable
-	this.dirty = true
+func (connAckMsg *ConnackMessage) AddUserProperty(userProperty []byte) {
+	connAckMsg.userProperties = append(connAckMsg.userProperties, userProperty)
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SubscriptionIdentifierAvailable() byte {
-	return this.subscriptionIdentifierAvailable
+func (connAckMsg *ConnackMessage) WildcardSubscriptionAvailable() byte {
+	return connAckMsg.wildcardSubscriptionAvailable
 }
 
-func (this *ConnackMessage) SetSubscriptionIdentifierAvailable(subscriptionIdentifierAvailable byte) {
-	this.subscriptionIdentifierAvailable = subscriptionIdentifierAvailable
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetWildcardSubscriptionAvailable(wildcardSubscriptionAvailable byte) {
+	connAckMsg.wildcardSubscriptionAvailable = wildcardSubscriptionAvailable
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) SharedSubscriptionAvailable() byte {
-	return this.sharedSubscriptionAvailable
+func (connAckMsg *ConnackMessage) SubscriptionIdentifierAvailable() byte {
+	return connAckMsg.subscriptionIdentifierAvailable
 }
 
-func (this *ConnackMessage) SetSharedSubscriptionAvailable(sharedSubscriptionAvailable byte) {
-	this.sharedSubscriptionAvailable = sharedSubscriptionAvailable
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetSubscriptionIdentifierAvailable(subscriptionIdentifierAvailable byte) {
+	connAckMsg.subscriptionIdentifierAvailable = subscriptionIdentifierAvailable
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) ServerKeepAlive() uint16 {
-	return this.serverKeepAlive
+func (connAckMsg *ConnackMessage) SharedSubscriptionAvailable() byte {
+	return connAckMsg.sharedSubscriptionAvailable
 }
 
-func (this *ConnackMessage) SetServerKeepAlive(serverKeepAlive uint16) {
-	this.serverKeepAlive = serverKeepAlive
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetSharedSubscriptionAvailable(sharedSubscriptionAvailable byte) {
+	connAckMsg.sharedSubscriptionAvailable = sharedSubscriptionAvailable
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) ResponseInformation() []byte {
-	return this.responseInformation
+func (connAckMsg *ConnackMessage) ServerKeepAlive() uint16 {
+	return connAckMsg.serverKeepAlive
 }
 
-func (this *ConnackMessage) SetResponseInformation(responseInformation []byte) {
-	this.responseInformation = responseInformation
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetServerKeepAlive(serverKeepAlive uint16) {
+	connAckMsg.serverKeepAlive = serverKeepAlive
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) ServerReference() []byte {
-	return this.serverReference
+func (connAckMsg *ConnackMessage) ResponseInformation() []byte {
+	return connAckMsg.responseInformation
 }
 
-func (this *ConnackMessage) SetServerReference(serverReference []byte) {
-	this.serverReference = serverReference
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetResponseInformation(responseInformation []byte) {
+	connAckMsg.responseInformation = responseInformation
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) AuthMethod() []byte {
-	return this.authMethod
+func (connAckMsg *ConnackMessage) ServerReference() []byte {
+	return connAckMsg.serverReference
 }
 
-func (this *ConnackMessage) SetAuthMethod(authMethod []byte) {
-	this.authMethod = authMethod
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetServerReference(serverReference []byte) {
+	connAckMsg.serverReference = serverReference
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) AuthData() []byte {
-	return this.authData
+func (connAckMsg *ConnackMessage) AuthMethod() []byte {
+	return connAckMsg.authMethod
 }
 
-func (this *ConnackMessage) SetAuthData(authData []byte) {
-	this.authData = authData
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetAuthMethod(authMethod []byte) {
+	connAckMsg.authMethod = authMethod
+	connAckMsg.dirty = true
+}
+
+func (connAckMsg *ConnackMessage) AuthData() []byte {
+	return connAckMsg.authData
+}
+
+func (connAckMsg *ConnackMessage) SetAuthData(authData []byte) {
+	connAckMsg.authData = authData
+	connAckMsg.dirty = true
 }
 
 // SessionPresent returns the session present flag value
-func (this *ConnackMessage) SessionPresent() bool {
-	return this.sessionPresent
+func (connAckMsg *ConnackMessage) SessionPresent() bool {
+	return connAckMsg.sessionPresent
 }
 
 // SetSessionPresent sets the value of the session present flag
 // SetSessionPresent设置会话present标志的值
-func (this *ConnackMessage) SetSessionPresent(v bool) {
+func (connAckMsg *ConnackMessage) SetSessionPresent(v bool) {
 	if v {
-		this.sessionPresent = true
+		connAckMsg.sessionPresent = true
 	} else {
-		this.sessionPresent = false
+		connAckMsg.sessionPresent = false
 	}
 
-	this.dirty = true
+	connAckMsg.dirty = true
 }
 
 // ReturnCode returns the return code received for the CONNECT message. The return
 // type is an error
-func (this *ConnackMessage) ReasonCode() ReasonCode {
-	return this.reasonCode
+func (connAckMsg *ConnackMessage) ReasonCode() ReasonCode {
+	return connAckMsg.reasonCode
 }
 
-func (this *ConnackMessage) SetReasonCode(ret ReasonCode) {
-	this.reasonCode = ret
-	this.dirty = true
+func (connAckMsg *ConnackMessage) SetReasonCode(ret ReasonCode) {
+	connAckMsg.reasonCode = ret
+	connAckMsg.dirty = true
 }
 
-func (this *ConnackMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+func (connAckMsg *ConnackMessage) Len() int {
+	if !connAckMsg.dirty {
+		return len(connAckMsg.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := connAckMsg.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := connAckMsg.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return connAckMsg.header.msglen() + ml
 }
 
-func (this *ConnackMessage) Decode(src []byte) (int, error) {
+func (connAckMsg *ConnackMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	n, err := this.header.decode(src)
+	n, err := connAckMsg.header.decode(src)
 	total += n
 	if err != nil {
 		return total, err
@@ -384,7 +385,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 		return 0, ProtocolError // fmt.Errorf("connack/Decode: Bits 7-1 in Connack Acknowledge Flags byte (1) are not 0")
 	}
 
-	this.sessionPresent = b&0x1 == 1 // 连接确认标志的第0位为会话存在标志
+	connAckMsg.sessionPresent = b&0x1 == 1 // 连接确认标志的第0位为会话存在标志
 	total++
 
 	b = src[total] // 连接原因码
@@ -394,15 +395,15 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 		return 0, ProtocolError // fmt.Errorf("connack/Decode: Invalid CONNACK return code (%d)", b)
 	}
 
-	this.reasonCode = ReasonCode(b)
+	connAckMsg.reasonCode = ReasonCode(b)
 	total++
-	if !ValidConnAckReasonCode(this.reasonCode) {
+	if !ValidConnAckReasonCode(connAckMsg.reasonCode) {
 		return total, ProtocolError
 	}
 
 	// Connack 属性
 
-	this.propertiesLen, n, err = lbDecode(src[total:])
+	connAckMsg.propertiesLen, n, err = lbDecode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
@@ -410,7 +411,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 
 	if total < len(src) && src[total] == SessionExpirationInterval { // 会话过期间隔
 		total++
-		this.sessionExpiryInterval = binary.BigEndian.Uint32(src[total:])
+		connAckMsg.sessionExpiryInterval = binary.BigEndian.Uint32(src[total:])
 		total += 4
 		if total < len(src) && src[total] == SessionExpirationInterval {
 			return 0, ProtocolError
@@ -418,39 +419,39 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == MaximumQuantityReceived { // 接收最大值
 		total++
-		this.receiveMaximum = binary.BigEndian.Uint16(src[total:])
+		connAckMsg.receiveMaximum = binary.BigEndian.Uint16(src[total:])
 		total += 2
-		if this.receiveMaximum == 0 || (total < len(src) && src[total] == MaximumQuantityReceived) {
+		if connAckMsg.receiveMaximum == 0 || (total < len(src) && src[total] == MaximumQuantityReceived) {
 			return 0, ProtocolError
 		}
 	} else {
-		this.receiveMaximum = 65535
+		connAckMsg.receiveMaximum = 65535
 	}
 	if total < len(src) && src[total] == MaximumQoS { // 最大服务质量
 		total++
-		this.maxQos = src[total]
+		connAckMsg.maxQos = src[total]
 		total++
-		if this.maxQos > 2 || this.maxQos < 0 || (total < len(src) && src[total] == MaximumQoS) {
+		if connAckMsg.maxQos > 2 || connAckMsg.maxQos < 0 || (total < len(src) && src[total] == MaximumQoS) {
 			return 0, ProtocolError
 		}
 	} else {
-		this.maxQos = 2 //  默认2
+		connAckMsg.maxQos = 2 //  默认2
 	}
 	if total < len(src) && src[total] == PreservePropertyAvailability { // 保留可用
 		total++
-		this.retainAvailable = src[total]
+		connAckMsg.retainAvailable = src[total]
 		total++
-		if (this.retainAvailable != 0 && this.retainAvailable != 1) || (total < len(src) && src[total] == PreservePropertyAvailability) {
+		if (connAckMsg.retainAvailable != 0 && connAckMsg.retainAvailable != 1) || (total < len(src) && src[total] == PreservePropertyAvailability) {
 			return 0, ProtocolError
 		}
 	} else {
-		this.retainAvailable = 0x01
+		connAckMsg.retainAvailable = 0x01
 	}
 	if total < len(src) && src[total] == MaximumMessageLength { // 最大报文长度
 		total++
-		this.maxPacketSize = binary.BigEndian.Uint32(src[total:])
+		connAckMsg.maxPacketSize = binary.BigEndian.Uint32(src[total:])
 		total += 4
-		if this.maxPacketSize == 0 || (total < len(src) && src[total] == MaximumMessageLength) {
+		if connAckMsg.maxPacketSize == 0 || (total < len(src) && src[total] == MaximumMessageLength) {
 			return 0, ProtocolError
 		}
 	} else {
@@ -458,7 +459,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == AssignCustomerIdentifiers { // 分配的客户端标识符
 		total++
-		this.assignedIdentifier, n, err = readLPBytes(src[total:])
+		connAckMsg.assignedIdentifier, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -469,7 +470,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == MaximumLengthOfTopicAlias { // 主题别名最大值
 		total++
-		this.topicAliasMax = binary.BigEndian.Uint16(src[total:])
+		connAckMsg.topicAliasMax = binary.BigEndian.Uint16(src[total:])
 		total += 2
 		if total < len(src) && src[total] == MaximumLengthOfTopicAlias {
 			return 0, ProtocolError
@@ -477,7 +478,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == ReasonString { // 分配的客户端标识符
 		total++
-		this.reasonStr, n, err = readLPBytes(src[total:])
+		connAckMsg.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -487,7 +488,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 		}
 	}
 
-	this.userProperties, n, err = decodeUserProperty(src[total:]) // 用户属性
+	connAckMsg.userProperties, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
@@ -495,40 +496,40 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 
 	if total < len(src) && src[total] == WildcardSubscriptionAvailability { // 通配符订阅可用
 		total++
-		this.wildcardSubscriptionAvailable = src[total]
+		connAckMsg.wildcardSubscriptionAvailable = src[total]
 		total++
-		if (this.wildcardSubscriptionAvailable != 0 && this.wildcardSubscriptionAvailable != 1) ||
+		if (connAckMsg.wildcardSubscriptionAvailable != 0 && connAckMsg.wildcardSubscriptionAvailable != 1) ||
 			(total < len(src) && src[total] == WildcardSubscriptionAvailability) {
 			return 0, ProtocolError
 		}
 	} else {
-		this.wildcardSubscriptionAvailable = 0x01
+		connAckMsg.wildcardSubscriptionAvailable = 0x01
 	}
 	if total < len(src) && src[total] == AvailabilityOfSubscriptionIdentifiers { // 订阅标识符可用
 		total++
-		this.subscriptionIdentifierAvailable = src[total]
+		connAckMsg.subscriptionIdentifierAvailable = src[total]
 		total++
-		if (this.subscriptionIdentifierAvailable != 0 && this.subscriptionIdentifierAvailable != 1) ||
+		if (connAckMsg.subscriptionIdentifierAvailable != 0 && connAckMsg.subscriptionIdentifierAvailable != 1) ||
 			(total < len(src) && src[total] == AvailabilityOfSubscriptionIdentifiers) {
 			return 0, ProtocolError
 		}
 	} else {
-		this.subscriptionIdentifierAvailable = 0x01
+		connAckMsg.subscriptionIdentifierAvailable = 0x01
 	}
 	if total < len(src) && src[total] == SharedSubscriptionAvailability { // 共享订阅标识符可用
 		total++
-		this.sharedSubscriptionAvailable = src[total]
+		connAckMsg.sharedSubscriptionAvailable = src[total]
 		total++
-		if (this.sharedSubscriptionAvailable != 0 && this.sharedSubscriptionAvailable != 1) ||
+		if (connAckMsg.sharedSubscriptionAvailable != 0 && connAckMsg.sharedSubscriptionAvailable != 1) ||
 			(total < len(src) && src[total] == SharedSubscriptionAvailability) {
 			return 0, ProtocolError
 		}
 	} else {
-		this.subscriptionIdentifierAvailable = 0x01
+		connAckMsg.subscriptionIdentifierAvailable = 0x01
 	}
 	if total < len(src) && src[total] == ServerSurvivalTime { // 服务保持连接
 		total++
-		this.serverKeepAlive = binary.BigEndian.Uint16(src[total:])
+		connAckMsg.serverKeepAlive = binary.BigEndian.Uint16(src[total:])
 		total++
 		if total < len(src) && src[total] == ServerSurvivalTime {
 			return 0, ProtocolError
@@ -536,7 +537,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == SolicitedMessage { // 响应信息
 		total++
-		this.responseInformation, n, err = readLPBytes(src[total:])
+		connAckMsg.responseInformation, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -547,7 +548,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == ServerReference { // 服务端参考
 		total++
-		this.serverReference, n, err = readLPBytes(src[total:])
+		connAckMsg.serverReference, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -558,7 +559,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == AuthenticationMethod { // 认证方法
 		total++
-		this.authMethod, n, err = readLPBytes(src[total:])
+		connAckMsg.authMethod, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -569,7 +570,7 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == AuthenticationData { // 认证数据
 		total++
-		this.authData, n, err = readLPBytes(src[total:])
+		connAckMsg.authData, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -578,169 +579,169 @@ func (this *ConnackMessage) Decode(src []byte) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	this.dirty = false
+	connAckMsg.dirty = false
 
 	return total, nil
 }
 
-func (this *ConnackMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("connack/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (connAckMsg *ConnackMessage) Encode(dst []byte) (int, error) {
+	if !connAckMsg.dirty {
+		if len(dst) < len(connAckMsg.dbuf) {
+			return 0, fmt.Errorf("connack/Encode: Insufficient buffer size. Expecting %d, got %d.", len(connAckMsg.dbuf), len(dst))
 		}
 
-		return copy(dst, this.dbuf), nil
+		return copy(dst, connAckMsg.dbuf), nil
 	}
 
 	// CONNACK remaining length fixed at 2 bytes
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := connAckMsg.msglen()
+	hl := connAckMsg.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("connack/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := connAckMsg.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
 	total := 0
 
-	n, err := this.header.encode(dst[total:])
+	n, err := connAckMsg.header.encode(dst[total:])
 	total += n
 	if err != nil {
 		return 0, err
 	}
 
-	if this.sessionPresent { // 连接确认标志
+	if connAckMsg.sessionPresent { // 连接确认标志
 		dst[total] = 1
 	}
 	total++
 
-	if this.reasonCode > UnsupportedWildcardSubscriptions {
-		return total, fmt.Errorf("connack/Encode: Invalid CONNACK return code (%d)", this.reasonCode)
+	if connAckMsg.reasonCode > UnsupportedWildcardSubscriptions {
+		return total, fmt.Errorf("connack/Encode: Invalid CONNACK return code (%d)", connAckMsg.reasonCode)
 	}
 
-	dst[total] = this.reasonCode.Value() // 原因码
+	dst[total] = connAckMsg.reasonCode.Value() // 原因码
 	total++
 
-	n = copy(dst[total:], lbEncode(this.propertiesLen))
+	n = copy(dst[total:], lbEncode(connAckMsg.propertiesLen))
 	total += n
 
 	// 属性
-	if this.sessionExpiryInterval > 0 { // 会话过期间隔
+	if connAckMsg.sessionExpiryInterval > 0 { // 会话过期间隔
 		dst[total] = SessionExpirationInterval
 		total++
-		binary.BigEndian.PutUint32(dst[total:], this.sessionExpiryInterval)
+		binary.BigEndian.PutUint32(dst[total:], connAckMsg.sessionExpiryInterval)
 		total += 4
 	}
-	if this.receiveMaximum > 0 && this.receiveMaximum < 65535 { // 接收最大值
+	if connAckMsg.receiveMaximum > 0 && connAckMsg.receiveMaximum < 65535 { // 接收最大值
 		dst[total] = MaximumQuantityReceived
 		total++
-		binary.BigEndian.PutUint16(dst[total:], this.receiveMaximum)
+		binary.BigEndian.PutUint16(dst[total:], connAckMsg.receiveMaximum)
 		total += 2
 	}
-	if this.maxQos > 0 { // 最大服务质量，正常都会编码
+	if connAckMsg.maxQos > 0 { // 最大服务质量，正常都会编码
 		dst[total] = MaximumQoS
 		total++
-		dst[total] = this.maxQos
+		dst[total] = connAckMsg.maxQos
 		total++
 	}
-	if this.retainAvailable != 1 { // 保留可用
+	if connAckMsg.retainAvailable != 1 { // 保留可用
 		dst[total] = PreservePropertyAvailability
 		total++
-		dst[total] = this.retainAvailable
+		dst[total] = connAckMsg.retainAvailable
 		total++
 	}
-	if this.maxPacketSize != 1 { // 最大报文长度
+	if connAckMsg.maxPacketSize != 1 { // 最大报文长度
 		dst[total] = MaximumMessageLength
 		total++
-		binary.BigEndian.PutUint32(dst[total:], this.maxPacketSize)
+		binary.BigEndian.PutUint32(dst[total:], connAckMsg.maxPacketSize)
 		total += 4
 	}
-	if len(this.assignedIdentifier) > 0 { // 分配客户标识符
+	if len(connAckMsg.assignedIdentifier) > 0 { // 分配客户标识符
 		dst[total] = AssignCustomerIdentifiers
 		total++
-		n, err = writeLPBytes(dst[total:], this.assignedIdentifier)
+		n, err = writeLPBytes(dst[total:], connAckMsg.assignedIdentifier)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	if this.topicAliasMax > 0 { // 主题别名最大值
+	if connAckMsg.topicAliasMax > 0 { // 主题别名最大值
 		dst[total] = MaximumLengthOfTopicAlias
 		total++
-		binary.BigEndian.PutUint16(dst[total:], this.topicAliasMax)
+		binary.BigEndian.PutUint16(dst[total:], connAckMsg.topicAliasMax)
 		total += 2
 	}
-	if len(this.reasonStr) > 0 { // 原因字符串
+	if len(connAckMsg.reasonStr) > 0 { // 原因字符串
 		dst[total] = ReasonString
 		total++
-		n, err = writeLPBytes(dst[total:], this.reasonStr)
+		n, err = writeLPBytes(dst[total:], connAckMsg.reasonStr)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
 
-	n, err = writeUserProperty(dst[total:], this.userProperties) // 用户属性
+	n, err = writeUserProperty(dst[total:], connAckMsg.userProperties) // 用户属性
 	total += n
 
-	if this.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
+	if connAckMsg.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
 		dst[total] = WildcardSubscriptionAvailability
 		total++
-		dst[total] = this.wildcardSubscriptionAvailable
+		dst[total] = connAckMsg.wildcardSubscriptionAvailable
 		total++
 	}
-	if this.subscriptionIdentifierAvailable != 1 { // 订阅标识符可用
+	if connAckMsg.subscriptionIdentifierAvailable != 1 { // 订阅标识符可用
 		dst[total] = AvailabilityOfSubscriptionIdentifiers
 		total++
-		dst[total] = this.subscriptionIdentifierAvailable
+		dst[total] = connAckMsg.subscriptionIdentifierAvailable
 		total++
 	}
-	if this.sharedSubscriptionAvailable != 1 { // 共享订阅可用
+	if connAckMsg.sharedSubscriptionAvailable != 1 { // 共享订阅可用
 		dst[total] = SharedSubscriptionAvailability
 		total++
-		dst[total] = this.sharedSubscriptionAvailable
+		dst[total] = connAckMsg.sharedSubscriptionAvailable
 		total++
 	}
-	if this.serverKeepAlive > 0 { // 服务端保持连接
+	if connAckMsg.serverKeepAlive > 0 { // 服务端保持连接
 		dst[total] = ServerSurvivalTime
 		total++
-		binary.BigEndian.PutUint16(dst[total:], this.serverKeepAlive)
+		binary.BigEndian.PutUint16(dst[total:], connAckMsg.serverKeepAlive)
 		total += 2
 	}
-	if len(this.responseInformation) > 0 { // 响应信息
+	if len(connAckMsg.responseInformation) > 0 { // 响应信息
 		dst[total] = SolicitedMessage
 		total++
-		n, err = writeLPBytes(dst[total:], this.responseInformation)
+		n, err = writeLPBytes(dst[total:], connAckMsg.responseInformation)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	if len(this.serverReference) > 0 { // 服务端参考
+	if len(connAckMsg.serverReference) > 0 { // 服务端参考
 		dst[total] = ServerReference
 		total++
-		n, err = writeLPBytes(dst[total:], this.serverReference)
+		n, err = writeLPBytes(dst[total:], connAckMsg.serverReference)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	if len(this.authMethod) > 0 { // 认证方法
+	if len(connAckMsg.authMethod) > 0 { // 认证方法
 		dst[total] = AuthenticationMethod
 		total++
-		n, err = writeLPBytes(dst[total:], this.authMethod)
+		n, err = writeLPBytes(dst[total:], connAckMsg.authMethod)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	if len(this.authData) > 0 { // 认证数据
+	if len(connAckMsg.authData) > 0 { // 认证数据
 		dst[total] = AuthenticationData
 		total++
-		n, err = writeLPBytes(dst[total:], this.authData)
+		n, err = writeLPBytes(dst[total:], connAckMsg.authData)
 		total += n
 		if err != nil {
 			return total, err
@@ -749,122 +750,122 @@ func (this *ConnackMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 
-func (this *ConnackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (connAckMsg *ConnackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !connAckMsg.dirty {
+		return dst.Write(connAckMsg.dbuf)
 	}
 
 	// CONNACK remaining length fixed at 2 bytes
-	ml := this.msglen()
+	ml := connAckMsg.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := connAckMsg.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := connAckMsg.header.encodeToBuf(dst)
 	if err != nil {
 		return 0, err
 	}
 
-	if this.sessionPresent { // 连接确认标志
+	if connAckMsg.sessionPresent { // 连接确认标志
 		dst.WriteByte(1)
 	} else {
 		dst.WriteByte(0)
 	}
 
-	if this.reasonCode > UnsupportedWildcardSubscriptions {
-		return dst.Len(), fmt.Errorf("connack/Encode: Invalid CONNACK return code (%d)", this.reasonCode)
+	if connAckMsg.reasonCode > UnsupportedWildcardSubscriptions {
+		return dst.Len(), fmt.Errorf("connack/Encode: Invalid CONNACK return code (%d)", connAckMsg.reasonCode)
 	}
 
-	dst.WriteByte(this.reasonCode.Value()) // 原因码
+	dst.WriteByte(connAckMsg.reasonCode.Value()) // 原因码
 
-	dst.Write(lbEncode(this.propertiesLen))
+	dst.Write(lbEncode(connAckMsg.propertiesLen))
 
 	// 属性
-	if this.sessionExpiryInterval > 0 { // 会话过期间隔
+	if connAckMsg.sessionExpiryInterval > 0 { // 会话过期间隔
 		dst.WriteByte(SessionExpirationInterval)
-		_ = BigEndianPutUint32(dst, this.sessionExpiryInterval)
+		_ = BigEndianPutUint32(dst, connAckMsg.sessionExpiryInterval)
 	}
-	if this.receiveMaximum > 0 && this.receiveMaximum < 65535 { // 接收最大值
+	if connAckMsg.receiveMaximum > 0 && connAckMsg.receiveMaximum < 65535 { // 接收最大值
 		dst.WriteByte(MaximumQuantityReceived)
-		_ = BigEndianPutUint16(dst, this.receiveMaximum)
+		_ = BigEndianPutUint16(dst, connAckMsg.receiveMaximum)
 	}
-	if this.maxQos > 0 { // 最大服务质量，正常都会编码
+	if connAckMsg.maxQos > 0 { // 最大服务质量，正常都会编码
 		dst.WriteByte(MaximumQoS)
-		dst.WriteByte(this.maxQos)
+		dst.WriteByte(connAckMsg.maxQos)
 	}
-	if this.retainAvailable != 1 { // 保留可用
+	if connAckMsg.retainAvailable != 1 { // 保留可用
 		dst.WriteByte(PreservePropertyAvailability)
-		dst.WriteByte(this.retainAvailable)
+		dst.WriteByte(connAckMsg.retainAvailable)
 	}
-	if this.maxPacketSize != 1 { // 最大报文长度
+	if connAckMsg.maxPacketSize != 1 { // 最大报文长度
 		dst.WriteByte(MaximumMessageLength)
-		_ = BigEndianPutUint32(dst, this.maxPacketSize)
+		_ = BigEndianPutUint32(dst, connAckMsg.maxPacketSize)
 	}
-	if len(this.assignedIdentifier) > 0 { // 分配客户标识符
+	if len(connAckMsg.assignedIdentifier) > 0 { // 分配客户标识符
 		dst.WriteByte(AssignCustomerIdentifiers)
-		_, err = writeToBufLPBytes(dst, this.assignedIdentifier)
+		_, err = writeToBufLPBytes(dst, connAckMsg.assignedIdentifier)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	if this.topicAliasMax > 0 { // 主题别名最大值
+	if connAckMsg.topicAliasMax > 0 { // 主题别名最大值
 		dst.WriteByte(MaximumLengthOfTopicAlias)
-		_ = BigEndianPutUint16(dst, this.topicAliasMax)
+		_ = BigEndianPutUint16(dst, connAckMsg.topicAliasMax)
 	}
-	if len(this.reasonStr) > 0 { // 原因字符串
+	if len(connAckMsg.reasonStr) > 0 { // 原因字符串
 		dst.WriteByte(ReasonString)
-		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		_, err = writeToBufLPBytes(dst, connAckMsg.reasonStr)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
 
-	_, err = writeUserPropertyByBuf(dst, this.userProperties) // 用户属性
+	_, err = writeUserPropertyByBuf(dst, connAckMsg.userProperties) // 用户属性
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	if this.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
+	if connAckMsg.wildcardSubscriptionAvailable != 1 { // 通配符订阅可用
 		dst.WriteByte(WildcardSubscriptionAvailability)
-		dst.WriteByte(this.wildcardSubscriptionAvailable)
+		dst.WriteByte(connAckMsg.wildcardSubscriptionAvailable)
 	}
-	if this.subscriptionIdentifierAvailable != 1 { // 订阅标识符可用
+	if connAckMsg.subscriptionIdentifierAvailable != 1 { // 订阅标识符可用
 		dst.WriteByte(AvailabilityOfSubscriptionIdentifiers)
-		dst.WriteByte(this.subscriptionIdentifierAvailable)
+		dst.WriteByte(connAckMsg.subscriptionIdentifierAvailable)
 	}
-	if this.sharedSubscriptionAvailable != 1 { // 共享订阅可用
+	if connAckMsg.sharedSubscriptionAvailable != 1 { // 共享订阅可用
 		dst.WriteByte(SharedSubscriptionAvailability)
-		dst.WriteByte(this.sharedSubscriptionAvailable)
+		dst.WriteByte(connAckMsg.sharedSubscriptionAvailable)
 	}
-	if this.serverKeepAlive > 0 { // 服务端保持连接
+	if connAckMsg.serverKeepAlive > 0 { // 服务端保持连接
 		dst.WriteByte(ServerSurvivalTime)
-		_ = BigEndianPutUint16(dst, this.serverKeepAlive)
+		_ = BigEndianPutUint16(dst, connAckMsg.serverKeepAlive)
 	}
-	if len(this.responseInformation) > 0 { // 响应信息
+	if len(connAckMsg.responseInformation) > 0 { // 响应信息
 		dst.WriteByte(SolicitedMessage)
-		_, err = writeToBufLPBytes(dst, this.responseInformation)
+		_, err = writeToBufLPBytes(dst, connAckMsg.responseInformation)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	if len(this.serverReference) > 0 { // 服务端参考
+	if len(connAckMsg.serverReference) > 0 { // 服务端参考
 		dst.WriteByte(ServerReference)
-		_, err = writeToBufLPBytes(dst, this.serverReference)
+		_, err = writeToBufLPBytes(dst, connAckMsg.serverReference)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	if len(this.authMethod) > 0 { // 认证方法
+	if len(connAckMsg.authMethod) > 0 { // 认证方法
 		dst.WriteByte(AuthenticationMethod)
-		_, err = writeToBufLPBytes(dst, this.authMethod)
+		_, err = writeToBufLPBytes(dst, connAckMsg.authMethod)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	if len(this.authData) > 0 { // 认证数据
+	if len(connAckMsg.authData) > 0 { // 认证数据
 		dst.WriteByte(AuthenticationData)
-		_, err = writeToBufLPBytes(dst, this.authData)
+		_, err = writeToBufLPBytes(dst, connAckMsg.authData)
 		if err != nil {
 			return dst.Len(), err
 		}
@@ -873,7 +874,7 @@ func (this *ConnackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 }
 
 // propertiesLen
-func (this *ConnackMessage) msglen() int {
-	this.build()
-	return int(this.remlen)
+func (connAckMsg *ConnackMessage) msglen() int {
+	connAckMsg.build()
+	return int(connAckMsg.remlen)
 }

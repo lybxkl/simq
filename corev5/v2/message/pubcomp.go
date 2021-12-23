@@ -1,12 +1,15 @@
 package message
 
+var (
+	_ Message             = (*PubcompMessage)(nil)
+	_ CleanReqProblemInfo = (*PubcompMessage)(nil)
+)
+
 // PubcompMessage The PUBCOMP Packet is the response to a PUBREL Packet. It is the fourth and
 // final packet of the QoS 2 protocol exchange.
 type PubcompMessage struct {
 	PubackMessage
 }
-
-var _ Message = (*PubcompMessage)(nil)
 
 // NewPubcompMessage creates a new PUBCOMP message.
 func NewPubcompMessage() *PubcompMessage {
@@ -16,34 +19,34 @@ func NewPubcompMessage() *PubcompMessage {
 	return msg
 }
 
-func (this *PubcompMessage) Decode(src []byte) (int, error) {
+func (pubComp *PubcompMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	n, err := this.header.decode(src[total:])
+	n, err := pubComp.header.decode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
-	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = CopyLen(src[total:total+2], 2)
+	//pubComp.packetId = binary.BigEndian.Uint16(src[total:])
+	pubComp.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
-	if this.header.remlen == 2 {
-		this.reasonCode = Success
+	if pubComp.header.remlen == 2 {
+		pubComp.reasonCode = Success
 		return total, nil
 	}
-	return this.decodeOther(src, total, n)
+	return pubComp.decodeOther(src, total, n)
 }
 
 // 从可变包头中原因码开始处理
-func (this *PubcompMessage) decodeOther(src []byte, total, n int) (int, error) {
+func (pubComp *PubcompMessage) decodeOther(src []byte, total, n int) (int, error) {
 	var err error
-	this.reasonCode = ReasonCode(src[total])
+	pubComp.reasonCode = ReasonCode(src[total])
 	total++
-	if !ValidPubCompReasonCode(this.reasonCode) {
+	if !ValidPubCompReasonCode(pubComp.reasonCode) {
 		return total, ProtocolError
 	}
 	if total < len(src) && len(src[total:]) > 0 {
-		this.propertyLen, n, err = lbDecode(src[total:])
+		pubComp.propertyLen, n, err = lbDecode(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -51,7 +54,7 @@ func (this *PubcompMessage) decodeOther(src []byte, total, n int) (int, error) {
 	}
 	if total < len(src) && src[total] == ReasonString {
 		total++
-		this.reasonStr, n, err = readLPBytes(src[total:])
+		pubComp.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -60,11 +63,11 @@ func (this *PubcompMessage) decodeOther(src []byte, total, n int) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	pubComp.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
 	}
-	this.dirty = false
+	pubComp.dirty = false
 	return total, nil
 }

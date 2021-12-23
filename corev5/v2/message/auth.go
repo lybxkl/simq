@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+var _ Message = (*AuthMessage)(nil)
+
 // AuthMessage v5版本新增
 type AuthMessage struct {
 	header
@@ -22,66 +24,6 @@ type AuthMessage struct {
 	// AUTH 报文没有有效载荷
 }
 
-func (this *AuthMessage) ReasonCode() ReasonCode {
-	return this.reasonCode
-}
-
-func (this *AuthMessage) SetReasonCode(reasonCode ReasonCode) {
-	this.reasonCode = reasonCode
-	this.dirty = true
-}
-
-func (this *AuthMessage) PropertiesLen() uint32 {
-	return this.propertiesLen
-}
-
-func (this *AuthMessage) SetPropertiesLen(propertiesLen uint32) {
-	this.propertiesLen = propertiesLen
-	this.dirty = true
-}
-
-func (this *AuthMessage) AuthMethod() []byte {
-	return this.authMethod
-}
-
-func (this *AuthMessage) SetAuthMethod(authMethod []byte) {
-	this.authMethod = authMethod
-	this.dirty = true
-}
-
-func (this *AuthMessage) AuthData() []byte {
-	return this.authData
-}
-
-func (this *AuthMessage) SetAuthData(authData []byte) {
-	this.authData = authData
-	this.dirty = true
-}
-
-func (this *AuthMessage) ReasonStr() []byte {
-	return this.reasonStr
-}
-
-func (this *AuthMessage) SetReasonStr(reasonStr []byte) {
-	this.reasonStr = reasonStr
-	this.dirty = true
-}
-
-func (this *AuthMessage) UserProperty() [][]byte {
-	return this.userProperty
-}
-
-func (this *AuthMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperty = append(this.userProperty, userProperty...)
-	this.dirty = true
-}
-func (this *AuthMessage) AddUserProperty(userProperty []byte) {
-	this.userProperty = append(this.userProperty, userProperty)
-	this.dirty = true
-}
-
-var _ Message = (*AuthMessage)(nil)
-
 // NewAuthMessage creates a new AUTH message.
 func NewAuthMessage() *AuthMessage {
 	msg := &AuthMessage{}
@@ -90,55 +32,113 @@ func NewAuthMessage() *AuthMessage {
 	return msg
 }
 
-func (this AuthMessage) String() string {
+func (authMsg *AuthMessage) ReasonCode() ReasonCode {
+	return authMsg.reasonCode
+}
+
+func (authMsg *AuthMessage) SetReasonCode(reasonCode ReasonCode) {
+	authMsg.reasonCode = reasonCode
+	authMsg.dirty = true
+}
+
+func (authMsg *AuthMessage) PropertiesLen() uint32 {
+	return authMsg.propertiesLen
+}
+
+func (authMsg *AuthMessage) SetPropertiesLen(propertiesLen uint32) {
+	authMsg.propertiesLen = propertiesLen
+	authMsg.dirty = true
+}
+
+func (authMsg *AuthMessage) AuthMethod() []byte {
+	return authMsg.authMethod
+}
+
+func (authMsg *AuthMessage) SetAuthMethod(authMethod []byte) {
+	authMsg.authMethod = authMethod
+	authMsg.dirty = true
+}
+
+func (authMsg *AuthMessage) AuthData() []byte {
+	return authMsg.authData
+}
+
+func (authMsg *AuthMessage) SetAuthData(authData []byte) {
+	authMsg.authData = authData
+	authMsg.dirty = true
+}
+
+func (authMsg *AuthMessage) ReasonStr() []byte {
+	return authMsg.reasonStr
+}
+
+func (authMsg *AuthMessage) SetReasonStr(reasonStr []byte) {
+	authMsg.reasonStr = reasonStr
+	authMsg.dirty = true
+}
+
+func (authMsg *AuthMessage) UserProperty() [][]byte {
+	return authMsg.userProperty
+}
+
+func (authMsg *AuthMessage) AddUserPropertys(userProperty [][]byte) {
+	authMsg.userProperty = append(authMsg.userProperty, userProperty...)
+	authMsg.dirty = true
+}
+func (authMsg *AuthMessage) AddUserProperty(userProperty []byte) {
+	authMsg.userProperty = append(authMsg.userProperty, userProperty)
+	authMsg.dirty = true
+}
+
+func (authMsg AuthMessage) String() string {
 	return fmt.Sprintf("%s, ReasonCode=%b, PropertiesLen=%d, AuthMethod=%s, AuthData=%q, ReasonStr=%s, UserProperty=%s",
-		this.header,
-		this.ReasonCode(),
-		this.PropertiesLen(),
-		this.AuthMethod(),
-		this.AuthData(),
-		this.ReasonStr(),
-		this.UserProperty(),
+		authMsg.header,
+		authMsg.ReasonCode(),
+		authMsg.PropertiesLen(),
+		authMsg.AuthMethod(),
+		authMsg.AuthData(),
+		authMsg.ReasonStr(),
+		authMsg.UserProperty(),
 	)
 }
 
-func (this *AuthMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+func (authMsg *AuthMessage) Len() int {
+	if !authMsg.dirty {
+		return len(authMsg.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := authMsg.msglen()
 
-	if err := this.SetRemainingLength(ml); err != nil {
+	if err := authMsg.SetRemainingLength(ml); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + int(ml)
+	return authMsg.header.msglen() + int(ml)
 }
 
-func (this *AuthMessage) Decode(src []byte) (int, error) {
+func (authMsg *AuthMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	n, err := this.header.decode(src[total:])
+	n, err := authMsg.header.decode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
-	if int(this.header.remlen) > len(src[total:]) {
+	if int(authMsg.header.remlen) > len(src[total:]) {
 		return total, ProtocolError
 	}
 
-	if this.header.remlen == 0 {
-		this.reasonCode = Success
+	if authMsg.header.remlen == 0 {
+		authMsg.reasonCode = Success
 		return total, nil
 	}
 
-	this.reasonCode = ReasonCode(src[total])
+	authMsg.reasonCode = ReasonCode(src[total])
 	total++
-	if !ValidAuthReasonCode(this.reasonCode) {
+	if !ValidAuthReasonCode(authMsg.reasonCode) {
 		return total, ProtocolError
 	}
-	this.propertiesLen, n, err = lbDecode(src[total:])
+	authMsg.propertiesLen, n, err = lbDecode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
@@ -146,7 +146,7 @@ func (this *AuthMessage) Decode(src []byte) (int, error) {
 
 	if total < len(src) && src[total] == AuthenticationMethod {
 		total++
-		this.authMethod, n, err = readLPBytes(src[total:])
+		authMsg.authMethod, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -157,7 +157,7 @@ func (this *AuthMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == AuthenticationData {
 		total++
-		this.authData, n, err = readLPBytes(src[total:])
+		authMsg.authData, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -168,7 +168,7 @@ func (this *AuthMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == ReasonString {
 		total++
-		this.reasonStr, n, err = readLPBytes(src[total:])
+		authMsg.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -177,175 +177,180 @@ func (this *AuthMessage) Decode(src []byte) (int, error) {
 			return total, ProtocolError
 		}
 	}
-	this.userProperty, n, err = decodeUserProperty(src[total:])
+	authMsg.userProperty, n, err = decodeUserProperty(src[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	this.dirty = false
+	authMsg.dirty = false
 
 	return total, nil
 }
 
-func (this *AuthMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (authMsg *AuthMessage) Encode(dst []byte) (int, error) {
+	if !authMsg.dirty {
+		if len(dst) < len(authMsg.dbuf) {
+			return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", len(authMsg.dbuf), len(dst))
 		}
 
-		return copy(dst, this.dbuf), nil
+		return copy(dst, authMsg.dbuf), nil
 	}
 
-	if this.Type() != AUTH {
-		return 0, fmt.Errorf("auth/Encode: Invalid message type. Expecting %d, got %d", AUTH, this.Type())
+	if authMsg.Type() != AUTH {
+		return 0, fmt.Errorf("auth/Encode: Invalid message type. Expecting %d, got %d", AUTH, authMsg.Type())
 	}
 
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := authMsg.msglen()
+	hl := authMsg.header.msglen()
 
 	ln := hl + int(ml)
 	if len(dst) < ln {
 		return 0, fmt.Errorf("auth/Encode: Insufficient buffer size. Expecting %d, got %d.", ln, len(dst))
 	}
 
-	if err := this.SetRemainingLength(ml); err != nil {
+	if err := authMsg.SetRemainingLength(ml); err != nil {
 		return 0, err
 	}
 
 	total := 0
 
-	n, err := this.header.encode(dst[total:])
+	n, err := authMsg.header.encode(dst[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	if this.reasonCode == Success && len(this.authMethod) == 0 && len(this.authData) == 0 && len(this.reasonStr) == 0 && len(this.userProperty) == 0 {
+	if authMsg.reasonCode == Success && len(authMsg.authMethod) == 0 && len(authMsg.authData) == 0 && len(authMsg.reasonStr) == 0 && len(authMsg.userProperty) == 0 {
 		return total, nil
 	} else {
-		dst[total] = byte(this.reasonCode)
+		dst[total] = byte(authMsg.reasonCode)
 		total++
 	}
-	n = copy(dst[total:], lbEncode(this.propertiesLen))
+	n = copy(dst[total:], lbEncode(authMsg.propertiesLen))
 	total += n
 
-	if len(this.authMethod) > 0 {
+	if len(authMsg.authMethod) > 0 {
 		dst[total] = AuthenticationMethod
 		total++
-		n, err = writeLPBytes(dst[total:], this.authMethod)
+		n, err = writeLPBytes(dst[total:], authMsg.authMethod)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	if len(this.authData) > 0 {
+	if len(authMsg.authData) > 0 {
 		dst[total] = AuthenticationData
 		total++
-		n, err = writeLPBytes(dst[total:], this.authData)
+		n, err = writeLPBytes(dst[total:], authMsg.authData)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	if len(this.reasonStr) > 0 {
+	if len(authMsg.reasonStr) > 0 {
 		dst[total] = ReasonString
 		total++
-		n, err = writeLPBytes(dst[total:], this.reasonStr)
+		n, err = writeLPBytes(dst[total:], authMsg.reasonStr)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	n, err = writeUserProperty(dst[total:], this.userProperty)
+	n, err = writeUserProperty(dst[total:], authMsg.userProperty)
 	total += n
 	return total, err
 }
 
-func (this *AuthMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (authMsg *AuthMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !authMsg.dirty {
+		return dst.Write(authMsg.dbuf)
 	}
 
-	if this.Type() != AUTH {
-		return 0, fmt.Errorf("auth/Encode: Invalid message type. Expecting %d, got %d", AUTH, this.Type())
+	if authMsg.Type() != AUTH {
+		return 0, fmt.Errorf("auth/Encode: Invalid message type. Expecting %d, got %d", AUTH, authMsg.Type())
 	}
 
-	ml := this.msglen()
+	ml := authMsg.msglen()
 
-	if err := this.SetRemainingLength(ml); err != nil {
+	if err := authMsg.SetRemainingLength(ml); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := authMsg.header.encodeToBuf(dst)
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	if this.reasonCode == Success && len(this.authMethod) == 0 && len(this.authData) == 0 && len(this.reasonStr) == 0 && len(this.userProperty) == 0 {
+	if authMsg.reasonCode == Success && len(authMsg.authMethod) == 0 && len(authMsg.authData) == 0 && len(authMsg.reasonStr) == 0 && len(authMsg.userProperty) == 0 {
 		return dst.Len(), nil
 	} else {
-		dst.WriteByte(byte(this.reasonCode))
+		dst.WriteByte(byte(authMsg.reasonCode))
 	}
-	dst.Write(lbEncode(this.propertiesLen))
+	dst.Write(lbEncode(authMsg.propertiesLen))
 
-	if len(this.authMethod) > 0 {
+	if len(authMsg.authMethod) > 0 {
 		dst.WriteByte(AuthenticationMethod)
-		_, err = writeToBufLPBytes(dst, this.authMethod)
+		_, err = writeToBufLPBytes(dst, authMsg.authMethod)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	if len(this.authData) > 0 {
+	if len(authMsg.authData) > 0 {
 		dst.WriteByte(AuthenticationData)
-		_, err = writeToBufLPBytes(dst, this.authData)
+		_, err = writeToBufLPBytes(dst, authMsg.authData)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	if len(this.reasonStr) > 0 {
+	if len(authMsg.reasonStr) > 0 {
 		dst.WriteByte(ReasonString)
-		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		_, err = writeToBufLPBytes(dst, authMsg.reasonStr)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	return writeUserPropertyByBuf(dst, this.userProperty)
+	return writeUserPropertyByBuf(dst, authMsg.userProperty)
 }
 
-func (this *AuthMessage) build() {
+func (authMsg *AuthMessage) build() {
 	// == 可变报头 ==
 	total := 1 // 认证原因码
 	// 属性
-	if len(this.authMethod) > 0 {
+	if len(authMsg.authMethod) > 0 {
 		total++
 		total += 2
-		total += len(this.authMethod)
+		total += len(authMsg.authMethod)
 	}
-	if len(this.authData) > 0 {
+	if len(authMsg.authData) > 0 {
 		total++
 		total += 2
-		total += len(this.authData)
+		total += len(authMsg.authData)
 	}
-	if len(this.reasonStr) > 0 { // todo 超过接收端指定的最大报文长度，不能发送
+	if len(authMsg.reasonStr) > 0 { // todo 超过接收端指定的最大报文长度，不能发送
 		total++
 		total += 2
-		total += len(this.reasonStr)
+		total += len(authMsg.reasonStr)
 	}
-	n := buildUserPropertyLen(this.userProperty)
+	n := buildUserPropertyLen(authMsg.userProperty)
 	total += n
 
-	this.propertiesLen = uint32(total - 1)
+	authMsg.propertiesLen = uint32(total - 1)
 
-	if this.propertiesLen == 0 && this.reasonCode == Success {
-		_ = this.SetRemainingLength(0)
+	if authMsg.propertiesLen == 0 && authMsg.reasonCode == Success {
+		_ = authMsg.SetRemainingLength(0)
 		return
 	}
-	total += len(lbEncode(this.propertiesLen))
-	_ = this.SetRemainingLength(uint32(total))
+	total += len(lbEncode(authMsg.propertiesLen))
+	_ = authMsg.SetRemainingLength(uint32(total))
 }
 
-func (this *AuthMessage) msglen() uint32 {
-	this.build()
-	return this.remlen
+func (authMsg *AuthMessage) msglen() uint32 {
+	authMsg.build()
+	return authMsg.remlen
+}
+
+func (authMsg *AuthMessage) SetUserProperties(userProperty [][]byte) {
+	authMsg.userProperty = userProperty
+	authMsg.dirty = true
 }

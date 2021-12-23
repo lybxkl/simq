@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 )
 
+var _ Message = (*PublishMessage)(nil)
+
 // PublishMessage A PUBLISH Control Packet is sent from a Client to a Server or from Server to a Client
 // to transport an Application Message.
 type PublishMessage struct {
@@ -32,8 +34,6 @@ type PublishMessage struct {
 	payload []byte // 用固定报头中的剩余长度字段的值减去可变报头的长度。包含零长度有效载荷的PUBLISH报文是合法的
 }
 
-var _ Message = (*PublishMessage)(nil)
-
 // NewPublishMessage creates a new PUBLISH message.
 func NewPublishMessage() *PublishMessage {
 	msg := &PublishMessage{}
@@ -41,125 +41,121 @@ func NewPublishMessage() *PublishMessage {
 
 	return msg
 }
-func (m *PublishMessage) Copy() *PublishMessage {
-	p := NewPublishMessage()
-	cp := make([]byte, p.Len())
-	_, _ = m.Encode(cp)
-	_, _ = p.Decode(cp)
-	return p
-}
-func (this PublishMessage) String() string {
+
+func (pub PublishMessage) String() string {
 	return fmt.Sprintf("%s, Topic=%q, QoS=%d, Retained=%t, Dup=%t, Payload=%s, "+
 		"PropertiesLen=%d, Payload Format Indicator=%d, Message Expiry Interval=%d, Topic Alias=%v, Response Topic=%s, "+
 		"Correlation Data=%s, User Property=%s, Subscription Identifier=%v, Content Type=%s",
-		this.header, this.topic, this.QoS(), this.Retain(), this.Dup(), this.payload,
-		this.propertiesLen, this.payloadFormatIndicator, this.messageExpiryInterval, this.topicAlias, this.responseTopic,
-		this.correlationData, this.userProperty, this.subscriptionIdentifier, this.contentType)
-}
-func (this *PublishMessage) PropertiesLen() uint32 {
-	return this.propertiesLen
+		pub.header, pub.topic, pub.QoS(), pub.Retain(), pub.Dup(), pub.payload,
+		pub.propertiesLen, pub.payloadFormatIndicator, pub.messageExpiryInterval, pub.topicAlias, pub.responseTopic,
+		pub.correlationData, pub.userProperty, pub.subscriptionIdentifier, pub.contentType)
 }
 
-func (this *PublishMessage) SetPropertiesLen(propertiesLen uint32) {
-	this.propertiesLen = propertiesLen
-	this.dirty = true
+func (pub *PublishMessage) PropertiesLen() uint32 {
+	return pub.propertiesLen
 }
 
-func (this *PublishMessage) PayloadFormatIndicator() byte {
-	return this.payloadFormatIndicator
+func (pub *PublishMessage) SetPropertiesLen(propertiesLen uint32) {
+	pub.propertiesLen = propertiesLen
+	pub.dirty = true
 }
 
-func (this *PublishMessage) SetPayloadFormatIndicator(payloadFormatIndicator byte) {
-	this.payloadFormatIndicator = payloadFormatIndicator
-	this.dirty = true
+func (pub *PublishMessage) PayloadFormatIndicator() byte {
+	return pub.payloadFormatIndicator
 }
 
-func (this *PublishMessage) MessageExpiryInterval() uint32 {
-	return this.messageExpiryInterval
+func (pub *PublishMessage) SetPayloadFormatIndicator(payloadFormatIndicator byte) {
+	pub.payloadFormatIndicator = payloadFormatIndicator
+	pub.dirty = true
 }
 
-func (this *PublishMessage) SetMessageExpiryInterval(messageExpiryInterval uint32) {
-	this.messageExpiryInterval = messageExpiryInterval
-	this.dirty = true
+func (pub *PublishMessage) MessageExpiryInterval() uint32 {
+	return pub.messageExpiryInterval
 }
 
-func (this *PublishMessage) TopicAlias() uint16 {
-	return this.topicAlias
+func (pub *PublishMessage) SetMessageExpiryInterval(messageExpiryInterval uint32) {
+	pub.messageExpiryInterval = messageExpiryInterval
+	pub.dirty = true
 }
 
-func (this *PublishMessage) SetTopicAlias(topicAlias uint16) {
-	this.topicAlias = topicAlias
-	this.dirty = true
-}
-func (this *PublishMessage) SetNilTopicAndAlias(alias uint16) {
-	this.topicAlias = alias
-	this.topic = nil
-	this.dirty = true
-}
-func (this *PublishMessage) ResponseTopic() []byte {
-	return this.responseTopic
+func (pub *PublishMessage) TopicAlias() uint16 {
+	return pub.topicAlias
 }
 
-func (this *PublishMessage) SetResponseTopic(responseTopic []byte) {
-	this.responseTopic = responseTopic
-	this.dirty = true
+func (pub *PublishMessage) SetTopicAlias(topicAlias uint16) {
+	pub.topicAlias = topicAlias
+	pub.dirty = true
+}
+func (pub *PublishMessage) SetNilTopicAndAlias(alias uint16) {
+	pub.topicAlias = alias
+	pub.topic = nil
+	pub.dirty = true
+}
+func (pub *PublishMessage) ResponseTopic() []byte {
+	return pub.responseTopic
 }
 
-func (this *PublishMessage) CorrelationData() []byte {
-	return this.correlationData
+func (pub *PublishMessage) SetResponseTopic(responseTopic []byte) {
+	pub.responseTopic = responseTopic
+	pub.dirty = true
 }
 
-func (this *PublishMessage) SetCorrelationData(correlationData []byte) {
-	this.correlationData = correlationData
-	this.dirty = true
+func (pub *PublishMessage) CorrelationData() []byte {
+	return pub.correlationData
 }
 
-func (this *PublishMessage) UserProperty() [][]byte {
-	return this.userProperty
+func (pub *PublishMessage) SetCorrelationData(correlationData []byte) {
+	pub.correlationData = correlationData
+	pub.dirty = true
 }
 
-func (this *PublishMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperty = append(this.userProperty, userProperty...)
-	this.dirty = true
-}
-func (this *PublishMessage) AddUserProperty(userProperty []byte) {
-	this.userProperty = append(this.userProperty, userProperty)
-	this.dirty = true
+func (pub *PublishMessage) UserProperty() [][]byte {
+	return pub.userProperty
 }
 
-func (this *PublishMessage) SubscriptionIdentifier() uint32 {
-	return this.subscriptionIdentifier
+func (pub *PublishMessage) AddUserPropertys(userProperty [][]byte) {
+	pub.userProperty = append(pub.userProperty, userProperty...)
+	pub.dirty = true
 }
 
-func (this *PublishMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
-	this.subscriptionIdentifier = subscriptionIdentifier
-	this.dirty = true
+func (pub *PublishMessage) AddUserProperty(userProperty []byte) {
+	pub.userProperty = append(pub.userProperty, userProperty)
+	pub.dirty = true
 }
 
-func (this *PublishMessage) ContentType() []byte {
-	return this.contentType
+func (pub *PublishMessage) SubscriptionIdentifier() uint32 {
+	return pub.subscriptionIdentifier
 }
 
-func (this *PublishMessage) SetContentType(contentType []byte) {
-	this.contentType = contentType
-	this.dirty = true
+func (pub *PublishMessage) SetSubscriptionIdentifier(subscriptionIdentifier uint32) {
+	pub.subscriptionIdentifier = subscriptionIdentifier
+	pub.dirty = true
+}
+
+func (pub *PublishMessage) ContentType() []byte {
+	return pub.contentType
+}
+
+func (pub *PublishMessage) SetContentType(contentType []byte) {
+	pub.contentType = contentType
+	pub.dirty = true
 }
 
 // Dup returns the value specifying the duplicate delivery of a PUBLISH Control Packet.
-// If the DUP flag is set to 0, it indicates that this is the first occasion that the
-// Client or Server has attempted to send this MQTT PUBLISH Packet. If the DUP flag is
-// set to 1, it indicates that this might be re-delivery of an earlier attempt to send
+// If the DUP flag is set to 0, it indicates that pub is the first occasion that the
+// Client or Server has attempted to send pub MQTT PUBLISH Packet. If the DUP flag is
+// set to 1, it indicates that pub might be re-delivery of an earlier attempt to send
 // the Packet.
-func (this *PublishMessage) Dup() bool {
-	return ((this.Flags() >> 3) & 0x1) == 1
+func (pub *PublishMessage) Dup() bool {
+	return ((pub.Flags() >> 3) & 0x1) == 1
 }
 
 // SetDup sets the value specifying the duplicate delivery of a PUBLISH Control Packet.
-func (this *PublishMessage) SetDup(v bool) {
+func (pub *PublishMessage) SetDup(v bool) {
 	if v {
-		this.mtypeflags[0] |= 0x8 // 00001000
+		pub.mtypeflags[0] |= 0x8 // 00001000
 	} else {
-		this.mtypeflags[0] &= 247 // 11110111
+		pub.mtypeflags[0] &= 247 // 11110111
 	}
 }
 
@@ -167,86 +163,86 @@ func (this *PublishMessage) SetDup(v bool) {
 // Packet. If the RETAIN flag is set to 1, in a PUBLISH Packet sent by a Client to a
 // Server, the Server MUST store the Application Message and its QoS, so that it can be
 // delivered to future subscribers whose subscriptions match its topic name.
-func (this *PublishMessage) Retain() bool {
-	return (this.Flags() & 0x1) == 1
+func (pub *PublishMessage) Retain() bool {
+	return (pub.Flags() & 0x1) == 1
 }
 
 // SetRetain sets the value of the RETAIN flag.
-func (this *PublishMessage) SetRetain(v bool) {
+func (pub *PublishMessage) SetRetain(v bool) {
 	if v {
-		this.mtypeflags[0] |= 0x1 // 00000001
+		pub.mtypeflags[0] |= 0x1 // 00000001
 	} else {
-		this.mtypeflags[0] &= 254 // 11111110
+		pub.mtypeflags[0] &= 254 // 11111110
 	}
 }
 
 // QoS returns the field that indicates the level of assurance for delivery of an
 // Application Message. The values are QosAtMostOnce, QosAtLeastOnce and QosExactlyOnce.
-func (this *PublishMessage) QoS() byte {
-	return (this.Flags() >> 1) & 0x3
+func (pub *PublishMessage) QoS() byte {
+	return (pub.Flags() >> 1) & 0x3
 }
 
 // SetQoS sets the field that indicates the level of assurance for delivery of an
 // Application Message. The values are QosAtMostOnce, QosAtLeastOnce and QosExactlyOnce.
 // An error is returned if the value is not one of these.
-func (this *PublishMessage) SetQoS(v byte) error {
+func (pub *PublishMessage) SetQoS(v byte) error {
 	if v != 0x0 && v != 0x1 && v != 0x2 {
 		return fmt.Errorf("publish/SetQoS: Invalid QoS %d.", v)
 	}
 
-	this.mtypeflags[0] = (this.mtypeflags[0] & 249) | (v << 1) // 249 = 11111001
-	this.dirty = true
+	pub.mtypeflags[0] = (pub.mtypeflags[0] & 249) | (v << 1) // 249 = 11111001
+	pub.dirty = true
 	return nil
 }
 
 // Topic returns the the topic name that identifies the information channel to which
 // payload data is published.
-func (this *PublishMessage) Topic() []byte {
-	return this.topic
+func (pub *PublishMessage) Topic() []byte {
+	return pub.topic
 }
 
 // SetTopic sets the the topic name that identifies the information channel to which
 // payload data is published. An error is returned if ValidTopic() is falbase.
-func (this *PublishMessage) SetTopic(v []byte) error {
+func (pub *PublishMessage) SetTopic(v []byte) error {
 	if !ValidTopic(v) {
 		return fmt.Errorf("publish/SetTopic: Invalid topic name (%s). Must not be empty or contain wildcard characters", string(v))
 	}
 
-	this.topic = v
-	this.dirty = true
+	pub.topic = v
+	pub.dirty = true
 
 	return nil
 }
 
 // Payload returns the application message that's part of the PUBLISH message.
-func (this *PublishMessage) Payload() []byte {
-	return this.payload
+func (pub *PublishMessage) Payload() []byte {
+	return pub.payload
 }
 
 // SetPayload sets the application message that's part of the PUBLISH message.
-func (this *PublishMessage) SetPayload(v []byte) {
-	this.payload = v
-	this.dirty = true
+func (pub *PublishMessage) SetPayload(v []byte) {
+	pub.payload = v
+	pub.dirty = true
 }
 
-func (this *PublishMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+func (pub *PublishMessage) Len() int {
+	if !pub.dirty {
+		return len(pub.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := pub.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := pub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return pub.header.msglen() + ml
 }
 
-func (this *PublishMessage) Decode(src []byte) (int, error) {
+func (pub *PublishMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	hn, err := this.header.decode(src[total:])
+	hn, err := pub.header.decode(src[total:])
 	total += hn
 	if err != nil {
 		return total, err
@@ -254,7 +250,7 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 
 	n := 0
 	// === 可变报头 ===
-	this.topic, n, err = readLPBytes(src[total:])
+	pub.topic, n, err = readLPBytes(src[total:])
 	total += n
 	if err != nil {
 		return total, err
@@ -262,10 +258,10 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 
 	// The packet identifier field is only present in the PUBLISH packets where the
 	// QoS level is 1 or 2
-	if this.QoS() != 0 {
-		//this.packetId = binary.BigEndian.Uint16(src[total:])
+	if pub.QoS() != 0 {
+		//pub.packetId = binary.BigEndian.Uint16(src[total:])
 
-		this.packetId = CopyLen(src[total:total+2], 2) //src[total : total+2]
+		pub.packetId = CopyLen(src[total:total+2], 2) //src[total : total+2]
 		total += 2
 	}
 
@@ -274,11 +270,11 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 		return 0, err
 	}
 	total += n
-	this.propertiesLen = propertiesLen
+	pub.propertiesLen = propertiesLen
 
 	if total < len(src) && src[total] == LoadFormatDescription { // 载荷格式
 		total++
-		this.payloadFormatIndicator = src[total]
+		pub.payloadFormatIndicator = src[total]
 		total++
 		if total < len(src) && src[total] == LoadFormatDescription {
 			return 0, ProtocolError
@@ -286,7 +282,7 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == MessageExpirationTime { // 消息过期间隔
 		total++
-		this.messageExpiryInterval = binary.BigEndian.Uint32(src[total:])
+		pub.messageExpiryInterval = binary.BigEndian.Uint32(src[total:])
 		total += 4
 		if total < len(src) && src[total] == MessageExpirationTime {
 			return 0, ProtocolError
@@ -294,96 +290,96 @@ func (this *PublishMessage) Decode(src []byte) (int, error) {
 	}
 	if total < len(src) && src[total] == ThemeAlias { // 主题别名
 		total++
-		this.topicAlias = binary.BigEndian.Uint16(src[total:])
+		pub.topicAlias = binary.BigEndian.Uint16(src[total:])
 		total += 2
-		if this.topicAlias == 0 || (total < len(src) && src[total] == ThemeAlias) {
+		if pub.topicAlias == 0 || (total < len(src) && src[total] == ThemeAlias) {
 			return 0, ProtocolError
 		}
 	}
-	if this.topicAlias == 0 { // 没有主题别名才验证topic
-		if !ValidTopic(this.topic) {
-			return total, fmt.Errorf("publish/Decode: Invalid topic name (%s). Must not be empty or contain wildcard characters", string(this.topic))
+	if pub.topicAlias == 0 { // 没有主题别名才验证topic
+		if !ValidTopic(pub.topic) {
+			return total, fmt.Errorf("publish/Decode: Invalid topic name (%s). Must not be empty or contain wildcard characters", string(pub.topic))
 		}
 	}
 	if total < len(src) && src[total] == ResponseTopic { // 响应主题
 		total++
-		this.responseTopic, n, err = readLPBytes(src[total:])
+		pub.responseTopic, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
-		if len(this.responseTopic) == 0 || (total < len(src) && src[total] == ResponseTopic) {
+		if len(pub.responseTopic) == 0 || (total < len(src) && src[total] == ResponseTopic) {
 			return 0, ProtocolError
 		}
 	}
 	if total < len(src) && src[total] == RelatedData { // 对比数据
 		total++
-		this.correlationData, n, err = readLPBytes(src[total:])
+		pub.correlationData, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
-		if len(this.correlationData) == 0 || (total < len(src) && src[total] == RelatedData) {
+		if len(pub.correlationData) == 0 || (total < len(src) && src[total] == RelatedData) {
 			return 0, ProtocolError
 		}
 	}
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	pub.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
 	}
 	if total < len(src) && src[total] == DefiningIdentifiers { // 订阅标识符
 		total++
-		this.subscriptionIdentifier, n, err = lbDecode(src[total:])
+		pub.subscriptionIdentifier, n, err = lbDecode(src[total:])
 		if err != nil {
 			return 0, ProtocolError
 		}
 		total += n
-		if this.subscriptionIdentifier == 0 || (total < len(src) && src[total] == DefiningIdentifiers) {
+		if pub.subscriptionIdentifier == 0 || (total < len(src) && src[total] == DefiningIdentifiers) {
 			return 0, ProtocolError
 		}
 	}
 	if total < len(src) && src[total] == ContentType { // 内容类型
 		total++
-		this.contentType, n, err = readLPBytes(src[total:])
+		pub.contentType, n, err = readLPBytes(src[total:])
 		if err != nil {
 			return 0, ProtocolError
 		}
 		total += n
-		if len(this.contentType) == 0 || (total < len(src) && src[total] == ContentType) {
+		if len(pub.contentType) == 0 || (total < len(src) && src[total] == ContentType) {
 			return 0, ProtocolError
 		}
 	}
 	// === 载荷 ===
-	l := int(this.remlen) - (total - hn)
-	this.payload = CopyLen(src[total:total+l], l)
-	total += len(this.payload)
+	l := int(pub.remlen) - (total - hn)
+	pub.payload = CopyLen(src[total:total+l], l)
+	total += len(pub.payload)
 
-	this.dirty = false
+	pub.dirty = false
 
 	return total, nil
 }
 
-func (this *PublishMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("publish/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (pub *PublishMessage) Encode(dst []byte) (int, error) {
+	if !pub.dirty {
+		if len(dst) < len(pub.dbuf) {
+			return 0, fmt.Errorf("publish/Encode: Insufficient buffer size. Expecting %d, got %d.", len(pub.dbuf), len(dst))
 		}
 
-		return copy(dst, this.dbuf), nil
+		return copy(dst, pub.dbuf), nil
 	}
-	if len(this.topic) == 0 && this.topicAlias == 0 {
+	if len(pub.topic) == 0 && pub.topicAlias == 0 {
 		return 0, fmt.Errorf("publish/Encode: Topic name is empty, and topic alice <= 0.")
 	}
 
-	if len(this.payload) == 0 {
+	if len(pub.payload) == 0 {
 		return 0, fmt.Errorf("publish/Encode: Payload is empty.")
 	}
 
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := pub.msglen()
+	hl := pub.header.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := pub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
@@ -393,234 +389,235 @@ func (this *PublishMessage) Encode(dst []byte) (int, error) {
 
 	total := 0
 
-	n, err := this.header.encode(dst[total:])
+	n, err := pub.header.encode(dst[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	n, err = writeLPBytes(dst[total:], this.topic)
+	n, err = writeLPBytes(dst[total:], pub.topic)
 	total += n
 	if err != nil {
 		return total, err
 	}
 
 	// The packet identifier field is only present in the PUBLISH packets where the QoS level is 1 or 2
-	if this.QoS() != 0 {
-		if this.PacketId() == 0 {
-			this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
-			//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if pub.QoS() != 0 {
+		if pub.PacketId() == 0 {
+			pub.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+			//pub.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 		}
 
-		n = copy(dst[total:], this.packetId)
-		//binary.BigEndian.PutUint16(dst[total:], this.packetId)
+		n = copy(dst[total:], pub.packetId)
+		//binary.BigEndian.PutUint16(dst[total:], pub.packetId)
 		total += n
 	}
 	// === 属性 ===
-	b := lbEncode(this.propertiesLen)
+	b := lbEncode(pub.propertiesLen)
 	copy(dst[total:], b)
 	total += len(b)
-	if this.payloadFormatIndicator != 0 { // 载荷格式指示
+	if pub.payloadFormatIndicator != 0 { // 载荷格式指示
 		dst[total] = LoadFormatDescription
 		total++
-		dst[total] = this.payloadFormatIndicator
+		dst[total] = pub.payloadFormatIndicator
 		total++
 	}
-	if this.messageExpiryInterval > 0 { // 消息过期间隔
+	if pub.messageExpiryInterval > 0 { // 消息过期间隔
 		dst[total] = MessageExpirationTime
 		total++
-		binary.BigEndian.PutUint32(dst[total:], this.messageExpiryInterval)
+		binary.BigEndian.PutUint32(dst[total:], pub.messageExpiryInterval)
 		total += 4
 	}
-	if this.topicAlias > 0 { // 主题别名
+	if pub.topicAlias > 0 { // 主题别名
 		dst[total] = ThemeAlias
 		total++
-		binary.BigEndian.PutUint16(dst[total:], this.topicAlias)
+		binary.BigEndian.PutUint16(dst[total:], pub.topicAlias)
 		total += 2
 	}
-	if len(this.responseTopic) > 0 { // 响应主题
+	if len(pub.responseTopic) > 0 { // 响应主题
 		dst[total] = ResponseTopic
 		total++
-		n, err = writeLPBytes(dst[total:], this.responseTopic)
+		n, err = writeLPBytes(dst[total:], pub.responseTopic)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	if len(this.correlationData) > 0 { // 对比数据
+	if len(pub.correlationData) > 0 { // 对比数据
 		dst[total] = RelatedData
 		total++
-		n, err = writeLPBytes(dst[total:], this.correlationData)
+		n, err = writeLPBytes(dst[total:], pub.correlationData)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
 
-	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	n, err = writeUserProperty(dst[total:], pub.userProperty) // 用户属性
 	total += n
 
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier < 168435455 { // 订阅标识符
+	if pub.subscriptionIdentifier > 0 && pub.subscriptionIdentifier < 168435455 { // 订阅标识符
 		dst[total] = DefiningIdentifiers
 		total++
-		b1 := lbEncode(this.subscriptionIdentifier)
+		b1 := lbEncode(pub.subscriptionIdentifier)
 		copy(dst[total:], b1)
 		total += len(b1)
 	}
-	if len(this.contentType) > 0 { // 内容类型
+	if len(pub.contentType) > 0 { // 内容类型
 		dst[total] = ContentType
 		total++
-		n, err = writeLPBytes(dst[total:], this.contentType)
+		n, err = writeLPBytes(dst[total:], pub.contentType)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
 
-	copy(dst[total:], this.payload)
-	total += len(this.payload)
+	copy(dst[total:], pub.payload)
+	total += len(pub.payload)
 
 	return total, nil
 }
 
-func (this *PublishMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (pub *PublishMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !pub.dirty {
+		return dst.Write(pub.dbuf)
 	}
 
-	if len(this.topic) == 0 && this.topicAlias == 0 {
+	if len(pub.topic) == 0 && pub.topicAlias == 0 {
 		return 0, fmt.Errorf("publish/Encode: Topic name is empty, and topic alice <= 0.")
 	}
 
-	if len(this.payload) == 0 {
+	if len(pub.payload) == 0 {
 		return 0, fmt.Errorf("publish/Encode: Payload is empty.")
 	}
 
-	ml := this.msglen()
+	ml := pub.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := pub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := pub.header.encodeToBuf(dst)
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	_, err = writeToBufLPBytes(dst, this.topic)
+	_, err = writeToBufLPBytes(dst, pub.topic)
 	if err != nil {
 		return dst.Len(), err
 	}
 
 	// The packet identifier field is only present in the PUBLISH packets where the QoS level is 1 or 2
-	if this.QoS() != 0 {
-		if this.PacketId() == 0 {
-			this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
-			//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if pub.QoS() != 0 {
+		if pub.PacketId() == 0 {
+			pub.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+			//pub.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 		}
 
-		dst.Write(this.packetId)
+		dst.Write(pub.packetId)
 	}
 	// === 属性 ===
-	dst.Write(lbEncode(this.propertiesLen))
+	dst.Write(lbEncode(pub.propertiesLen))
 
-	if this.payloadFormatIndicator != 0 { // 载荷格式指示
+	if pub.payloadFormatIndicator != 0 { // 载荷格式指示
 		dst.WriteByte(LoadFormatDescription)
-		dst.WriteByte(this.payloadFormatIndicator)
+		dst.WriteByte(pub.payloadFormatIndicator)
 	}
-	if this.messageExpiryInterval > 0 { // 消息过期间隔
+	if pub.messageExpiryInterval > 0 { // 消息过期间隔
 		dst.WriteByte(MessageExpirationTime)
-		_ = BigEndianPutUint32(dst, this.messageExpiryInterval)
+		_ = BigEndianPutUint32(dst, pub.messageExpiryInterval)
 	}
-	if this.topicAlias > 0 { // 主题别名
+	if pub.topicAlias > 0 { // 主题别名
 		dst.WriteByte(ThemeAlias)
-		_ = BigEndianPutUint16(dst, this.topicAlias)
+		_ = BigEndianPutUint16(dst, pub.topicAlias)
 	}
-	if len(this.responseTopic) > 0 { // 响应主题
+	if len(pub.responseTopic) > 0 { // 响应主题
 		dst.WriteByte(ResponseTopic)
-		_, err = writeToBufLPBytes(dst, this.responseTopic)
+		_, err = writeToBufLPBytes(dst, pub.responseTopic)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
-	if len(this.correlationData) > 0 { // 对比数据
+	if len(pub.correlationData) > 0 { // 对比数据
 		dst.WriteByte(RelatedData)
-		_, err = writeToBufLPBytes(dst, this.correlationData)
+		_, err = writeToBufLPBytes(dst, pub.correlationData)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
 
-	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	_, err = writeUserPropertyByBuf(dst, pub.userProperty) // 用户属性
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier < 168435455 { // 订阅标识符
+	if pub.subscriptionIdentifier > 0 && pub.subscriptionIdentifier < 168435455 { // 订阅标识符
 		dst.WriteByte(DefiningIdentifiers)
-		dst.Write(lbEncode(this.subscriptionIdentifier))
+		dst.Write(lbEncode(pub.subscriptionIdentifier))
 	}
-	if len(this.contentType) > 0 { // 内容类型
+	if len(pub.contentType) > 0 { // 内容类型
 		dst.WriteByte(ContentType)
-		_, err = writeToBufLPBytes(dst, this.contentType)
+		_, err = writeToBufLPBytes(dst, pub.contentType)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
 
-	dst.Write(this.payload)
+	dst.Write(pub.payload)
 	return dst.Len(), nil
 }
 
-func (this *PublishMessage) build() {
+func (pub *PublishMessage) build() {
 	total := 0
 
 	total += 2 // 主题
-	total += len(this.topic)
-	if this.QoS() != 0 {
+	total += len(pub.topic)
+	if pub.QoS() != 0 {
 		total += 2
 	}
 	tag := total
-	if this.payloadFormatIndicator != 0 { // 载荷格式指示
+	if pub.payloadFormatIndicator != 0 { // 载荷格式指示
 		total += 2
 	}
-	if this.messageExpiryInterval > 0 { // 消息过期间隔
+	if pub.messageExpiryInterval > 0 { // 消息过期间隔
 		total += 5
 	}
-	if this.topicAlias > 0 { // 主题别名
+	if pub.topicAlias > 0 { // 主题别名
 		total += 3
 	}
-	if len(this.responseTopic) > 0 { // 响应主题
+	if len(pub.responseTopic) > 0 { // 响应主题
 		total++
 		total += 2
-		total += len(this.responseTopic)
+		total += len(pub.responseTopic)
 	}
-	if len(this.correlationData) > 0 { // 对比数据
+	if len(pub.correlationData) > 0 { // 对比数据
 		total++
 		total += 2
-		total += len(this.correlationData)
+		total += len(pub.correlationData)
 	}
 
-	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	n := buildUserPropertyLen(pub.userProperty) // 用户属性
 	total += n
 
-	if this.subscriptionIdentifier > 0 && this.subscriptionIdentifier < 168435455 { // 订阅标识符
+	if pub.subscriptionIdentifier > 0 && pub.subscriptionIdentifier < 168435455 { // 订阅标识符
 		total++
-		b1 := lbEncode(this.subscriptionIdentifier)
+		b1 := lbEncode(pub.subscriptionIdentifier)
 		total += len(b1)
 	}
-	if len(this.contentType) > 0 { // 内容类型
+	if len(pub.contentType) > 0 { // 内容类型
 		total++
 		total += 2
-		total += len(this.contentType)
+		total += len(pub.contentType)
 	}
 	propertiesLen := uint32(total - tag) // 可变的属性长度
-	this.propertiesLen = propertiesLen
+	pub.propertiesLen = propertiesLen
 	total += len(lbEncode(propertiesLen))
-	total += len(this.payload)
-	_ = this.SetRemainingLength(uint32(total))
+	total += len(pub.payload)
+	_ = pub.SetRemainingLength(uint32(total))
 }
-func (this *PublishMessage) msglen() int {
-	this.build()
-	return int(this.remlen)
+
+func (pub *PublishMessage) msglen() int {
+	pub.build()
+	return int(pub.remlen)
 }

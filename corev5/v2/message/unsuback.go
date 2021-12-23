@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
+var (
+	_ Message             = (*UnsubackMessage)(nil)
+	_ CleanReqProblemInfo = (*UnsubackMessage)(nil)
+)
+
 // UnsubackMessage The UNSUBACK Packet is sent by the Server to the Client to confirm receipt of an
 // UNSUBSCRIBE Packet.
 type UnsubackMessage struct {
@@ -16,52 +21,6 @@ type UnsubackMessage struct {
 	reasonCodes  []byte
 }
 
-func (u *UnsubackMessage) PropertyLen() uint32 {
-	return u.propertyLen
-}
-
-func (u *UnsubackMessage) SetPropertyLen(propertyLen uint32) {
-	u.propertyLen = propertyLen
-	u.dirty = true
-}
-
-func (u *UnsubackMessage) ReasonStr() []byte {
-	return u.reasonStr
-}
-
-func (u *UnsubackMessage) SetReasonStr(reasonStr []byte) {
-	u.reasonStr = reasonStr
-	u.dirty = true
-}
-
-func (u *UnsubackMessage) UserProperty() [][]byte {
-	return u.userProperty
-}
-
-func (this *UnsubackMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperty = append(this.userProperty, userProperty...)
-	this.dirty = true
-}
-func (this *UnsubackMessage) AddUserProperty(userProperty []byte) {
-	this.userProperty = append(this.userProperty, userProperty)
-	this.dirty = true
-}
-
-func (u *UnsubackMessage) ReasonCodes() []byte {
-	return u.reasonCodes
-}
-
-func (u *UnsubackMessage) AddReasonCodes(reasonCodes []byte) {
-	u.reasonCodes = append(u.reasonCodes, reasonCodes...)
-	u.dirty = true
-}
-func (u *UnsubackMessage) AddReasonCode(reasonCode byte) {
-	u.reasonCodes = append(u.reasonCodes, reasonCode)
-	u.dirty = true
-}
-
-var _ Message = (*UnsubackMessage)(nil)
-
 // NewUnsubackMessage creates a new UNSUBACK message.
 func NewUnsubackMessage() *UnsubackMessage {
 	msg := &UnsubackMessage{}
@@ -69,25 +28,77 @@ func NewUnsubackMessage() *UnsubackMessage {
 
 	return msg
 }
-func (this UnsubackMessage) String() string {
+func (unSubAck *UnsubackMessage) PropertyLen() uint32 {
+	return unSubAck.propertyLen
+}
+
+func (unSubAck *UnsubackMessage) SetPropertyLen(propertyLen uint32) {
+	unSubAck.propertyLen = propertyLen
+	unSubAck.dirty = true
+}
+
+func (unSubAck *UnsubackMessage) ReasonStr() []byte {
+	return unSubAck.reasonStr
+}
+
+func (unSubAck *UnsubackMessage) SetReasonStr(reasonStr []byte) {
+	unSubAck.reasonStr = reasonStr
+	unSubAck.dirty = true
+}
+
+func (unSubAck *UnsubackMessage) UserProperty() [][]byte {
+	return unSubAck.userProperty
+}
+
+func (unSubAck *UnsubackMessage) SetUserProperties(userProperty [][]byte) {
+	unSubAck.userProperty = userProperty
+	unSubAck.dirty = true
+}
+
+func (unSubAck *UnsubackMessage) AddUserPropertys(userProperty [][]byte) {
+	unSubAck.userProperty = append(unSubAck.userProperty, userProperty...)
+	unSubAck.dirty = true
+}
+
+func (unSubAck *UnsubackMessage) AddUserProperty(userProperty []byte) {
+	unSubAck.userProperty = append(unSubAck.userProperty, userProperty)
+	unSubAck.dirty = true
+}
+
+func (unSubAck *UnsubackMessage) ReasonCodes() []byte {
+	return unSubAck.reasonCodes
+}
+
+func (unSubAck *UnsubackMessage) AddReasonCodes(reasonCodes []byte) {
+	unSubAck.reasonCodes = append(unSubAck.reasonCodes, reasonCodes...)
+	unSubAck.dirty = true
+}
+
+func (unSubAck *UnsubackMessage) AddReasonCode(reasonCode byte) {
+	unSubAck.reasonCodes = append(unSubAck.reasonCodes, reasonCode)
+	unSubAck.dirty = true
+}
+
+func (unSubAck UnsubackMessage) String() string {
 	return fmt.Sprintf("%s, Packet ID=%d, PropertyLen=%v, "+
 		"Reason String=%s, User Property=%s, Reason Code=%v",
-		this.header, this.packetId, this.propertyLen, this.reasonStr, this.userProperty, this.reasonCodes)
+		unSubAck.header, unSubAck.packetId, unSubAck.propertyLen, unSubAck.reasonStr, unSubAck.userProperty, unSubAck.reasonCodes)
 }
-func (this *UnsubackMessage) Decode(src []byte) (int, error) {
+
+func (unSubAck *UnsubackMessage) Decode(src []byte) (int, error) {
 	total, n := 0, 0
 
-	hn, err := this.header.decode(src[total:])
+	hn, err := unSubAck.header.decode(src[total:])
 	total += hn
 	n = hn
 	if err != nil {
 		return total, err
 	}
-	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = CopyLen(src[total:total+2], 2)
+	//unSubAck.packetId = binary.BigEndian.Uint16(src[total:])
+	unSubAck.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
 
-	this.propertyLen, n, err = lbDecode(src[total:])
+	unSubAck.propertyLen, n, err = lbDecode(src[total:])
 	total += n
 	if err != nil {
 		return total, err
@@ -95,7 +106,7 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 
 	if total < len(src) && src[total] == ReasonString {
 		total++
-		this.reasonStr, n, err = readLPBytes(src[total:])
+		unSubAck.reasonStr, n, err = readLPBytes(src[total:])
 		total += n
 		if err != nil {
 			return total, err
@@ -105,162 +116,162 @@ func (this *UnsubackMessage) Decode(src []byte) (int, error) {
 		}
 	}
 
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	unSubAck.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	l := int(this.remlen) - (total - hn)
+	l := int(unSubAck.remlen) - (total - hn)
 	if l == 0 {
 		return total, ProtocolError
 	}
-	this.reasonCodes = CopyLen(src[total:total+l], l)
-	total += len(this.reasonCodes)
+	unSubAck.reasonCodes = CopyLen(src[total:total+l], l)
+	total += len(unSubAck.reasonCodes)
 
-	for _, code := range this.reasonCodes {
+	for _, code := range unSubAck.reasonCodes {
 		if !ValidUnSubAckReasonCode(ReasonCode(code)) {
 			return total, ProtocolError // fmt.Errorf("unsuback/Decode: Invalid return code %d for topic %d", code, i)
 		}
 	}
 
-	this.dirty = false
+	unSubAck.dirty = false
 	return total, nil
 }
 
-func (this *UnsubackMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("unsuback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (unSubAck *UnsubackMessage) Encode(dst []byte) (int, error) {
+	if !unSubAck.dirty {
+		if len(dst) < len(unSubAck.dbuf) {
+			return 0, fmt.Errorf("unsuback/Encode: Insufficient buffer size. Expecting %d, got %d.", len(unSubAck.dbuf), len(dst))
 		}
-		return copy(dst, this.dbuf), nil
+		return copy(dst, unSubAck.dbuf), nil
 	}
 
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := unSubAck.msglen()
+	hl := unSubAck.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("unsuback/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := unSubAck.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
 	total := 0
 
-	n, err := this.header.encode(dst[total:])
+	n, err := unSubAck.header.encode(dst[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
 
 	// 可变报头
-	if copy(dst[total:total+2], this.packetId) != 2 {
+	if copy(dst[total:total+2], unSubAck.packetId) != 2 {
 		dst[total], dst[total+1] = 0, 0
 	}
 	total += 2
 
-	b := lbEncode(this.propertyLen)
+	b := lbEncode(unSubAck.propertyLen)
 	copy(dst[total:], b)
 	total += len(b)
 
 	// TODO 下面两个在PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此原因字符串
-	if len(this.reasonStr) > 0 {
+	if len(unSubAck.reasonStr) > 0 {
 		dst[total] = ReasonString
 		total++
-		n, err = writeLPBytes(dst[total:], this.reasonStr)
+		n, err = writeLPBytes(dst[total:], unSubAck.reasonStr)
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
 
-	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	n, err = writeUserProperty(dst[total:], unSubAck.userProperty) // 用户属性
 	total += n
 
-	copy(dst[total:], this.reasonCodes)
-	total += len(this.reasonCodes)
+	copy(dst[total:], unSubAck.reasonCodes)
+	total += len(unSubAck.reasonCodes)
 
 	return total, nil
 }
 
-func (this *UnsubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (unSubAck *UnsubackMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !unSubAck.dirty {
+		return dst.Write(unSubAck.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := unSubAck.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := unSubAck.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := unSubAck.header.encodeToBuf(dst)
 	if err != nil {
 		return dst.Len(), err
 	}
 
 	// 可变报头
-	if len(this.packetId) != 2 {
+	if len(unSubAck.packetId) != 2 {
 		dst.Write([]byte{0, 0})
 	} else {
-		dst.Write(this.packetId)
+		dst.Write(unSubAck.packetId)
 	}
 
-	dst.Write(lbEncode(this.propertyLen))
+	dst.Write(lbEncode(unSubAck.propertyLen))
 
 	// TODO 下面两个在PUBACK报文长度超出了接收端指定的最大报文长度（Maximum Packet Size），则发送端不能发送此原因字符串
-	if len(this.reasonStr) > 0 {
+	if len(unSubAck.reasonStr) > 0 {
 		dst.WriteByte(ReasonString)
-		_, err = writeToBufLPBytes(dst, this.reasonStr)
+		_, err = writeToBufLPBytes(dst, unSubAck.reasonStr)
 		if err != nil {
 			return dst.Len(), err
 		}
 	}
 
-	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	_, err = writeUserPropertyByBuf(dst, unSubAck.userProperty) // 用户属性
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	dst.Write(this.reasonCodes)
+	dst.Write(unSubAck.reasonCodes)
 	return dst.Len(), nil
 }
 
-func (this *UnsubackMessage) build() {
+func (unSubAck *UnsubackMessage) build() {
 	// packet ID
 	total := 2
 
-	if len(this.reasonStr) != 0 {
+	if len(unSubAck.reasonStr) != 0 {
 		total++
 		total += 2
-		total += len(this.reasonStr)
+		total += len(unSubAck.reasonStr)
 	}
 
-	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	n := buildUserPropertyLen(unSubAck.userProperty) // 用户属性
 	total += n
 
-	this.propertyLen = uint32(total - 2)
-	total += len(lbEncode(this.propertyLen))
-	total += len(this.reasonCodes)
-	_ = this.SetRemainingLength(uint32(total))
+	unSubAck.propertyLen = uint32(total - 2)
+	total += len(lbEncode(unSubAck.propertyLen))
+	total += len(unSubAck.reasonCodes)
+	_ = unSubAck.SetRemainingLength(uint32(total))
 }
-func (this *UnsubackMessage) msglen() int {
-	this.build()
-	return int(this.remlen)
+func (unSubAck *UnsubackMessage) msglen() int {
+	unSubAck.build()
+	return int(unSubAck.remlen)
 }
 
-func (this *UnsubackMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+func (unSubAck *UnsubackMessage) Len() int {
+	if !unSubAck.dirty {
+		return len(unSubAck.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := unSubAck.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := unSubAck.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return unSubAck.header.msglen() + ml
 }

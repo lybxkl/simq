@@ -6,6 +6,11 @@ import (
 	"sync/atomic"
 )
 
+var (
+	_ Message             = (*UnsubscribeMessage)(nil)
+	_ CleanReqProblemInfo = (*UnsubscribeMessage)(nil)
+)
+
 // An UNSUBSCRIBE Packet is sent by the Client to the Server, to unsubscribe from topics.
 type UnsubscribeMessage struct {
 	header
@@ -17,30 +22,6 @@ type UnsubscribeMessage struct {
 	topics [][]byte
 }
 
-func (this *UnsubscribeMessage) PropertyLen() uint32 {
-	return this.propertyLen
-}
-
-func (this *UnsubscribeMessage) SetPropertyLen(propertyLen uint32) {
-	this.propertyLen = propertyLen
-	this.dirty = true
-}
-
-func (this *UnsubscribeMessage) UserProperty() [][]byte {
-	return this.userProperty
-}
-
-func (this *UnsubscribeMessage) AddUserPropertys(userProperty [][]byte) {
-	this.userProperty = append(this.userProperty, userProperty...)
-	this.dirty = true
-}
-func (this *UnsubscribeMessage) AddUserProperty(userProperty []byte) {
-	this.userProperty = append(this.userProperty, userProperty)
-	this.dirty = true
-}
-
-var _ Message = (*UnsubscribeMessage)(nil)
-
 // NewUnsubscribeMessage creates a new UNSUBSCRIBE message.
 func NewUnsubscribeMessage() *UnsubscribeMessage {
 	msg := &UnsubscribeMessage{}
@@ -49,11 +30,43 @@ func NewUnsubscribeMessage() *UnsubscribeMessage {
 	return msg
 }
 
-func (this UnsubscribeMessage) String() string {
-	msgstr := fmt.Sprintf("%s", this.header)
-	msgstr = fmt.Sprintf("%s, PropertiesLen=%v,  User Properties=%v", msgstr, this.propertyLen, this.UserProperty())
+func (unSub *UnsubscribeMessage) PropertyLen() uint32 {
+	return unSub.propertyLen
+}
 
-	for i, t := range this.topics {
+func (unSub *UnsubscribeMessage) SetPropertyLen(propertyLen uint32) {
+	unSub.propertyLen = propertyLen
+	unSub.dirty = true
+}
+
+func (unSub *UnsubscribeMessage) UserProperty() [][]byte {
+	return unSub.userProperty
+}
+
+func (unSub *UnsubscribeMessage) AddUserPropertys(userProperty [][]byte) {
+	unSub.userProperty = append(unSub.userProperty, userProperty...)
+	unSub.dirty = true
+}
+
+func (unSub *UnsubscribeMessage) AddUserProperty(userProperty []byte) {
+	unSub.userProperty = append(unSub.userProperty, userProperty)
+	unSub.dirty = true
+}
+
+func (unSub *UnsubscribeMessage) SetUserProperties(userProperty [][]byte) {
+	unSub.userProperty = userProperty
+	unSub.dirty = true
+}
+
+func (unSub *UnsubscribeMessage) SetReasonStr(reasonStr []byte) {
+
+}
+
+func (unSub UnsubscribeMessage) String() string {
+	msgstr := fmt.Sprintf("%s", unSub.header)
+	msgstr = fmt.Sprintf("%s, PropertiesLen=%v,  User Properties=%v", msgstr, unSub.propertyLen, unSub.UserProperty())
+
+	for i, t := range unSub.topics {
 		msgstr = fmt.Sprintf("%s, Topic%d=%s", msgstr, i, string(t))
 	}
 
@@ -61,28 +74,28 @@ func (this UnsubscribeMessage) String() string {
 }
 
 // Topics returns a list of topics sent by the Client.
-func (this *UnsubscribeMessage) Topics() [][]byte {
-	return this.topics
+func (unSub *UnsubscribeMessage) Topics() [][]byte {
+	return unSub.topics
 }
 
 // AddTopic adds a single topic to the message.
-func (this *UnsubscribeMessage) AddTopic(topic []byte) {
-	if this.TopicExists(topic) {
+func (unSub *UnsubscribeMessage) AddTopic(topic []byte) {
+	if unSub.TopicExists(topic) {
 		return
 	}
 
-	this.topics = append(this.topics, topic)
-	this.dirty = true
+	unSub.topics = append(unSub.topics, topic)
+	unSub.dirty = true
 }
 
 // RemoveTopic removes a single topic from the list of existing ones in the message.
 // If topic does not exist it just does nothing.
-func (this *UnsubscribeMessage) RemoveTopic(topic []byte) {
+func (unSub *UnsubscribeMessage) RemoveTopic(topic []byte) {
 	var i int
 	var t []byte
 	var found bool
 
-	for i, t = range this.topics {
+	for i, t = range unSub.topics {
 		if bytes.Equal(t, topic) {
 			found = true
 			break
@@ -90,15 +103,15 @@ func (this *UnsubscribeMessage) RemoveTopic(topic []byte) {
 	}
 
 	if found {
-		this.topics = append(this.topics[:i], this.topics[i+1:]...)
+		unSub.topics = append(unSub.topics[:i], unSub.topics[i+1:]...)
 	}
 
-	this.dirty = true
+	unSub.dirty = true
 }
 
 // TopicExists checks to see if a topic exists in the list.
-func (this *UnsubscribeMessage) TopicExists(topic []byte) bool {
-	for _, t := range this.topics {
+func (unSub *UnsubscribeMessage) TopicExists(topic []byte) bool {
+	for _, t := range unSub.topics {
 		if bytes.Equal(t, topic) {
 			return true
 		}
@@ -107,49 +120,49 @@ func (this *UnsubscribeMessage) TopicExists(topic []byte) bool {
 	return false
 }
 
-func (this *UnsubscribeMessage) Len() int {
-	if !this.dirty {
-		return len(this.dbuf)
+func (unSub *UnsubscribeMessage) Len() int {
+	if !unSub.dirty {
+		return len(unSub.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := unSub.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := unSub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0
 	}
 
-	return this.header.msglen() + ml
+	return unSub.header.msglen() + ml
 }
 
 // Decode reads from the io.Reader parameter until a full message is decoded, or
 // when io.Reader returns EOF or error. The first return value is the number of
 // bytes read from io.Reader. The second is error if Decode encounters any problems.
-func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
+func (unSub *UnsubscribeMessage) Decode(src []byte) (int, error) {
 	total := 0
 
-	hn, err := this.header.decode(src[total:])
+	hn, err := unSub.header.decode(src[total:])
 	total += hn
 	if err != nil {
 		return total, err
 	}
 
-	//this.packetId = binary.BigEndian.Uint16(src[total:])
-	this.packetId = CopyLen(src[total:total+2], 2)
+	//unSub.packetId = binary.BigEndian.Uint16(src[total:])
+	unSub.packetId = CopyLen(src[total:total+2], 2)
 	total += 2
 	var n int
 	if total < len(src) && len(src[total:]) >= 4 {
-		this.propertyLen, n, err = lbDecode(src[total:])
+		unSub.propertyLen, n, err = lbDecode(src[total:])
 		total += n
 		if err != nil {
 			return total, err
 		}
 	}
-	this.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
+	unSub.userProperty, n, err = decodeUserProperty(src[total:]) // 用户属性
 	total += n
 	if err != nil {
 		return total, err
 	}
-	remlen := int(this.remlen) - (total - hn)
+	remlen := int(unSub.remlen) - (total - hn)
 	var t []byte
 	for remlen > 0 {
 		t, n, err = readLPBytes(src[total:])
@@ -158,15 +171,15 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 			return total, err
 		}
 
-		this.topics = append(this.topics, t)
+		unSub.topics = append(unSub.topics, t)
 		remlen = remlen - n - 1
 	}
 
-	if len(this.topics) == 0 {
+	if len(unSub.topics) == 0 {
 		return 0, ProtocolError // fmt.Errorf("unsubscribe/Decode: Empty topic list")
 	}
 
-	this.dirty = false
+	unSub.dirty = false
 
 	return total, nil
 }
@@ -176,51 +189,51 @@ func (this *UnsubscribeMessage) Decode(src []byte) (int, error) {
 // there will be. If Encode returns an error, then the first two return values
 // should be considered invalid.
 // Any changes to the message after Encode() is called will invalidate the io.Reader.
-func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
-	if !this.dirty {
-		if len(dst) < len(this.dbuf) {
-			return 0, fmt.Errorf("unsubscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(this.dbuf), len(dst))
+func (unSub *UnsubscribeMessage) Encode(dst []byte) (int, error) {
+	if !unSub.dirty {
+		if len(dst) < len(unSub.dbuf) {
+			return 0, fmt.Errorf("unsubscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", len(unSub.dbuf), len(dst))
 		}
 
-		return copy(dst, this.dbuf), nil
+		return copy(dst, unSub.dbuf), nil
 	}
 
-	ml := this.msglen()
-	hl := this.header.msglen()
+	ml := unSub.msglen()
+	hl := unSub.header.msglen()
 
 	if len(dst) < hl+ml {
 		return 0, fmt.Errorf("unsubscribe/Encode: Insufficient buffer size. Expecting %d, got %d.", hl+ml, len(dst))
 	}
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := unSub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
 	total := 0
 
-	n, err := this.header.encode(dst[total:])
+	n, err := unSub.header.encode(dst[total:])
 	total += n
 	if err != nil {
 		return total, err
 	}
 
-	if this.PacketId() == 0 {
-		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
-		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if unSub.PacketId() == 0 {
+		unSub.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//unSub.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 	}
 
-	n = copy(dst[total:], this.packetId)
-	//binary.BigEndian.PutUint16(dst[total:], this.packetId)
+	n = copy(dst[total:], unSub.packetId)
+	//binary.BigEndian.PutUint16(dst[total:], unSub.packetId)
 	total += n
 
-	b := lbEncode(this.propertyLen)
+	b := lbEncode(unSub.propertyLen)
 	copy(dst[total:], b)
 	total += len(b)
 
-	n, err = writeUserProperty(dst[total:], this.userProperty) // 用户属性
+	n, err = writeUserProperty(dst[total:], unSub.userProperty) // 用户属性
 	total += n
 
-	for _, t := range this.topics {
+	for _, t := range unSub.topics {
 		n, err = writeLPBytes(dst[total:], t)
 		total += n
 		if err != nil {
@@ -231,37 +244,37 @@ func (this *UnsubscribeMessage) Encode(dst []byte) (int, error) {
 	return total, nil
 }
 
-func (this *UnsubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
-	if !this.dirty {
-		return dst.Write(this.dbuf)
+func (unSub *UnsubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
+	if !unSub.dirty {
+		return dst.Write(unSub.dbuf)
 	}
 
-	ml := this.msglen()
+	ml := unSub.msglen()
 
-	if err := this.SetRemainingLength(uint32(ml)); err != nil {
+	if err := unSub.SetRemainingLength(uint32(ml)); err != nil {
 		return 0, err
 	}
 
-	_, err := this.header.encodeToBuf(dst)
+	_, err := unSub.header.encodeToBuf(dst)
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	if this.PacketId() == 0 {
-		this.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
-		//this.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
+	if unSub.PacketId() == 0 {
+		unSub.SetPacketId(uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff))
+		//unSub.packetId = uint16(atomic.AddUint64(&gPacketId, 1) & 0xffff)
 	}
 
-	dst.Write(this.packetId)
+	dst.Write(unSub.packetId)
 
-	dst.Write(lbEncode(this.propertyLen))
+	dst.Write(lbEncode(unSub.propertyLen))
 
-	_, err = writeUserPropertyByBuf(dst, this.userProperty) // 用户属性
+	_, err = writeUserPropertyByBuf(dst, unSub.userProperty) // 用户属性
 	if err != nil {
 		return dst.Len(), err
 	}
 
-	for _, t := range this.topics {
+	for _, t := range unSub.topics {
 		_, err = writeToBufLPBytes(dst, t)
 		if err != nil {
 			return dst.Len(), err
@@ -271,22 +284,22 @@ func (this *UnsubscribeMessage) EncodeToBuf(dst *bytes.Buffer) (int, error) {
 	return dst.Len(), nil
 }
 
-func (this *UnsubscribeMessage) build() {
+func (unSub *UnsubscribeMessage) build() {
 	total := 0
 
-	n := buildUserPropertyLen(this.userProperty) // 用户属性
+	n := buildUserPropertyLen(unSub.userProperty) // 用户属性
 	total += n
 
-	this.propertyLen = uint32(total)
+	unSub.propertyLen = uint32(total)
 
 	total += 2 // packet ID
-	for _, t := range this.topics {
+	for _, t := range unSub.topics {
 		total += 2 + len(t)
 	}
-	total += len(lbEncode(this.propertyLen))
-	_ = this.SetRemainingLength(uint32(total))
+	total += len(lbEncode(unSub.propertyLen))
+	_ = unSub.SetRemainingLength(uint32(total))
 }
-func (this *UnsubscribeMessage) msglen() int {
-	this.build()
-	return int(this.remlen)
+func (unSub *UnsubscribeMessage) msglen() int {
+	unSub.build()
+	return int(unSub.remlen)
 }
