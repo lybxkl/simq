@@ -186,6 +186,7 @@ func (sess *session) Init(msg *message.ConnectMessage, tps ...sessions.SessionIn
 		sess.will.SetTopic(sess.cmessage.WillTopic())
 		sess.will.SetPayload(sess.cmessage.WillMessage())
 		sess.will.SetRetain(sess.cmessage.WillRetain())
+		sess.will.SetMessageExpiryInterval(sess.cmessage.WillMsgExpiryInterval())
 	}
 
 	sess.topics = make(map[string]*topics.Sub)
