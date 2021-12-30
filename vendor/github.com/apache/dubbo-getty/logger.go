@@ -38,23 +38,23 @@ type Logger interface {
 type LoggerLevel int8
 
 const (
-	// DebugLevel logs are typically voluminous, and are usually disabled in
+	// LoggerLevelDebug DebugLevel logs are typically voluminous, and are usually disabled in
 	// production.
 	LoggerLevelDebug = LoggerLevel(zapcore.DebugLevel)
-	// InfoLevel is the default logging priority.
+	// LoggerLevelInfo InfoLevel is the default logging priority.
 	LoggerLevelInfo = LoggerLevel(zapcore.InfoLevel)
-	// WarnLevel logs are more important than Infof, but don't need individual
+	// LoggerLevelWarn WarnLevel logs are more important than Infof, but don't need individual
 	// human review.
 	LoggerLevelWarn = LoggerLevel(zapcore.WarnLevel)
-	// ErrorLevel logs are high-priority. If an application is running smoothly,
+	// LoggerLevelError ErrorLevel logs are high-priority. If an application is running smoothly,
 	// it shouldn't generate any error-level logs.
 	LoggerLevelError = LoggerLevel(zapcore.ErrorLevel)
-	// DPanicLevel logs are particularly important errors. In development the
+	// LoggerLevelDPanic DPanicLevel logs are particularly important errors. In development the
 	// logger panics after writing the message.
 	LoggerLevelDPanic = LoggerLevel(zapcore.DPanicLevel)
-	// PanicLevel logs a message, then panics.
+	// LoggerLevelPanic PanicLevel logs a message, then panics.
 	LoggerLevelPanic = LoggerLevel(zapcore.PanicLevel)
-	// FatalLevel logs a message, then calls os.Exit(1).
+	// LoggerLevelFatal FatalLevel logs a message, then calls os.Exit(1).
 	LoggerLevelFatal = LoggerLevel(zapcore.FatalLevel)
 )
 
@@ -97,7 +97,7 @@ func init() {
 	// }()
 }
 
-// SetLogger: customize yourself logger.
+// SetLogger customize yourself logger.
 func SetLogger(logger Logger) {
 	log = logger
 }
@@ -107,7 +107,7 @@ func GetLogger() Logger {
 	return log
 }
 
-// SetLoggerLevel
+// SetLoggerLevel set logger level
 func SetLoggerLevel(level LoggerLevel) error {
 	var err error
 	zapLoggerConfig.Level = zap.NewAtomicLevelAt(zapcore.Level(level))
@@ -119,7 +119,7 @@ func SetLoggerLevel(level LoggerLevel) error {
 	return nil
 }
 
-// SetLoggerCallerDisable: disable caller info in production env for performance improve.
+// SetLoggerCallerDisable disable caller info in production env for performance improve.
 // It is highly recommended that you execute this method in a production environment.
 func SetLoggerCallerDisable() error {
 	var err error

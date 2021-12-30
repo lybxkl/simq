@@ -32,8 +32,11 @@ import (
 	gxbytes "github.com/dubbogo/gost/bytes"
 	gxcontext "github.com/dubbogo/gost/context"
 	gxtime "github.com/dubbogo/gost/time"
+
 	"github.com/gorilla/websocket"
+
 	perrors "github.com/pkg/errors"
+
 	uatomic "go.uber.org/atomic"
 )
 
@@ -44,6 +47,7 @@ const (
 	pendingDuration = 3e9
 	// MaxWheelTimeSpan 900s, 15 minute
 	MaxWheelTimeSpan = 900e9
+	maxPacketLen     = 16 * 1024
 
 	defaultSessionName    = "session"
 	defaultTCPSessionName = "tcp-session"
@@ -53,15 +57,46 @@ const (
 	outputFormat          = "session %s, Read Bytes: %d, Write Bytes: %d, Read Pkgs: %d, Write Pkgs: %d"
 )
 
-/////////////////////////////////////////
-// session
-/////////////////////////////////////////
-
 var defaultTimerWheel *gxtime.TimerWheel
 
 func init() {
 	gxtime.InitDefaultTimerWheel()
 	defaultTimerWheel = gxtime.GetDefaultTimerWheel()
+}
+
+// Session wrap connection between the server and the client
+type Session interface {
+	Connection
+	Reset()
+	Conn() net.Conn
+	Stat() string
+	IsClosed() bool
+	// EndPoint get endpoint type
+	EndPoint() EndPoint
+
+	SetMaxMsgLen(int)
+	SetName(string)
+	SetEventListener(EventListener)
+	SetPkgHandler(ReadWriter)
+	SetReader(Reader)
+	SetWriter(Writer)
+	SetCronPeriod(int)
+
+	SetWaitTime(time.Duration)
+
+	GetAttribute(interface{}) interface{}
+	SetAttribute(interface{}, interface{})
+	RemoveAttribute(interface{})
+
+	// WritePkg the Writer will invoke this function. Pls attention that if timeout is less than 0, WritePkg will send @pkg asap.
+	// for udp session, the first parameter should be UDPContext.
+	// totalBytesLength: @pkg stream bytes length after encoding @pkg.
+	// sendBytesLength: stream bytes length that sent out successfully.
+	// err: maybe it has illegal data, encoding error, or write out system error.
+	WritePkg(pkg interface{}, timeout time.Duration) (totalBytesLength int, sendBytesLength int, err error)
+	WriteBytes([]byte) (int, error)
+	WriteBytesArray(...[]byte) (int, error)
+	Close()
 }
 
 // getty base session
@@ -93,8 +128,9 @@ type session struct {
 	attrs *gxcontext.ValuesContext
 
 	// goroutines sync
-	grNum uatomic.Int32
-	lock  sync.RWMutex
+	grNum      uatomic.Int32
+	lock       sync.RWMutex
+	packetLock sync.RWMutex
 }
 
 func newSession(endPoint EndPoint, conn Connection) *session {
@@ -156,7 +192,6 @@ func (s *session) Reset() {
 	}
 }
 
-// func (s *session) SetConn(conn net.Conn) { s.gettyConn = newGettyConn(conn) }
 func (s *session) Conn() net.Conn {
 	if tc, ok := s.Connection.(*gettyTCPConn); ok {
 		return tc.conn
@@ -193,7 +228,7 @@ func (s *session) gettyConn() *gettyConn {
 	return nil
 }
 
-// return the connect statistic data
+// Stat get the connect statistic data
 func (s *session) Stat() string {
 	var conn *gettyConn
 	if conn = s.gettyConn(); conn == nil {
@@ -209,7 +244,7 @@ func (s *session) Stat() string {
 	)
 }
 
-// check whether the session has been closed.
+// IsClosed check whether the session has been closed.
 func (s *session) IsClosed() bool {
 	select {
 	case <-s.done:
@@ -220,7 +255,7 @@ func (s *session) IsClosed() bool {
 	}
 }
 
-// set maximum package length of every package in (EventListener)OnMessage(@pkgs)
+// SetMaxMsgLen set maximum package length of every package in (EventListener)OnMessage(@pkgs)
 func (s *session) SetMaxMsgLen(length int) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -228,7 +263,7 @@ func (s *session) SetMaxMsgLen(length int) {
 	s.maxMsgLen = int32(length)
 }
 
-// set session name
+// SetName set session name
 func (s *session) SetName(name string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -236,7 +271,7 @@ func (s *session) SetName(name string) {
 	s.name = name
 }
 
-// set EventListener
+// SetEventListener set event listener
 func (s *session) SetEventListener(listener EventListener) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -244,7 +279,7 @@ func (s *session) SetEventListener(listener EventListener) {
 	s.listener = listener
 }
 
-// set package handler
+// SetPkgHandler set package handler
 func (s *session) SetPkgHandler(handler ReadWriter) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -253,7 +288,6 @@ func (s *session) SetPkgHandler(handler ReadWriter) {
 	s.writer = handler
 }
 
-// set Reader
 func (s *session) SetReader(reader Reader) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -261,7 +295,6 @@ func (s *session) SetReader(reader Reader) {
 	s.reader = reader
 }
 
-// set Writer
 func (s *session) SetWriter(writer Writer) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -269,7 +302,7 @@ func (s *session) SetWriter(writer Writer) {
 	s.writer = writer
 }
 
-// period is in millisecond. Websocket session will send ping frame automatically every peroid.
+// SetCronPeriod period is in millisecond. Websocket session will send ping frame automatically every peroid.
 func (s *session) SetCronPeriod(period int) {
 	if period < 1 {
 		panic("@period < 1")
@@ -280,7 +313,7 @@ func (s *session) SetCronPeriod(period int) {
 	s.period = time.Duration(period) * time.Millisecond
 }
 
-// set maximum wait time when session got error or got exit signal
+// SetWaitTime set maximum wait time when session got error or got exit signal
 func (s *session) SetWaitTime(waitTime time.Duration) {
 	if waitTime < 1 {
 		panic("@wait < 1")
@@ -291,7 +324,7 @@ func (s *session) SetWaitTime(waitTime time.Duration) {
 	s.wait = waitTime
 }
 
-// set attribute of key @session:key
+// GetAttribute get attribute of key @session:key
 func (s *session) GetAttribute(key interface{}) interface{} {
 	s.lock.RLock()
 	if s.attrs == nil {
@@ -308,7 +341,7 @@ func (s *session) GetAttribute(key interface{}) interface{} {
 	return ret
 }
 
-// get attribute of key @session:key
+// SetAttribute set attribute of key @session:key
 func (s *session) SetAttribute(key interface{}, value interface{}) {
 	s.lock.Lock()
 	if s.attrs != nil {
@@ -317,7 +350,7 @@ func (s *session) SetAttribute(key interface{}, value interface{}) {
 	s.lock.Unlock()
 }
 
-// delete attribute of key @session:key
+// RemoveAttribute remove attribute of key @session:key
 func (s *session) RemoveAttribute(key interface{}) {
 	s.lock.Lock()
 	if s.attrs != nil {
@@ -369,6 +402,8 @@ func (s *session) WritePkg(pkg interface{}, timeout time.Duration) (int, int, er
 	} else {
 		pkg = pkgBytes
 	}
+	s.packetLock.RLock()
+	defer s.packetLock.RUnlock()
 	if 0 < timeout {
 		s.Connection.SetWriteTimeout(timeout)
 	}
@@ -381,20 +416,43 @@ func (s *session) WritePkg(pkg interface{}, timeout time.Duration) (int, int, er
 	return len(pkgBytes), succssCount, nil
 }
 
-// for codecs
+// WriteBytes for codecs
 func (s *session) WriteBytes(pkg []byte) (int, error) {
 	if s.IsClosed() {
 		return 0, ErrSessionClosed
 	}
 
-	lg, err := s.Connection.send(pkg)
-	if err != nil {
-		return 0, perrors.Wrapf(err, "s.Connection.Write(pkg len:%d)", len(pkg))
+	leftPackageSize, totalSize, writeSize := len(pkg), len(pkg), 0
+	if leftPackageSize > maxPacketLen {
+		s.packetLock.Lock()
+		defer s.packetLock.Unlock()
+	} else {
+		s.packetLock.RLock()
+		defer s.packetLock.RUnlock()
 	}
-	return lg, nil
+
+	for leftPackageSize > maxPacketLen {
+		_, err := s.Connection.send(pkg[writeSize:(writeSize + maxPacketLen)])
+		if err != nil {
+			return writeSize, perrors.Wrapf(err, "s.Connection.Write(pkg len:%d)", len(pkg))
+		}
+		leftPackageSize -= maxPacketLen
+		writeSize += maxPacketLen
+	}
+
+	if leftPackageSize == 0 {
+		return writeSize, nil
+	}
+
+	_, err := s.Connection.send(pkg[writeSize:])
+	if err != nil {
+		return writeSize, perrors.Wrapf(err, "s.Connection.Write(pkg len:%d)", len(pkg))
+	}
+
+	return totalSize, nil
 }
 
-// Write multiple packages at once. so we invoke write sys.call just one time.
+// WriteBytesArray Write multiple packages at once. so we invoke write sys.call just one time.
 func (s *session) WriteBytesArray(pkgs ...[]byte) (int, error) {
 	if s.IsClosed() {
 		return 0, ErrSessionClosed
@@ -405,6 +463,8 @@ func (s *session) WriteBytesArray(pkgs ...[]byte) (int, error) {
 
 	// reduce syscall and memcopy for multiple packages
 	if _, ok := s.Connection.(*gettyTCPConn); ok {
+		s.packetLock.RLock()
+		defer s.packetLock.RUnlock()
 		lg, err := s.Connection.send(pkgs)
 		if err != nil {
 			return 0, perrors.Wrapf(err, "s.Connection.Write(pkgs num:%d)", len(pkgs))
@@ -566,23 +626,12 @@ func (s *session) handleTCPPackage() error {
 		exit     bool
 		bufLen   int
 		pkgLen   int
-		bufp     *[]byte
 		buf      []byte
-		pktBuf   *bytes.Buffer
+		pktBuf   *gxbytes.Buffer
 		pkg      interface{}
 	)
 
-	// buf = make([]byte, maxReadBufLen)
-	bufp = gxbytes.GetBytes(maxReadBufLen)
-	buf = *bufp
-
-	// pktBuf = new(bytes.Buffer)
-	pktBuf = gxbytes.GetBytesBuffer()
-
-	defer func() {
-		gxbytes.PutBytes(bufp)
-		gxbytes.PutBytesBuffer(pktBuf)
-	}()
+	pktBuf = gxbytes.NewBuffer(nil)
 
 	conn = s.Connection.(*gettyTCPConn)
 	for {
@@ -597,6 +646,7 @@ func (s *session) handleTCPPackage() error {
 		for {
 			// for clause for the network timeout condition check
 			// s.conn.SetReadTimeout(time.Now().Add(s.rTimeout))
+			buf = pktBuf.WriteNextBegin(maxReadBufLen)
 			bufLen, err = conn.recv(buf)
 			if err != nil {
 				if netError, ok = perrors.Cause(err).(net.Error); ok && netError.Timeout() {
@@ -606,6 +656,13 @@ func (s *session) handleTCPPackage() error {
 					log.Infof("%s, session.conn read EOF, client send over, session exit", s.sessionToken())
 					err = nil
 					exit = true
+					if bufLen != 0 {
+						// as https://github.com/apache/dubbo-getty/issues/77#issuecomment-939652203
+						// this branch is impossible. Even if it happens, the bufLen will be zero and the error
+						// is io.EOF when getty continues to read the socket.
+						exit = false
+						log.Infof("%s, session.conn read EOF, while the bufLen(%d) is non-zero.", s.sessionToken())
+					}
 					break
 				}
 				log.Errorf("%s, [session.conn.read] = error:%+v", s.sessionToken(), perrors.WithStack(err))
@@ -613,38 +670,34 @@ func (s *session) handleTCPPackage() error {
 			}
 			break
 		}
-		if exit {
-			break
-		}
-		if 0 == bufLen {
-			continue // just continue if session can not read no more stream bytes.
-		}
-		pktBuf.Write(buf[:bufLen])
-		for {
-			if pktBuf.Len() <= 0 {
-				break
+		if 0 != bufLen {
+			pktBuf.WriteNextEnd(bufLen)
+			for {
+				if pktBuf.Len() <= 0 {
+					break
+				}
+				pkg, pkgLen, err = s.reader.Read(s, pktBuf.Bytes())
+				// for case 3/case 4
+				if err == nil && s.maxMsgLen > 0 && pkgLen > int(s.maxMsgLen) {
+					err = perrors.Errorf("pkgLen %d > session max message len %d", pkgLen, s.maxMsgLen)
+				}
+				// handle case 1
+				if err != nil {
+					log.Warnf("%s, [session.handleTCPPackage] = len{%d}, error:%+v",
+						s.sessionToken(), pkgLen, perrors.WithStack(err))
+					exit = true
+					break
+				}
+				// handle case 2/case 3
+				if pkg == nil {
+					break
+				}
+				// handle case 4
+				s.UpdateActive()
+				s.addTask(pkg)
+				pktBuf.Next(pkgLen)
+				// continue to handle case 5
 			}
-			pkg, pkgLen, err = s.reader.Read(s, pktBuf.Bytes())
-			// for case 3/case 4
-			if err == nil && s.maxMsgLen > 0 && pkgLen > int(s.maxMsgLen) {
-				err = perrors.Errorf("pkgLen %d > session max message len %d", pkgLen, s.maxMsgLen)
-			}
-			// handle case 1
-			if err != nil {
-				log.Warnf("%s, [session.handleTCPPackage] = len{%d}, error:%+v",
-					s.sessionToken(), pkgLen, perrors.WithStack(err))
-				exit = true
-				break
-			}
-			// handle case 2/case 3
-			if pkg == nil {
-				break
-			}
-			// handle case 4
-			s.UpdateActive()
-			s.addTask(pkg)
-			pktBuf.Next(pkgLen)
-			// continue to handle case 5
 		}
 		if exit {
 			break
