@@ -11,6 +11,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/middleware"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
+	getty "github.com/apache/dubbo-getty"
 	"io"
 	"math"
 	"reflect"
@@ -42,6 +43,8 @@ var (
 type service struct {
 	clusterBelong bool // 集群特殊使用的标记
 	clusterOpen   bool // 是否开启了集群
+
+	gettySession getty.Session // getty 启动
 
 	id   uint64 //这个服务的ID，它与客户ID无关，只是一个数字而已
 	ccid string // 客户端id
@@ -238,15 +241,15 @@ func (svc *service) start(resp *message.ConnackMessage) error {
 			pub := offline[i].(*message.PublishMessage)
 			// topics.Sub 获取
 			var (
-				subs []interface{}
-				qoss []topics.Sub
+				subs   []interface{}
+				subOpt []topics.Sub
 			)
-			_ = svc.topicsMgr.Subscribers(pub.Topic(), pub.QoS(), &subs, &qoss, false, "", false)
+			_ = svc.topicsMgr.Subscribers(pub.Topic(), pub.QoS(), &subs, &subOpt, false, "", false)
 			tag := false
 			for j := 0; j < len(subs); j++ {
 				if utils.Equal(subs[i], &svc.onpub) {
 					tag = true
-					_ = svc.onpub(pub, qoss[j], "", false)
+					_ = svc.onpub(pub, subOpt[j], "", false)
 					break
 				}
 			}

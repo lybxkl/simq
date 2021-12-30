@@ -103,15 +103,20 @@ func (svc *service) processor() {
 		}
 
 		// 中间件处理消息，可桥接
-		for _, opt := range svc.middleware {
-			canSkipErr, middleWareErr := opt.Apply(msg)
-			if middleWareErr != nil {
-				if canSkipErr {
-					logger.Logger.Errorf("(%s) middlewrae deal msg %s error [skip]: %v", svc.cid(), msg, middleWareErr)
-				} else {
-					logger.Logger.Errorf("(%s) middlewrae deal msg %s error [no_skip]: %v", svc.cid(), msg, middleWareErr)
-					break
-				}
+		svc.middlewareHandle(msg)
+	}
+}
+
+func (svc *service) middlewareHandle(message messagev2.Message) {
+	// 中间件处理消息，可桥接
+	for _, opt := range svc.middleware {
+		canSkipErr, middleWareErr := opt.Apply(message)
+		if middleWareErr != nil {
+			if canSkipErr {
+				logger.Logger.Errorf("(%s) middlewrae deal msg %s error [skip]: %v", svc.cid(), message, middleWareErr)
+			} else {
+				logger.Logger.Errorf("(%s) middlewrae deal msg %s error [no_skip]: %v", svc.cid(), message, middleWareErr)
+				break
 			}
 		}
 	}
@@ -272,8 +277,10 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 		case messagev2.Success:
 			// 服务端收到包含原因码为0x00（正常关闭） 的DISCONNECT报文之后删除了遗嘱消息
 			svc.sess.Cmsg().SetWillMessage(nil)
+			svc.sess.SetWill(nil)
 		default:
 			svc.sess.Cmsg().SetWillMessage(nil)
+			svc.sess.SetWill(nil)
 		}
 
 		// 判断是否需要重新设置session过期时间
@@ -294,11 +301,11 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 		return errDisconnect
 
 	default:
-		return messagev2.NewCodeErr(messagev2.ProtocolError, fmt.Sprintf("(%s) invalid messagev5 type %s", svc.cid(), msg.Name()))
+		return messagev2.NewCodeErr(messagev2.ProtocolError, fmt.Sprintf("(%s) invalid message type %s", svc.cid(), msg.Name()))
 	}
 
 	if err != nil {
-		logger.Logger.Debugf("(%s) Error processing acked messagev5: %v", svc.cid(), err)
+		logger.Logger.Debugf("(%s) Error processing acked message: %v", svc.cid(), err)
 	}
 
 	return err

@@ -95,7 +95,7 @@ func (connMsg ConnectMessage) String() string {
 		"Will Properties\t"+
 		"Will Properties Len=%v\tWill Delay Interval=%v\tPayload Format Indicator=%v\tMessage Expiry Interval=%v\t"+
 		"Content Type=%s\tResponse Topic=%s\tCorrelation Data=%v\tUser Property=%s, "+
-		"Will Topic=%s\tWill Payload=%s\tUsername=%s\n\t\tPassword=%s",
+		"Will Topic=%s\tWill Payload=%s\tUsername=%s\tPassword=%s。",
 		connMsg.header,
 
 		connMsg.protoName,
@@ -644,6 +644,8 @@ func (connMsg *ConnectMessage) SetWillMessage(v []byte) {
 	if len(v) > 0 {
 		connMsg.SetWillFlag(true)
 	} else if len(connMsg.willTopic) == 0 {
+		connMsg.SetWillFlag(false)
+	} else if len(v) == 0 {
 		connMsg.SetWillFlag(false)
 	}
 
