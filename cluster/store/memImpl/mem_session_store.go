@@ -46,7 +46,7 @@ func NewMemSessionStore() store2.SessionStore {
 		secTwoCache:  make(map[string]map[uint16]struct{}),
 	}
 }
-func (m *memSessionStore) Start(ctx context.Context, config config.SIConfig) error {
+func (m *memSessionStore) Start(ctx context.Context, config *config.SIConfig) error {
 	return nil
 }
 

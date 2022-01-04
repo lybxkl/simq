@@ -10,6 +10,7 @@ import (
 	getty "github.com/apache/dubbo-getty"
 	gxsync "github.com/dubbogo/gost/sync"
 	"math"
+	"net/url"
 	"reflect"
 	"sync/atomic"
 	"time"
@@ -27,33 +28,39 @@ func (server *Server) ListenAndServeByGetty(uri string, taskPoolSize int) error 
 	if !atomic.CompareAndSwapInt32(&server.running, 0, 1) {
 		return fmt.Errorf("server/ListenAndServe: Server is already running")
 	}
-	serverName = server.ConFig.Cluster.ClusterName
+	serverName = server.cfg.Cluster.ClusterName
 
 	server.quit = make(chan struct{})
 
 	//这个是配置各种钩子，比如账号认证钩子
 	err := server.checkAndInitConfiguration()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	getty.SetLogger(logger.Logger)
 
-	options := []getty.ServerOption{getty.WithLocalAddress(uri)}
+	u, err := url.Parse(uri)
+	if err != nil {
+		return err
+	}
+
+	options := []getty.ServerOption{getty.WithLocalAddress(u.Host)}
 
 	options = append(options, getty.WithServerTaskPool(gxsync.NewTaskPoolSimple(taskPoolSize)))
 
 	sev := getty.NewTCPServer(options...)
+	server.gServer = sev
+
 	sev.RunEventLoop(func(session getty.Session) error {
 		session.SetPkgHandler(&packageHandler{})
 		session.SetEventListener(server)
-		session.SetReadTimeout(time.Second * time.Duration(server.KeepAlive))
-		session.SetWriteTimeout(time.Second * time.Duration(server.WriteTimeout))
+		session.SetReadTimeout(time.Second * time.Duration(server.cfg.Keepalive))
+		session.SetWriteTimeout(time.Second * time.Duration(server.cfg.WriteTimeout))
 		session.SetCronPeriod(1000) // 单位millisecond
 		session.SetAttribute(CronPeriod, 10)
 		return nil
 	})
-
 	return nil
 }
 
@@ -66,23 +73,11 @@ func (server *Server) OnOpen(session getty.Session) error {
 	svc := &service{
 		id:          atomic.AddUint64(&gsvcid, 1),
 		client:      false,
-		clusterOpen: server.ConFig.Cluster.Enabled,
+		clusterOpen: server.cfg.Cluster.Enabled,
 
-		keepAlive:      int(req.KeepAlive()),
-		writeTimeout:   server.WriteTimeout,
-		connectTimeout: server.ConnectTimeout,
-		ackTimeout:     server.AckTimeout,
-		timeoutRetries: server.TimeoutRetries,
-
-		conn:              session.Conn(),
-		sessMgr:           server.sessMgr,
-		topicsMgr:         server.topicsMgr,
-		shareTopicMapNode: server.ShareTopicMapNode,
-		conFig:            server.ConFig,
-
-		middleware: server.middleware,
-
+		conn:         session.Conn(),
 		gettySession: session,
+		server:       server,
 	}
 
 	err = server.getSession(svc, req, resp)
@@ -93,7 +88,7 @@ func (server *Server) OnOpen(session getty.Session) error {
 	session.SetAttribute(ServAttr, svc)
 	session.SetAttribute(CronPeriod, int64(req.KeepAlive()))
 
-	svc.ccid = fmt.Sprintf("%s%d/%s", svc.conFig.Broker.AutoIdPrefix, svc.id, svc.sess.IDs())
+	svc.ccid = fmt.Sprintf("%s%d/%s", svc.server.cfg.AutoIdPrefix, svc.id, svc.sess.IDs())
 	svc.sign = NewSign(svc.quota, svc.limit)
 
 	// 这个是发送给订阅者的，是每个订阅者都有一份的方法
@@ -106,7 +101,7 @@ func (server *Server) OnOpen(session getty.Session) error {
 	}
 
 	resp.SetReasonCode(messagev2.Success)
-	_, _, err = session.WritePkg(resp, time.Second*time.Duration(svc.writeTimeout))
+	_, _, err = session.WritePkg(resp, time.Second*time.Duration(svc.server.cfg.WriteTimeout))
 	if err != nil {
 		return err
 	}
@@ -158,8 +153,8 @@ func (server *Server) OnClose(session getty.Session) {
 
 	// 直接删除session，重连时重新初始化
 	svc.sess.SetStatus(sessions.OFFLINE)
-	if svc.sessMgr != nil { // svc.sess.Cmsg().CleanSession() &&
-		svc.sessMgr.Del(svc.sess.ID())
+	if svc.server.sessMgr != nil { // svc.sess.Cmsg().CleanSession() &&
+		svc.server.sessMgr.Del(svc.sess.ID())
 	}
 
 	svc.conn = nil
@@ -204,7 +199,7 @@ func (svc *service) sendOfflineMsg() {
 			subs   []interface{}
 			subOpt []topics.Sub
 		)
-		_ = svc.topicsMgr.Subscribers(pub.Topic(), pub.QoS(), &subs, &subOpt, false, "", false)
+		_ = svc.server.topicsMgr.Subscribers(pub.Topic(), pub.QoS(), &subs, &subOpt, false, "", false)
 		tag := false
 		for j := 0; j < len(subs); j++ {
 			if utils.Equal(subs[i], &svc.onpub) {
@@ -225,10 +220,10 @@ func (svc *service) reloadSub() error {
 		return err
 	} else {
 		for _, t := range tpc {
-			if svc.conFig.Broker.CloseShareSub && len(t.Topic) > 6 && reflect.DeepEqual(t.Topic[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
+			if svc.server.cfg.CloseShareSub && len(t.Topic) > 6 && reflect.DeepEqual(t.Topic[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
 				continue
 			}
-			_, _ = svc.topicsMgr.Subscribe(topics.Sub{
+			_, _ = svc.server.topicsMgr.Subscribe(topics.Sub{
 				Topic:             t.Topic,
 				Qos:               t.Qos,
 				NoLocal:           t.NoLocal,
@@ -248,7 +243,7 @@ func (svc *service) unSubAll() {
 			logger.Logger.Errorf("(%s/%d): %v", svc.cid(), svc.id, err)
 		} else {
 			for _, t := range tpc {
-				if err = svc.topicsMgr.Unsubscribe(t.Topic, &svc.onpub); err != nil {
+				if err = svc.server.topicsMgr.Unsubscribe(t.Topic, &svc.onpub); err != nil {
 					logger.Logger.Errorf("(%s): Error unsubscribing topic %q: %v", svc.cid(), t, err)
 				}
 			}

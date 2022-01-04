@@ -17,7 +17,7 @@ type MessageRepo struct {
 func NewMessageStore() store2.MessageStore {
 	return &MessageRepo{}
 }
-func (m *MessageRepo) Start(ctx context.Context, config config.SIConfig) error {
+func (m *MessageRepo) Start(ctx context.Context, config *config.SIConfig) error {
 	var err error
 	storeCfg := config.Store.Mongo
 	m.c, err = mongoorm.NewMongoOrm(storeCfg.Source, storeCfg.MinPoolSize, storeCfg.MaxPoolSize, storeCfg.MaxConnIdleTime)

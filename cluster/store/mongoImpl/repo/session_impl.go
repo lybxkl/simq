@@ -22,7 +22,7 @@ type SessionRepo struct {
 func NewSessionStore() store2.SessionStore {
 	return &SessionRepo{}
 }
-func (s *SessionRepo) Start(ctx context.Context, config config.SIConfig) error {
+func (s *SessionRepo) Start(ctx context.Context, config *config.SIConfig) error {
 	var err error
 	storeCfg := config.Store.Mongo
 	s.c, err = mongoorm.NewMongoOrm(storeCfg.Source, storeCfg.MinPoolSize, storeCfg.MaxPoolSize, storeCfg.MaxConnIdleTime)

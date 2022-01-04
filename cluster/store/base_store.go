@@ -6,7 +6,7 @@ import (
 )
 
 type BaseStore interface {
-	Start(ctx context.Context, config config.SIConfig) error
+	Start(ctx context.Context, config *config.SIConfig) error
 	Stop(ctx context.Context) error
 }
 

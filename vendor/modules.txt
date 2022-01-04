@@ -33,6 +33,18 @@ github.com/garyburd/redigo/redis
 # github.com/go-ole/go-ole v1.2.4
 github.com/go-ole/go-ole
 github.com/go-ole/go-ole/oleutil
+# github.com/go-playground/locales v0.14.0
+## explicit
+github.com/go-playground/locales
+github.com/go-playground/locales/currency
+github.com/go-playground/locales/zh
+# github.com/go-playground/universal-translator v0.18.0
+## explicit
+github.com/go-playground/universal-translator
+# github.com/go-playground/validator/v10 v10.10.0
+## explicit
+github.com/go-playground/validator/v10
+github.com/go-playground/validator/v10/translations/zh
 # github.com/go-redis/redis v6.15.9+incompatible
 ## explicit
 github.com/go-redis/redis
@@ -63,6 +75,8 @@ github.com/klauspost/compress/huff0
 github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
+# github.com/leodido/go-urn v1.2.1
+github.com/leodido/go-urn
 # github.com/mattn/go-colorable v0.1.7
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.14
@@ -149,9 +163,10 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+# golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/pbkdf2
+golang.org/x/crypto/sha3
 # golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
 ## explicit
 golang.org/x/net/websocket
@@ -159,10 +174,15 @@ golang.org/x/net/websocket
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
 # golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1
+golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.6
+golang.org/x/text/internal/language
+golang.org/x/text/internal/language/compact
+golang.org/x/text/internal/tag
+golang.org/x/text/language
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
 # gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b

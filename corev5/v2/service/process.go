@@ -59,7 +59,7 @@ func (svc *service) processor() {
 			}
 			return
 		}
-		if total > int(svc.conFig.Broker.MaxPacketSize) {
+		if total > int(svc.server.cfg.MaxPacketSize) {
 			writeMessage(svc.conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.MessageTooLong, nil))
 			logger.Logger.Errorf("(%s): message sent is too large", svc.cid())
 			return
@@ -109,7 +109,7 @@ func (svc *service) processor() {
 
 func (svc *service) middlewareHandle(message messagev2.Message) {
 	// 中间件处理消息，可桥接
-	for _, opt := range svc.middleware {
+	for _, opt := range svc.server.middleware {
 		canSkipErr, middleWareErr := opt.Apply(message)
 		if middleWareErr != nil {
 			if canSkipErr {
@@ -293,7 +293,7 @@ func (svc *service) processIncoming(msg messagev2.Message) error {
 			}
 			// TODO 需要更新过期间隔
 			svc.sess.Cmsg().SetSessionExpiryInterval(msg.SessionExpiryInterval())
-			err = svc.SessionStore.StoreSession(context.Background(), svc.cid(), svc.sess)
+			err = svc.server.SessionStore.StoreSession(context.Background(), svc.cid(), svc.sess)
 			if err != nil {
 				return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
 			}
@@ -472,10 +472,10 @@ func (svc *service) topicAliceIn(msg *messagev2.PublishMessage) error {
 //如果QoS == 1，我们应该返回PUBACK，然后进行下一步
 //如果QoS == 2，我们需要将其放入ack队列中，发送回PUBREC
 func (svc *service) processPublish(msg *messagev2.PublishMessage) error {
-	if svc.conFig.Broker.MaxQos < int(msg.QoS()) { // 判断是否是支持的qos等级，只会验证本broker内收到的，集群转发来的不会验证，前提是因为集群来的已经是验证过的
-		return messagev2.NewCodeErr(messagev2.UnsupportedQoSLevel, fmt.Sprintf("a maximum of qos %d is supported", svc.conFig.Broker.MaxQos))
+	if svc.server.cfg.MaxQos < int(msg.QoS()) { // 判断是否是支持的qos等级，只会验证本broker内收到的，集群转发来的不会验证，前提是因为集群来的已经是验证过的
+		return messagev2.NewCodeErr(messagev2.UnsupportedQoSLevel, fmt.Sprintf("a maximum of qos %d is supported", svc.server.cfg.MaxQos))
 	}
-	if msg.Retain() && !svc.conFig.Broker.RetainAvailable {
+	if msg.Retain() && !svc.server.cfg.RetainAvailable {
 		return messagev2.NewCodeErr(messagev2.UnsupportedRetention, "unSupport retain message")
 	}
 
@@ -529,7 +529,7 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 	unSupport := false
 	for _, t := range tps {
 		// 简单处理，直接断开连接，返回原因码
-		if svc.conFig.Broker.CloseShareSub && len(t) > 6 && reflect.DeepEqual(t[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
+		if svc.server.cfg.Broker.CloseShareSub && len(t) > 6 && reflect.DeepEqual(t[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
 			//dis := messagev5.NewDisconnectMessage()
 			//dis.SetReasonCode(messagev5.UnsupportedSharedSubscriptions)
 			//if _, err := svc.writeMessage(resp); err != nil {
@@ -568,7 +568,7 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 			RetainHandling:    retainHandling,
 			SubIdentifier:     msg.SubscriptionIdentifier(),
 		}
-		rqos, err := svc.topicsMgr.Subscribe(sub, &svc.onpub)
+		rqos, err := svc.server.topicsMgr.Subscribe(sub, &svc.onpub)
 		if err != nil {
 			return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 		}
@@ -582,7 +582,7 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 		if retainHandling == messagev2.NoSendRetain {
 			continue
 		} else if retainHandling == messagev2.CanSendRetain {
-			err = svc.topicsMgr.Retained(t, &svc.rmsgs)
+			err = svc.server.topicsMgr.Retained(t, &svc.rmsgs)
 			if err != nil {
 				return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 			}
@@ -608,7 +608,7 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 			END:
 			}
 			if !existThisTopic {
-				err = svc.topicsMgr.Retained(t, &svc.rmsgs)
+				err = svc.server.topicsMgr.Retained(t, &svc.rmsgs)
 				if err != nil {
 					return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 				}
@@ -654,7 +654,7 @@ func (svc *service) processUnsubscribe(msg *messagev2.UnsubscribeMessage) error 
 	tps := msg.Topics()
 
 	for _, t := range tps {
-		svc.topicsMgr.Unsubscribe(t, &svc.onpub)
+		svc.server.topicsMgr.Unsubscribe(t, &svc.onpub)
 		svc.sess.RemoveTopic(string(t))
 	}
 
@@ -717,11 +717,11 @@ func (svc *service) processToCluster(topics [][]byte, msg messagev2.Message) {
 				switch msg.Type() {
 				case messagev2.SUBSCRIBE:
 					// 添加本地集群共享订阅
-					svc.shareTopicMapNode.AddTopicMapNode(tp, string(shareName), GetServerName(), 1)
+					svc.server.ShareTopicMapNode.AddTopicMapNode(tp, string(shareName), GetServerName(), 1)
 					logger.Logger.Debugf("添加本地集群共享订阅：%s,%s,%s", tp, string(shareName), GetServerName())
 				case messagev2.UNSUBSCRIBE:
 					// 删除本地集群共享订阅
-					svc.shareTopicMapNode.RemoveTopicMapNode(tp, string(shareName), GetServerName())
+					svc.server.ShareTopicMapNode.RemoveTopicMapNode(tp, string(shareName), GetServerName())
 					logger.Logger.Debugf("删除本地集群共享订阅：%s,%s,%s", tp, string(shareName), GetServerName())
 				}
 			}
@@ -753,7 +753,7 @@ func (svc *service) processToCluster(topics [][]byte, msg messagev2.Message) {
 //此方法将根据发布获取订阅服务器列表主题，并将消息发布到订阅方列表。
 func (svc *service) onPublish(msg *messagev2.PublishMessage) error {
 	if msg.Retain() {
-		if err := svc.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
+		if err := svc.server.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", svc.cid(), err)
 		}
 	}
@@ -794,7 +794,7 @@ func (svc *service) sendShareToCluster(msg *messagev2.PublishMessage) {
 	}
 	submit(func() {
 		// 发送共享主题消息
-		sn, err := svc.shareTopicMapNode.GetShareNames(msg.Topic())
+		sn, err := svc.server.ShareTopicMapNode.GetShareNames(msg.Topic())
 		if err != nil {
 			logger.Logger.Errorf("%v 获取主题%s共享组错误:%v", svc.id, msg.Topic(), err)
 			return
@@ -834,7 +834,7 @@ func (svc *service) ClusterInToPub(msg *messagev2.PublishMessage) error {
 		return nil
 	}
 	if msg.Retain() {
-		if err := svc.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
+		if err := svc.server.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", svc.cid(), err)
 		}
 	}
@@ -849,7 +849,7 @@ func (svc *service) ClusterInToPubShare(msg *messagev2.PublishMessage, shareName
 		return nil
 	}
 	if msg.Retain() {
-		if err := svc.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
+		if err := svc.server.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", svc.cid(), err)
 		}
 	}
@@ -863,7 +863,7 @@ func (svc *service) ClusterInToPubSys(msg *messagev2.PublishMessage) error {
 		return nil
 	}
 	if msg.Retain() {
-		if err := svc.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
+		if err := svc.server.topicsMgr.Retain(msg); err != nil { // 为这个主题保存最后一条保留消息
 			logger.Logger.Errorf("(%s) Error retaining messagev5: %v", svc.cid(), err)
 		}
 	}
@@ -877,7 +877,7 @@ func (svc *service) pubFn(msg *messagev2.PublishMessage, shareName string, onlyS
 		qoss []topics.Sub
 	)
 
-	err := svc.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, shareName, onlyShare)
+	err := svc.server.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, shareName, onlyShare)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
 		return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
@@ -895,7 +895,7 @@ func (svc *service) pubFnPlus(msg *messagev2.PublishMessage) error {
 		subs []interface{}
 		qoss []topics.Sub
 	)
-	err := svc.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, "", true)
+	err := svc.server.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, false, "", true)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
 		return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
@@ -913,7 +913,7 @@ func (svc *service) pubFnSys(msg *messagev2.PublishMessage) error {
 		subs []interface{}
 		qoss []topics.Sub
 	)
-	err := svc.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, true, "", false)
+	err := svc.server.topicsMgr.Subscribers(msg.Topic(), msg.QoS(), &subs, &qoss, true, "", false)
 	if err != nil {
 		//logger.Logger.Error(err, "(%s) Error retrieving subscribers list: %v", svc.cid(), err)
 		return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
@@ -955,7 +955,7 @@ func (svc *service) openCluster() bool {
 
 // 是否开启共享
 func (svc *service) openShare() bool {
-	return svc.conFig.OpenShare()
+	return svc.server.cfg.OpenShare()
 }
 
 func copyMsg(msg *messagev2.PublishMessage, newQos byte) *messagev2.PublishMessage {

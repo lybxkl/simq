@@ -2,13 +2,9 @@ package service
 
 import (
 	"fmt"
-	"gitee.com/Ljolan/si-mqtt/cluster"
-	"gitee.com/Ljolan/si-mqtt/cluster/store"
-	"gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/message"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
-	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/middleware"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
 	getty "github.com/apache/dubbo-getty"
@@ -53,35 +49,12 @@ type service struct {
 	// 用来表示该是服务端的还是客户端的
 	client bool
 
-	//如果没有数据，保持连接有效的秒数。
-	//如果没有设置，则默认为5分钟。1.5倍该值 作为读超时
-	keepAlive    int
-	writeTimeout int // 写超时，1.5
-
-	//断开连接前等待CONNACK消息的秒数。
-	//如果没有设置，则默认为2秒。
-	connectTimeout int
-
-	//在失败之前等待任何ACK消息的秒数。
-	//如果没有设置，则默认为20秒。
-	ackTimeout int
-
-	//如果没有收到ACK，重试发送数据包的次数。
-	//如果没有设置，则默认为3次重试。
-	timeoutRetries int
-
 	//客户端最大可接收包大小，在connect包内，但broker不处理，因为超过限制的报文将导致协议错误，客户端发送包含原因码0x95（报文过大）的DISCONNECT报文给broker
 	// 共享订阅的情况下，如果一条消息对于部分客户端来说太长而不能发送，服务端可以选择丢弃此消息或者把消息发送给剩余能够接收此消息的客户端。
 	// 非规范：服务端可以把那些没有发送就被丢弃的报文放在死信队列 上，或者执行其他诊断操作。具体的操作超出了5.0规范的范围。
 	// maxPackageSize int
 
 	conn io.Closer
-
-	//会话管理器，用于跟踪所有客户端
-	sessMgr sessions.Provider
-
-	//所有客户端订阅的主题管理器
-	topicsMgr topics.Manager
 
 	// sess是这个MQTT会话的会话对象。它跟踪会话变量
 	//比如ClientId, KeepAlive，用户名等
@@ -122,20 +95,13 @@ type service struct {
 
 	rmsgs []*message.PublishMessage
 
-	shareTopicMapNode cluster.ShareTopicMapNode
-
-	SessionStore store.SessionStore
-	MessageStore store.MessageStore
-	EventStore   store.EventStore
-	conFig       *config.SIConfig
-
-	middleware middleware.Options
+	server *Server
 }
 
 // 运行接入的连接，会产生三个协程异步逻辑处理，当前不会阻塞
 func (svc *service) start(resp *message.ConnackMessage) error {
 	var err error
-	svc.ccid = fmt.Sprintf("%s%d/%s", svc.conFig.Broker.AutoIdPrefix, svc.id, svc.sess.IDs())
+	svc.ccid = fmt.Sprintf("%s%d/%s", svc.server.cfg.Broker.AutoIdPrefix, svc.id, svc.sess.IDs())
 
 	// Create the incoming ring buffer
 	svc.in, err = newBuffer(defaultBufferSize)
@@ -198,10 +164,10 @@ func (svc *service) start(resp *message.ConnackMessage) error {
 			return err
 		} else {
 			for _, t := range tpc {
-				if svc.conFig.Broker.CloseShareSub && len(t.Topic) > 6 && reflect.DeepEqual(t.Topic[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
+				if svc.server.cfg.CloseShareSub && len(t.Topic) > 6 && reflect.DeepEqual(t.Topic[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
 					continue
 				}
-				_, _ = svc.topicsMgr.Subscribe(topics.Sub{
+				_, _ = svc.server.topicsMgr.Subscribe(topics.Sub{
 					Topic:             t.Topic,
 					Qos:               t.Qos,
 					NoLocal:           t.NoLocal,
@@ -244,7 +210,7 @@ func (svc *service) start(resp *message.ConnackMessage) error {
 				subs   []interface{}
 				subOpt []topics.Sub
 			)
-			_ = svc.topicsMgr.Subscribers(pub.Topic(), pub.QoS(), &subs, &subOpt, false, "", false)
+			_ = svc.server.topicsMgr.Subscribers(pub.Topic(), pub.QoS(), &subs, &subOpt, false, "", false)
 			tag := false
 			for j := 0; j < len(subs); j++ {
 				if utils.Equal(subs[i], &svc.onpub) {
@@ -310,7 +276,7 @@ func (svc *service) stop() {
 			logger.Logger.Errorf("(%s/%d): %v", svc.cid(), svc.id, err)
 		} else {
 			for _, t := range tpc {
-				if err := svc.topicsMgr.Unsubscribe(t.Topic, &svc.onpub); err != nil {
+				if err := svc.server.topicsMgr.Unsubscribe(t.Topic, &svc.onpub); err != nil {
 					logger.Logger.Errorf("(%s): Error unsubscribing topic %q: %v", svc.cid(), t, err)
 				}
 			}
@@ -326,8 +292,8 @@ func (svc *service) stop() {
 
 	// 直接删除session，重连时重新初始化
 	svc.sess.SetStatus(sessions.OFFLINE)
-	if svc.sessMgr != nil { // svc.sess.Cmsg().CleanSession() &&
-		svc.sessMgr.Del(svc.sess.ID())
+	if svc.server.sessMgr != nil { // svc.sess.Cmsg().CleanSession() &&
+		svc.server.sessMgr.Del(svc.sess.ID())
 	}
 
 	svc.conn = nil
@@ -450,7 +416,7 @@ func (svc *service) subscribe(msg *message.SubscribeMessage, onComplete OnComple
 				}
 				tp := make([]byte, len(t))
 				copy(tp, t)
-				_, err = svc.topicsMgr.Subscribe(topics.Sub{
+				_, err = svc.server.topicsMgr.Subscribe(topics.Sub{
 					Topic:             tp,
 					Qos:               c,
 					NoLocal:           sub.TopicNoLocal(tp),
@@ -518,7 +484,7 @@ func (svc *service) unsubscribe(msg *message.UnsubscribeMessage, onComplete OnCo
 		for _, tb := range unsub.Topics() {
 			// Remove all subscribers, which basically it's just svc client, since
 			// each client has it's own topic tree.
-			err := svc.topicsMgr.Unsubscribe(tb, nil)
+			err := svc.server.topicsMgr.Unsubscribe(tb, nil)
 			if err != nil {
 				err2 = fmt.Errorf("%v\n%v", err2, err)
 			}

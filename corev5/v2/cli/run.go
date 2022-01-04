@@ -4,7 +4,6 @@ import (
 	config2 "gitee.com/Ljolan/si-mqtt/config"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/service"
 	"gitee.com/Ljolan/si-mqtt/logger"
-	utils2 "gitee.com/Ljolan/si-mqtt/utils"
 	"golang.org/x/net/websocket"
 	"io"
 	"net"
@@ -18,23 +17,12 @@ import (
 )
 
 func init() {
-	utils2.MustPanic(config2.Configure(nil))
+	//utils2.MustPanic(config2.Configure(nil))
 }
 func Run() {
 	cfg := config2.GetConfig()
-	conCif := cfg.DefaultConfig.Connect
-	authPlusCif := cfg.DefaultConfig.Auth
 
-	svr := &service.Server{
-		ConFig:           &cfg,
-		KeepAlive:        conCif.Keepalive,
-		WriteTimeout:     conCif.WriteTimeout,
-		ConnectTimeout:   conCif.ConnectTimeout,
-		AckTimeout:       conCif.AckTimeout,
-		TimeoutRetries:   conCif.TimeoutRetries,
-		AuthPlusProvider: authPlusCif.Allows,
-		Version:          cfg.ServerVersion,
-	}
+	svr := service.NewServer(cfg)
 
 	var err error
 

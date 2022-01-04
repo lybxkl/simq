@@ -70,7 +70,7 @@ func (svc *service) receiver() {
 		// 保持连接的实际值是由应用指定的，一般是几分钟。允许的最大值是18小时12分15秒(两个字节)
 		// 保持连接（Keep Alive）值为零的结果是关闭保持连接（Keep Alive）机制。
 		// 如果保持连接（Keep Alive）612 值为零，客户端不必按照任何特定的时间发送MQTT控制报文。
-		keepAlive := time.Second * time.Duration(svc.keepAlive)
+		keepAlive := time.Second * time.Duration(svc.server.cfg.Keepalive)
 		r := timeoutReader{
 			d:    keepAlive + (keepAlive / 2),
 			conn: conn,
@@ -125,7 +125,7 @@ func (svc *service) sender() {
 	svc.wgStarted.Done()
 	switch conn := svc.conn.(type) {
 	case net.Conn:
-		writeTimeout := time.Second * time.Duration(svc.writeTimeout)
+		writeTimeout := time.Second * time.Duration(svc.server.cfg.WriteTimeout)
 		r := timeoutWriter{
 			d:    writeTimeout + (writeTimeout / 2),
 			conn: conn,
@@ -304,7 +304,7 @@ func (svc *service) readMessage(mtype messagev2.MessageType, total int) (message
 }
 
 func (svc *service) gettyWriteMsg(msg messagev2.Message) (int, error) {
-	_, tl, err := svc.gettySession.WritePkg(msg, time.Second*time.Duration(svc.writeTimeout))
+	_, tl, err := svc.gettySession.WritePkg(msg, time.Second*time.Duration(svc.server.cfg.WriteTimeout))
 	return tl, err
 }
 

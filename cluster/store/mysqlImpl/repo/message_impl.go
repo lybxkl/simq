@@ -21,7 +21,7 @@ type MessageRepo struct {
 func NewMessageStore() store2.MessageStore {
 	return &MessageRepo{}
 }
-func (m *MessageRepo) Start(ctx context.Context, config config.SIConfig) error {
+func (m *MessageRepo) Start(ctx context.Context, config *config.SIConfig) error {
 	var err error
 	storeCfg := config.Store.Mysql
 	m.c, err = mysql.NewMysqlOrm(storeCfg.Source, storeCfg.PoolSize)

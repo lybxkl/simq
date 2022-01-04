@@ -24,6 +24,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/runtimex"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
+	getty "github.com/apache/dubbo-getty"
 	"io"
 	"net"
 	"net/url"
@@ -48,27 +49,9 @@ func GetServerName() string {
 }
 
 type Server struct {
-	Version string // 服务版本
+	cfg     *config.SIConfig
+	gServer getty.Server
 
-	ConFig *config.SIConfig
-
-	//如果没有数据，保持连接的秒数。
-	//如果没有设置，则默认为5分钟。connect中的该值的1.5倍作为读超时
-	KeepAlive int // uint16
-	// 写超时，默认5分钟 1.5
-	WriteTimeout int
-	//在断开连接之前等待连接消息的秒数。
-	//如果没有设置，则默认为5秒。
-	ConnectTimeout int
-	//失败前等待ACK消息的秒数。
-	//如果没有设置，则默认为20秒。
-	AckTimeout int
-	//如果没有收到ACK，重试发送数据包的次数。
-	//如果没有设置，则默认为3次重试。
-	TimeoutRetries int
-
-	// 增强认证管理器
-	AuthPlusProvider []string
 	// authMgr是我们将用于普通身份验证的认证管理器
 	authMgr auth.Authenticator
 	// 增强认证允许的方法
@@ -115,6 +98,10 @@ type Server struct {
 	middleware middleware.Options
 }
 
+func NewServer(cfg *config.SIConfig) *Server {
+	return &Server{cfg: cfg}
+}
+
 //func (s *Server) TopicProvider() topics.Manager {
 //	return s.topicsMgr
 //}
@@ -131,7 +118,7 @@ func (server *Server) ListenAndServe(uri string) error {
 	if !atomic.CompareAndSwapInt32(&server.running, 0, 1) {
 		return fmt.Errorf("server/ListenAndServe: Server is already running")
 	}
-	serverName = server.ConFig.Cluster.ClusterName
+	serverName = server.cfg.Cluster.ClusterName
 
 	server.quit = make(chan struct{})
 
@@ -221,21 +208,30 @@ func (server *Server) Close() error {
 	}
 	// We then close the net.Listener, which will force Accept() to return if it's
 	// blocked waiting for new connections.
-	err := server.ln.Close()
-	if err != nil {
-		logger.Logger.Errorf("关闭网络Listener错误:%v", err)
+	if server.ln != nil {
+		err := server.ln.Close()
+		if err != nil {
+			logger.Logger.Errorf("关闭网络Listener错误:%v", err)
+		}
 	}
+
+	if server.gServer != nil {
+		server.gServer.Close()
+	}
+
 	// 后面不会执行到，不知道为啥
 	// TODO 将当前节点上的客户端数据保存持久化到mysql或者redis都行，待这些客户端重连集群时，可以搜索到旧session，也要考虑是否和客户端连接时的cleanSession有绑定
 	for i := 0; i < len(server.close); i++ {
-		server.close[i].Close()
+		err := server.close[i].Close()
+		if err != nil {
+			logger.Logger.Error(err.Error())
+		}
 	}
 	return nil
 }
+
 func (server *Server) NewService() *service {
 	return &service{
-		sessMgr:       server.sessMgr,
-		topicsMgr:     server.topicsMgr,
 		clusterBelong: true,
 	}
 }
@@ -265,7 +261,7 @@ func (server *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	// 4.给客户端发送成功的ConnackMessage消息
 	// 从连线中读取连接消息，如果错误，则检查它是否正确一个连接错误。
 	// 如果是连接错误，请返回正确的连接错误
-	utils.MustPanic(conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(server.ConnectTimeout))))
+	utils.MustPanic(conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(server.cfg.ConnectTimeout))))
 
 	// 等待连接认证
 	req, resp, err := server.conAuth(conn)
@@ -276,21 +272,10 @@ func (server *Server) handleConnection(c io.Closer) (svc *service, err error) {
 	svc = &service{
 		id:          atomic.AddUint64(&gsvcid, 1),
 		client:      false,
-		clusterOpen: server.ConFig.Cluster.Enabled,
+		clusterOpen: server.cfg.Cluster.Enabled,
 
-		keepAlive:      int(req.KeepAlive()),
-		writeTimeout:   server.WriteTimeout,
-		connectTimeout: server.ConnectTimeout,
-		ackTimeout:     server.AckTimeout,
-		timeoutRetries: server.TimeoutRetries,
-
-		conn:              conn,
-		sessMgr:           server.sessMgr,
-		topicsMgr:         server.topicsMgr,
-		shareTopicMapNode: server.ShareTopicMapNode,
-		conFig:            server.ConFig,
-
-		middleware: server.middleware,
+		conn:   conn,
+		server: server,
 	}
 	err = server.getSession(svc, req, resp)
 	if err != nil {
@@ -322,7 +307,7 @@ func (server *Server) handleConnection(c io.Closer) (svc *service, err error) {
 // 连接认证
 func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messagev2.ConnackMessage, error) {
 	resp := messagev2.NewConnackMessage()
-	if !server.ConFig.Broker.CloseShareSub { // 简单处理，热修改需要考虑的东西有点复杂
+	if !server.cfg.Broker.CloseShareSub { // 简单处理，热修改需要考虑的东西有点复杂
 		resp.SetSharedSubscriptionAvailable(1)
 	}
 	// 从本次连接中获取到connectMessage
@@ -338,27 +323,27 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 	}
 
 	// 判断是否允许空client id
-	if len(req.ClientId()) == 0 && !server.ConFig.Broker.AllowZeroLengthClientId {
+	if len(req.ClientId()) == 0 && !server.cfg.Broker.AllowZeroLengthClientId {
 		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.CustomerIdentifierInvalid, []byte("the length of the client ID cannot be zero")))
 		return nil, nil, errors.New("the length of the client ID cannot be zero")
 	}
-	if server.ConFig.Broker.MaxKeepalive > 0 && req.KeepAlive() > server.ConFig.Broker.MaxKeepalive {
+	if server.cfg.Broker.MaxKeepalive > 0 && req.KeepAlive() > server.cfg.Broker.MaxKeepalive {
 		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.UnspecifiedError, []byte("the keepalive value exceeds the maximum value")))
 		return nil, nil, errors.New("the keepalive value exceeds the maximum value")
 	}
-	if server.ConFig.Broker.MaxPacketSize > 0 && req.Len() > int(server.ConFig.Broker.MaxPacketSize) { // 包大小限制
+	if server.cfg.Broker.MaxPacketSize > 0 && req.Len() > int(server.cfg.Broker.MaxPacketSize) { // 包大小限制
 		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.MessageTooLong, []byte("exceeds the maximum package size")))
 		return nil, nil, errors.New("exceeds the maximum package size")
 	}
-	resp.SetMaxPacketSize(server.ConFig.Broker.MaxPacketSize)
+	resp.SetMaxPacketSize(server.cfg.Broker.MaxPacketSize)
 
-	if server.ConFig.Broker.MaxQos < int(req.WillQos()) { // 遗嘱消息qos也需要遵循最大qos
+	if server.cfg.Broker.MaxQos < int(req.WillQos()) { // 遗嘱消息qos也需要遵循最大qos
 		writeMessage(conn, messagev2.NewDiscMessageWithCodeInfo(messagev2.UnsupportedQoSLevel, nil))
-		return nil, nil, errors.New("exceeds the max qos: " + strconv.Itoa(server.ConFig.Broker.MaxQos))
+		return nil, nil, errors.New("exceeds the max qos: " + strconv.Itoa(server.cfg.Broker.MaxQos))
 	}
-	resp.SetMaxQos(byte(server.ConFig.Broker.MaxQos)) // 设置最大qos等级
+	resp.SetMaxQos(byte(server.cfg.Broker.MaxQos)) // 设置最大qos等级
 
-	if server.ConFig.Broker.RetainAvailable { // 是否支持保留消息
+	if server.cfg.Broker.RetainAvailable { // 是否支持保留消息
 		resp.SetRetainAvailable(1)
 	} else {
 		if req.WillRetain() {
@@ -368,7 +353,7 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 		resp.SetRetainAvailable(0)
 	}
 
-	svcConf := server.ConFig.DefaultConfig.Server
+	svcConf := server.cfg.DefaultConfig.Server
 	if svcConf.RedirectOpen { // 重定向
 		dis := messagev2.NewDisconnectMessage()
 		if svcConf.RedirectIsForEver {
@@ -391,7 +376,7 @@ func (server *Server) conAuth(conn net.Conn) (*messagev2.ConnectMessage, *messag
 	// broker 的默认值
 	if req.KeepAlive() == 0 {
 		//设置默认的keepalive数，五分钟
-		req.SetKeepAlive(uint16(server.KeepAlive))
+		req.SetKeepAlive(uint16(server.cfg.Keepalive))
 	}
 
 	if req.RequestProblemInfo() == 0 {
@@ -486,27 +471,27 @@ func (server *Server) checkAndInitConfiguration() error {
 	var err error
 
 	server.configOnce.Do(func() {
-		if server.KeepAlive == 0 {
-			server.KeepAlive = consts.KeepAlive
+		if server.cfg.Keepalive == 0 {
+			server.cfg.Keepalive = consts.KeepAlive
 		}
 
-		if server.ConnectTimeout == 0 {
-			server.ConnectTimeout = consts.ConnectTimeout
+		if server.cfg.ConnectTimeout == 0 {
+			server.cfg.ConnectTimeout = consts.ConnectTimeout
 		}
 
-		if server.AckTimeout == 0 {
-			server.AckTimeout = consts.AckTimeout
+		if server.cfg.AckTimeout == 0 {
+			server.cfg.AckTimeout = consts.AckTimeout
 		}
 
-		if server.TimeoutRetries == 0 {
-			server.TimeoutRetries = consts.TimeoutRetries
+		if server.cfg.TimeoutRetries == 0 {
+			server.cfg.TimeoutRetries = consts.TimeoutRetries
 		}
 
 		// store
 		server.initStore()
 
 		auPlus := &sync.Map{} // make(map[string]authplus.AuthPlus)
-		for _, s := range server.AuthPlusProvider {
+		for _, s := range server.cfg.Allows {
 			auPlus.Store(s, authplus.NewDefaultAuth()) // TODO
 		}
 		server.authPlusAllows = auPlus
@@ -524,7 +509,7 @@ func (server *Server) checkAndInitConfiguration() error {
 		server.initMiddleware(middleware.WithConsole())
 
 		// 打印启动banner
-		printBanner(server.Version)
+		printBanner(server.cfg.ServerVersion)
 		return
 	})
 
@@ -542,7 +527,7 @@ func (server *Server) initMiddleware(option ...middleware.Option) {
 
 // 初始化存储
 func (server *Server) initStore() {
-	switch server.ConFig.Store.Model {
+	switch server.cfg.StoreModel {
 	case config.MongoStore:
 		server.SessionStore = mongorepo.NewSessionStore()
 		server.MessageStore = mongorepo.NewMessageStore()
@@ -554,13 +539,13 @@ func (server *Server) initStore() {
 		server.MessageStore = memImpl.NewMemMessageStore()
 	}
 	ctx := context.Background()
-	utils.MustPanic(server.SessionStore.Start(ctx, *server.ConFig))
-	utils.MustPanic(server.MessageStore.Start(ctx, *server.ConFig))
+	utils.MustPanic(server.SessionStore.Start(ctx, server.cfg))
+	utils.MustPanic(server.MessageStore.Start(ctx, server.cfg))
 }
 
 // 运行集群
 func (server *Server) runClusterComp() {
-	cfg := server.ConFig
+	cfg := server.cfg
 	if !cfg.Cluster.Enabled { // 集群服务启动
 		return
 	}
@@ -652,6 +637,10 @@ func (server *Server) getSession(svc *service, req *messagev2.ConnectMessage, re
 	cron.DelayTaskManager.Cancel(string(req.ClientId()))
 
 	return nil
+}
+
+func (server *Server) Wait() {
+	<-server.quit
 }
 
 // 打印启动banner

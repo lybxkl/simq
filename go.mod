@@ -9,6 +9,9 @@ require (
 	github.com/buguang01/util v1.1.14
 	github.com/dubbogo/gost v1.11.20
 	github.com/garyburd/redigo v1.6.2
+	github.com/go-playground/locales v0.14.0
+	github.com/go-playground/universal-translator v0.18.0
+	github.com/go-playground/validator/v10 v10.10.0
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/klauspost/compress v1.10.7 // indirect
 	github.com/onsi/gomega v1.14.0 // indirect

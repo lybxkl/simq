@@ -17,7 +17,7 @@ type eventStore struct {
 func NewEventStore() store2.EventStore {
 	return &eventStore{}
 }
-func (e *eventStore) Start(ctx context.Context, config config.SIConfig) error {
+func (e *eventStore) Start(ctx context.Context, config *config.SIConfig) error {
 	var err error
 	storeCfg := config.Store.Mongo
 	e.c, err = mongoorm.NewMongoOrm(storeCfg.Source, storeCfg.MinPoolSize, storeCfg.MaxPoolSize, storeCfg.MaxConnIdleTime)

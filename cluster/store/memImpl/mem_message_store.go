@@ -23,7 +23,7 @@ func NewMemMessageStore() store2.MessageStore {
 		retainTable: make(map[string]*messagev2.PublishMessage),
 	}
 }
-func (m *memMessageStore) Start(ctx context.Context, config config.SIConfig) error {
+func (m *memMessageStore) Start(ctx context.Context, config *config.SIConfig) error {
 	return nil
 }
 

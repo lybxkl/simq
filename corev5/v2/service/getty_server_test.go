@@ -7,11 +7,7 @@ import (
 
 func TestServer(t *testing.T) {
 	cfg := config2.GetConfig()
-	svc := &Server{
-		ConFig:       &cfg,
-		WriteTimeout: 100,
-		KeepAlive:    50,
-	}
+	svc := NewServer(cfg)
 	svc.ListenAndServeByGetty(":1883", 1000)
 	select {}
 }

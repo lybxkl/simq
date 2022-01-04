@@ -25,7 +25,7 @@ type SessionRepo struct {
 func NewSessionStore() store2.SessionStore {
 	return &SessionRepo{}
 }
-func (s *SessionRepo) Start(ctx context.Context, config config.SIConfig) error {
+func (s *SessionRepo) Start(ctx context.Context, config *config.SIConfig) error {
 	var err error
 	storeCfg := config.Store.Mysql
 	s.c, err = mysql.NewMysqlOrm(storeCfg.Source, storeCfg.PoolSize)
