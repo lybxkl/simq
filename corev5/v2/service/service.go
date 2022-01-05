@@ -98,6 +98,42 @@ type service struct {
 	server *Server
 }
 
+func (server *Server) NewGettyService(gettySession getty.Session) (*service, *message.ConnectMessage, *message.ConnackMessage, error) {
+	// 等待连接认证
+	req, resp, err := server.conAuth(gettySession.Conn())
+	if err != nil || resp == nil {
+		return nil, nil, nil, err
+	}
+
+	id := atomic.AddUint64(&gsvcid, 1)
+
+	sess, err := server.getSession(id, req, resp)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	ccId := fmt.Sprintf("%s%d/%s", server.cfg.AutoIdPrefix, id, sess.IDs())
+
+	svc := &service{
+		clusterBelong: false,
+		clusterOpen:   server.cfg.Cluster.Enabled,
+		id:            atomic.AddUint64(&gsvcid, 1),
+		ccid:          ccId,
+		sess:          sess,
+		gettySession:  gettySession,
+		conn:          gettySession.Conn(),
+		closed:        0,
+		done:          make(chan struct{}),
+		sign:          NewSign(server.cfg.Quota, server.cfg.QuotaLimit),
+		quota:         server.cfg.Quota,
+		limit:         server.cfg.QuotaLimit,
+		server:        server,
+	}
+
+	// 这个是发送给订阅者的，是每个订阅者都有一份的方法
+	svc.onpub = svc.onPub()
+	return svc, req, resp, nil
+}
+
 // 运行接入的连接，会产生三个协程异步逻辑处理，当前不会阻塞
 func (svc *service) start(resp *message.ConnackMessage) error {
 	var err error

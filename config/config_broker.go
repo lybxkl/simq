@@ -11,7 +11,8 @@ type Broker struct {
 	Ca            string `toml:"ca"`
 	CloseShareSub bool   `toml:"closeShareSub"`
 
-	ServerTaskPoolSize int `toml:"server_task_pool_size" validate:"default=2000"`
+	ServerTaskPoolSize      int `toml:"server_task_pool_size" validate:"default=2000"`
+	GettyServerTaskPoolSize int `toml:"getty_server_task_pool_size" validate:"default=10000"`
 
 	AllowZeroLengthClientId    bool   `toml:"allow_zero_length_clientId"`
 	MaxQos                     int    `toml:"max_qos"  validate:"default=2"`                        // 支持的最大qos，默认2，不得低于1

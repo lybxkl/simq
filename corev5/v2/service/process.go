@@ -12,6 +12,7 @@ import (
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/bufpool"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/util/cron"
 	"gitee.com/Ljolan/si-mqtt/logger"
+	"gitee.com/Ljolan/si-mqtt/utils"
 	"io"
 	"net"
 	"reflect"
@@ -514,51 +515,38 @@ func (svc *service) processPublish(msg *messagev2.PublishMessage) error {
 
 // For SUBSCRIBE messagev5, we should add subscriber, then send back SUBACK
 func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
+
+	// 在编解码处已经限制了至少有一个主题过滤器/订阅选项对
+
 	resp := messagev2.NewSubackMessage()
 	resp.SetPacketId(msg.PacketId())
 
-	// Subscribe to the different topics
 	//订阅不同的主题
-	var retcodes []byte
-
-	tps := msg.Topics()
-	qos := msg.Qos()
+	var (
+		retcodes []byte
+		tps      = msg.Topics()
+		qos      = msg.Qos()
+	)
 
 	svc.rmsgs = svc.rmsgs[0:0]
-	tmpResCode := make([]byte, 0)
-	unSupport := false
+
 	for _, t := range tps {
 		// 简单处理，直接断开连接，返回原因码
-		if svc.server.cfg.Broker.CloseShareSub && len(t) > 6 && reflect.DeepEqual(t[:6], []byte{'$', 's', 'h', 'a', 'r', 'e'}) {
-			//dis := messagev5.NewDisconnectMessage()
-			//dis.SetReasonCode(messagev5.UnsupportedSharedSubscriptions)
-			//if _, err := svc.writeMessage(resp); err != nil {
-			//	return err
-			//}
-			unSupport = true
-			tmpResCode = append(tmpResCode, messagev2.UnsupportedSharedSubscriptions.Value())
-		} else {
-			tmpResCode = append(tmpResCode, messagev2.UnspecifiedError.Value())
+		if svc.server.cfg.CloseShareSub && utils.IsShareSub(t) {
+			return messagev2.NewCodeErr(messagev2.UnsupportedSharedSubscriptions)
+		} else if !svc.server.cfg.CloseShareSub && utils.IsShareSub(t) && msg.TopicNoLocal(t) {
+			// 共享订阅时把非本地选项设为1将造成协议错误（Protocol Error）
+			return messagev2.NewCodeErr(messagev2.ProtocolError)
 		}
-	}
-	switch {
-	case unSupport && len(tmpResCode) > 0:
-		_ = resp.AddReasonCodes(tmpResCode)
-		if _, err := svc.writeMessage(resp); err != nil {
-			err = messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
-			return err
-		}
-		return nil
-	case len(tmpResCode) == 0:
-		// 正常情况不会走到此处，在编解码处已经限制了至少有一个主题过滤器/订阅选项对
-		return messagev2.NewCodeErr(messagev2.InvalidMessage, ErrInvalidSubscriber.Error())
 	}
 
 	for i, t := range tps {
-		noLocal := msg.TopicNoLocal(t)
-		retainAsPublished := msg.TopicRetainAsPublished(t)
-		retainHandling := msg.TopicRetainHandling(t)
-		tp := make([]byte, len(t))
+		var (
+			noLocal           = msg.TopicNoLocal(t)
+			retainAsPublished = msg.TopicRetainAsPublished(t)
+			retainHandling    = msg.TopicRetainHandling(t)
+			tp                = make([]byte, len(t))
+		)
 		copy(tp, t) // 必须copy
 		sub := topics.Sub{
 			Topic:             tp,
@@ -568,59 +556,60 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 			RetainHandling:    retainHandling,
 			SubIdentifier:     msg.SubscriptionIdentifier(),
 		}
+
 		rqos, err := svc.server.topicsMgr.Subscribe(sub, &svc.onpub)
 		if err != nil {
 			return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 		}
+
 		err = svc.sess.AddTopic(sub)
+		if err != nil {
+			return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
+		}
 		retcodes = append(retcodes, rqos)
 
-		// yeah I am not checking errors here. If there's an error we don't want the
-		// subscription to stop, just let it go.
-		//是的，我没有检查错误。如果有错误，我们不想
-		//订阅要停止，就放手吧。
-		if retainHandling == messagev2.NoSendRetain {
-			continue
-		} else if retainHandling == messagev2.CanSendRetain {
-			err = svc.server.topicsMgr.Retained(t, &svc.rmsgs)
-			if err != nil {
-				return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
-			}
-			logger.Logger.Debugf("(%s) topic = %s, retained count = %d", svc.cid(), t, len(svc.rmsgs))
-		} else if retainHandling == messagev2.NoExistSubSendRetain {
-			// 已存在订阅的情况下不发送保留消息是很有用的，比如重连完成时客户端不确定订阅是否在之前的会话连接中被创建。
-			oldTp, _ := svc.sess.Topics()
-
-			existThisTopic := false
-			for jk := 0; jk < len(oldTp); jk++ {
-				if len(oldTp[jk].Topic) != len(tp) {
-					continue
-				}
-				otp := oldTp[jk].Topic
-				for jj := 0; jj < len(otp); jj++ {
-					if otp[jj] != tp[jj] {
-						goto END
-					}
-				}
-				// 存在就不发送了
-				existThisTopic = true
+		if !utils.IsShareSub(t) { // 共享订阅不发送任何保留消息。
+			//没有检查错误。如果有错误，我们不想订阅要停止，就return。
+			switch retainHandling {
+			case messagev2.NoSendRetain:
 				break
-			END:
-			}
-			if !existThisTopic {
+			case messagev2.CanSendRetain:
 				err = svc.server.topicsMgr.Retained(t, &svc.rmsgs)
 				if err != nil {
 					return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
 				}
 				logger.Logger.Debugf("(%s) topic = %s, retained count = %d", svc.cid(), t, len(svc.rmsgs))
+			case messagev2.NoExistSubSendRetain:
+				// 已存在订阅的情况下不发送保留消息是很有用的，比如重连完成时客户端不确定订阅是否在之前的会话连接中被创建。
+				oldTp, _ := svc.sess.Topics()
+
+				existThisTopic := false
+				for jk := 0; jk < len(oldTp); jk++ {
+					if len(oldTp[jk].Topic) != len(tp) {
+						continue
+					}
+					otp := oldTp[jk].Topic
+					for jj := 0; jj < len(otp); jj++ {
+						if otp[jj] != tp[jj] {
+							goto END
+						}
+					}
+					// 存在就不发送了
+					existThisTopic = true
+					break
+				END:
+				}
+				if !existThisTopic {
+					err = svc.server.topicsMgr.Retained(t, &svc.rmsgs)
+					if err != nil {
+						return messagev2.NewCodeErr(messagev2.ServiceBusy, err.Error())
+					}
+					logger.Logger.Debugf("(%s) topic = %s, retained count = %d", svc.cid(), t, len(svc.rmsgs))
+				}
 			}
 		}
-
-		/**
-		* 可以在这里向其它集群节点发送添加主题消息
-		**/
-
 	}
+
 	logger.Logger.Infof("客户端：%s，订阅主题：%s，qos：%d，retained count = %d", svc.cid(), tps, qos, len(svc.rmsgs))
 	if err := resp.AddReasonCodes(retcodes); err != nil {
 		return messagev2.NewCodeErr(messagev2.UnspecifiedError, err.Error())
@@ -631,6 +620,7 @@ func (svc *service) processSubscribe(msg *messagev2.SubscribeMessage) error {
 	}
 
 	svc.processToCluster(tps, msg)
+
 	for _, rm := range svc.rmsgs {
 		// 下面不用担心因为又重新设置为old qos而有问题，因为在内部ackqueue都已经encode了
 		old := rm.QoS()

@@ -277,7 +277,7 @@ func (server *Server) handleConnection(c io.Closer) (svc *service, err error) {
 		conn:   conn,
 		server: server,
 	}
-	err = server.getSession(svc, req, resp)
+	svc.sess, err = server.getSession(svc.id, req, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +563,7 @@ func (server *Server) runClusterComp() {
 	logger.Logger.Infof("cluster startup mode: \"%v\", run success", cfg.Cluster.Model)
 }
 
-func (server *Server) getSession(svc *service, req *messagev2.ConnectMessage, resp *messagev2.ConnackMessage) error {
+func (server *Server) getSession(id uint64, req *messagev2.ConnectMessage, resp *messagev2.ConnackMessage) (sessions.Session, error) {
 	//如果cleanession设置为0，服务器必须恢复与客户端基于当前会话的状态，由客户端识别标识符。
 	//如果没有会话与客户端标识符相关联, 服务器必须创建一个新的会话。
 	//
@@ -574,12 +574,12 @@ func (server *Server) getSession(svc *service, req *messagev2.ConnectMessage, re
 
 	//检查客户端是否提供了ID，如果没有，生成一个并设置 清理会话。
 	if len(req.ClientId()) == 0 {
-		req.SetClientId([]byte(fmt.Sprintf("internalclient%d", svc.id)))
+		req.SetClientId([]byte(fmt.Sprintf("internalclient%d", id)))
 		req.SetCleanSession(true)
 	}
 
 	cid := string(req.ClientId())
-
+	var sess sessions.Session
 	//如果没有设置清除会话，请检查会话存储是否存在会话。
 	//如果找到，返回。
 	// TODO 通知其它节点断开那边的该客户端ID的连接，如果有的话
@@ -587,23 +587,23 @@ func (server *Server) getSession(svc *service, req *messagev2.ConnectMessage, re
 	// TODO 会话过期间隔 > 0 , 需要存储session，==0 则在连接断开时清除session
 	if !req.CleanStart() { // 使用旧session
 		// FIXME 当断线前是cleanStare=true，我们使用的是mem，但是重新连接时，使用了false，how to deal?
-		if svc.sess, err = server.sessMgr.Get(cid, req.CleanStart(), req.SessionExpiryInterval()); err == nil {
+		if sess, err = server.sessMgr.Get(cid, req.CleanStart(), req.SessionExpiryInterval()); err == nil {
 			// TODO 这里是懒删除，最好再加个定时删除
-			if svc.sess.Cmsg().SessionExpiryInterval() == 0 ||
-				(svc.sess.OfflineTime()+int64(svc.sess.Cmsg().SessionExpiryInterval()) <= time.Now().UnixNano()) {
+			if sess.Cmsg().SessionExpiryInterval() == 0 ||
+				(sess.OfflineTime()+int64(sess.Cmsg().SessionExpiryInterval()) <= time.Now().UnixNano()) {
 				// 删除session ， 因为已经过期了
-				svc.sess = nil
+				sess = nil
 				err = server.SessionStore.ClearSession(context.Background(), cid, true)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				server.sessMgr.Del(cid)
 			} else {
 				// 如果在该节点，则可以直接使用该session，前提是集群节点通知断开、清理session是成功的
 				resp.SetSessionPresent(true)
 
-				if err = svc.sess.Update(req); err != nil {
-					return err
+				if err = sess.Update(req); err != nil {
+					return nil, err
 				}
 			}
 		} else {
@@ -613,30 +613,30 @@ func (server *Server) getSession(svc *service, req *messagev2.ConnectMessage, re
 		// 删除旧数据，清空旧连接的离线消息和未完成的过程消息，会话数据
 		err = server.SessionStore.ClearSession(context.Background(), cid, true)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		server.sessMgr.Del(cid)
 	}
 	//如果没有session则创建一个
-	if svc.sess == nil {
+	if sess == nil {
 		// 这里因为前面通知其它节点断开旧连接，所以这里可以直接New
-		if svc.sess, err = server.sessMgr.New(cid, req.CleanStart(), req.SessionExpiryInterval()); err != nil {
-			return err
+		if sess, err = server.sessMgr.New(cid, req.CleanStart(), req.SessionExpiryInterval()); err != nil {
+			return nil, err
 		}
-		svc.sess.(store.Store).SetStore(server.SessionStore, server.MessageStore)
+		sess.(store.Store).SetStore(server.SessionStore, server.MessageStore)
 
 		// 新建的present设置为false
 		resp.SetSessionPresent(false)
 		// 从当前connectMessage初始化该session
-		if err = svc.sess.Init(req); err != nil {
-			return err
+		if err = sess.Init(req); err != nil {
+			return nil, err
 		}
 	}
 
 	// 取消任务
 	cron.DelayTaskManager.Cancel(string(req.ClientId()))
 
-	return nil
+	return sess, nil
 }
 
 func (server *Server) Wait() {

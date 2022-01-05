@@ -35,9 +35,11 @@ func (closer closer) Close() error {
 	taskGPool.Release()
 	return nil
 }
+
 func submit(f func()) {
 	dealAntsErr(taskGPool.Submit(f))
 }
+
 func dealAntsErr(err error) {
 	if err == nil {
 		return

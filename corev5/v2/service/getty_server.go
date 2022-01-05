@@ -49,6 +49,11 @@ func (server *Server) ListenAndServeByGetty(uri string, taskPoolSize int) error 
 
 	options = append(options, getty.WithServerTaskPool(gxsync.NewTaskPoolSimple(taskPoolSize)))
 
+	err = newBus(server.cfg.GettyServerTaskPoolSize)
+	if err != nil {
+		return err
+	}
+
 	sev := getty.NewTCPServer(options...)
 	server.gServer = sev
 
@@ -65,22 +70,8 @@ func (server *Server) ListenAndServeByGetty(uri string, taskPoolSize int) error 
 }
 
 func (server *Server) OnOpen(session getty.Session) error {
-	// 等待连接认证
-	req, resp, err := server.conAuth(session.Conn())
-	if err != nil || resp == nil {
-		return err
-	}
-	svc := &service{
-		id:          atomic.AddUint64(&gsvcid, 1),
-		client:      false,
-		clusterOpen: server.cfg.Cluster.Enabled,
 
-		conn:         session.Conn(),
-		gettySession: session,
-		server:       server,
-	}
-
-	err = server.getSession(svc, req, resp)
+	svc, req, resp, err := server.NewGettyService(session)
 	if err != nil {
 		return err
 	}
@@ -88,25 +79,21 @@ func (server *Server) OnOpen(session getty.Session) error {
 	session.SetAttribute(ServAttr, svc)
 	session.SetAttribute(CronPeriod, int64(req.KeepAlive()))
 
-	svc.ccid = fmt.Sprintf("%s%d/%s", svc.server.cfg.AutoIdPrefix, svc.id, svc.sess.IDs())
-	svc.sign = NewSign(svc.quota, svc.limit)
-
-	// 这个是发送给订阅者的，是每个订阅者都有一份的方法
-	svc.onpub = svc.onPub()
-
-	//如果这是一个恢复的会话，那么添加它之前订阅的任何主题
-	err = svc.reloadSub()
-	if err != nil {
-		return err
-	}
-
 	resp.SetReasonCode(messagev2.Success)
 	_, _, err = session.WritePkg(resp, time.Second*time.Duration(svc.server.cfg.WriteTimeout))
 	if err != nil {
 		return err
 	}
 
-	svc.sendOfflineMsg()
+	submitInitEvTask(func() {
+		//如果这是一个恢复的会话，那么添加它之前订阅的任何主题
+		err = svc.reloadSub()
+		if err != nil {
+			logger.Logger.Error(err.Error())
+		}
+		// 发送离线消息
+		svc.sendOfflineMsg()
+	})
 
 	// FIXME 是否主动发送未完成确认的过程消息，还是等客户端操作
 	return nil
@@ -169,13 +156,14 @@ func (server *Server) OnMessage(session getty.Session, m interface{}) {
 		return
 	}
 	svc := svs.(*service)
-	go func() {
+
+	submitInitEvTask(func() {
 		err := svc.processIncoming(m.(messagev2.Message))
 		if err != nil {
 			// TODO
 		}
 		svc.middlewareHandle(m.(messagev2.Message))
-	}()
+	})
 }
 
 func (server *Server) OnCron(session getty.Session) {
