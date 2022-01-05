@@ -314,7 +314,7 @@ func (svc *service) writeMessage(msg messagev2.Message) (int, error) {
 	// 当连接消息中请求问题信息为0，则需要去除部分数据再发送
 	svc.delRequestRespInfo(msg)
 
-	if svc.gettySession != nil {
+	if svc.gettySession != nil && !svc.gettySession.IsClosed() {
 		return svc.gettyWriteMsg(msg)
 	}
 

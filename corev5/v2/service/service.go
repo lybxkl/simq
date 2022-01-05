@@ -294,35 +294,28 @@ func (svc *service) stop() {
 		svc.conn.Close()
 	}
 
-	svc.in.Close()
-	svc.out.Close()
+	if svc.in != nil {
+		svc.in.Close()
+	}
+	if svc.out != nil {
+		svc.out.Close()
+	}
 
 	// Wait for all the goroutines to stop.
-	svc.wgStopped.Wait()
+	if svc.gettySession == nil {
+		svc.wgStopped.Wait()
+	}
 
 	//打印该客户端生命周期内的接收字节与消息条数、发送字节与消息条数
 	logger.Logger.Debugf("(%s) Received %d bytes in %d messages.", svc.cid(), svc.inStat.bytes, svc.inStat.msgs)
 	logger.Logger.Debugf("(%s) Sent %d bytes in %d messages.", svc.cid(), svc.outStat.bytes, svc.outStat.msgs)
 
-	// Unsubscribe from all the topics for svc client, only for the server side though
-	// 取消订阅该客户机的所有主题，但只针对服务器端
-	if !svc.client && svc.sess != nil {
-		tpc, err := svc.sess.Topics()
-		if err != nil {
-			logger.Logger.Errorf("(%s/%d): %v", svc.cid(), svc.id, err)
-		} else {
-			for _, t := range tpc {
-				if err := svc.server.topicsMgr.Unsubscribe(t.Topic, &svc.onpub); err != nil {
-					logger.Logger.Errorf("(%s): Error unsubscribing topic %q: %v", svc.cid(), t, err)
-				}
-			}
-		}
-	}
+	// 取消订阅该客户机的所有主题
+	svc.unSubAll()
+
 	//如果设置了遗嘱消息，则发送遗嘱消息，当是收到正常DisConnect消息产生的发送遗嘱消息行为，会在收到消息处处理
-	// Publish will messagev if WillFlag is set. Server side only.
-	if !svc.client && svc.sess.Cmsg().WillFlag() {
+	if svc.sess.Cmsg().WillFlag() {
 		logger.Logger.Infof("(%s) service/stop: connection unexpectedly closed. Sending Will：.", svc.cid())
-		//svc.onPublish(svc.sess.Will())
 		svc.sendWillMsg()
 	}
 
@@ -335,6 +328,7 @@ func (svc *service) stop() {
 	svc.conn = nil
 	svc.in = nil
 	svc.out = nil
+	svc.gettySession = nil
 }
 
 // 发布消息给客户端

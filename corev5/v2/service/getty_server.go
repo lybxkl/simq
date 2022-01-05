@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	messagev2 "gitee.com/Ljolan/si-mqtt/corev5/v2/message"
-	"gitee.com/Ljolan/si-mqtt/corev5/v2/sessions"
 	"gitee.com/Ljolan/si-mqtt/corev5/v2/topics"
 	"gitee.com/Ljolan/si-mqtt/logger"
 	"gitee.com/Ljolan/si-mqtt/utils"
@@ -60,7 +59,7 @@ func (server *Server) ListenAndServeByGetty(uri string, taskPoolSize int) error 
 	sev.RunEventLoop(func(session getty.Session) error {
 		session.SetPkgHandler(&packageHandler{})
 		session.SetEventListener(server)
-		session.SetReadTimeout(time.Second * time.Duration(server.cfg.Keepalive))
+		session.SetReadTimeout(time.Second * time.Duration(server.cfg.ReadTimeout))
 		session.SetWriteTimeout(time.Second * time.Duration(server.cfg.WriteTimeout))
 		session.SetCronPeriod(1000) // 单位millisecond
 		session.SetAttribute(CronPeriod, 10)
@@ -108,45 +107,7 @@ func (server *Server) OnError(session getty.Session, err error) {
 func (server *Server) OnClose(session getty.Session) {
 	// session 断线处理
 	svc := session.GetAttribute(ServAttr).(*service)
-
-	defer func() {
-		if err := recover(); err != nil {
-			logger.Logger.Errorf("(%s) Recovering from panic: %v", svc.cid(), err)
-		} else {
-			logger.Logger.Infof("(%s) closed session", svc.cid())
-		}
-	}()
-
-	doit := atomic.CompareAndSwapInt64(&svc.closed, 0, 1)
-	if !doit {
-		return
-	}
-	if svc.done != nil {
-		logger.Logger.Debugf("(%s) closing svc.done", svc.cid())
-		close(svc.done)
-	}
-
-	logger.Logger.Debugf("(%s) %s.", svc.cid(), session.Stat())
-
-	// 取消订阅该客户机的所有主题，但只针对服务器端
-	svc.unSubAll()
-
-	//如果设置了遗嘱消息，则发送遗嘱消息，当是收到正常DisConnect消息产生的发送遗嘱消息行为，会在收到消息处处理
-	if svc.sess.Cmsg().WillFlag() {
-		logger.Logger.Infof("(%s) service/stop: connection unexpectedly closed. Sending Will：.", svc.cid())
-		//svc.onPublish(svc.sess.Will())
-		svc.sendWillMsg()
-	}
-
-	// 直接删除session，重连时重新初始化
-	svc.sess.SetStatus(sessions.OFFLINE)
-	if svc.server.sessMgr != nil { // svc.sess.Cmsg().CleanSession() &&
-		svc.server.sessMgr.Del(svc.sess.ID())
-	}
-
-	svc.conn = nil
-	svc.in = nil
-	svc.out = nil
+	svc.stop()
 }
 
 func (server *Server) OnMessage(session getty.Session, m interface{}) {
@@ -160,7 +121,14 @@ func (server *Server) OnMessage(session getty.Session, m interface{}) {
 	submitInitEvTask(func() {
 		err := svc.processIncoming(m.(messagev2.Message))
 		if err != nil {
-			// TODO
+			if reasonErr, ok := err.(*messagev2.Code); ok {
+				_, err = svc.writeMessage(messagev2.NewDiscMessageWithCodeInfo(reasonErr.ReasonCode, []byte(reasonErr.Error())))
+				if err != nil {
+					logger.Logger.Error(err)
+				}
+			}
+			session.Close()
+			return
 		}
 		svc.middlewareHandle(m.(messagev2.Message))
 	})

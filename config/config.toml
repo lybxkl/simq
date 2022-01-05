@@ -83,7 +83,8 @@ serverVersion = "5.0.1"
 [defaultConfig]
     [defaultConfig.connect]
         keepalive=300 # 单位s，可以作为读超时
-        writeTimeout = 30 # 单位s, 写超时
+        writeTimeout = 3 # 单位s, 写超时
+        readTimeout = 3
         connectTimeout=2 # 单位s
         ackTimeout=20 #单位s
         timeOutRetries=3 # 超时重试次数
